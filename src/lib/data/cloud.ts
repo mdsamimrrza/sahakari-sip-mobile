@@ -26,6 +26,7 @@ import { csvRowSchema, entrySchema } from "../schemas/entry";
 import { fundConfigSchema, updateLatestNavSchema } from "../schemas/fund-config";
 import { getSupabase } from "../supabase";
 import { computeDashboardData, computeFundRolloverCash } from "./analytics";
+import { cacheGet, cacheSet, cacheInvalidate } from "./cache";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type CsvImportRow,
@@ -104,6 +105,12 @@ export class CloudStore implements DataStore {
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
+    // Serve the last computed dashboard instantly on focus/revisit;
+    // mutations clear this cache so it's never stale after a write.
+    const cacheKey = `dash.cloud.${userId}.${fundId}`;
+    const cached = cacheGet<DashboardData>(cacheKey);
+    if (cached) return { success: true, data: cached };
+
     const { data: fundsRaw, error: fundsError } = await this.db
       .from("fund_config")
       .select("*")
@@ -149,20 +156,19 @@ export class CloudStore implements DataStore {
       created_at: "",
     }));
 
-    return {
-      success: true,
-      data: computeDashboardData({
-        funds,
-        entries: entries.map((e) => ({
-          ...e,
-          amount: Number(e.amount),
-          nav: Number(e.nav),
-          units: Number(e.units),
-        })),
-        navHistory,
-        fundId,
-      }),
-    };
+    const data = computeDashboardData({
+      funds,
+      entries: entries.map((e) => ({
+        ...e,
+        amount: Number(e.amount),
+        nav: Number(e.nav),
+        units: Number(e.units),
+      })),
+      navHistory,
+      fundId,
+    });
+    cacheSet(cacheKey, data);
+    return { success: true, data };
   }
 
   // ------------------------------------------------------------
@@ -173,6 +179,10 @@ export class CloudStore implements DataStore {
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
+    const cacheKey = `funds.cloud.${userId}`;
+    const cached = cacheGet<FundConfig[]>(cacheKey);
+    if (cached) return { success: true, data: cached };
+
     const { data, error } = await this.db
       .from("fund_config")
       .select("*")
@@ -181,12 +191,15 @@ export class CloudStore implements DataStore {
       .order("created_at", { ascending: true });
 
     if (error) return { success: false, error: error.message };
-    return { success: true, data: (data ?? []) as FundConfig[] };
+    const funds = (data ?? []) as FundConfig[];
+    cacheSet(cacheKey, funds);
+    return { success: true, data: funds };
   }
 
   async createFundConfig(
     input: FundConfigInput
   ): Promise<ActionResult<FundConfig>> {
+    cacheInvalidate();
     const parsed = fundConfigSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -228,6 +241,7 @@ export class CloudStore implements DataStore {
     id: string,
     input: FundConfigInput
   ): Promise<ActionResult<FundConfig>> {
+    cacheInvalidate();
     const parsed = fundConfigSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -284,6 +298,7 @@ export class CloudStore implements DataStore {
   }
 
   async deleteFundConfig(id: string): Promise<ActionResult> {
+    cacheInvalidate();
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
@@ -317,6 +332,7 @@ export class CloudStore implements DataStore {
   }
 
   async updateLatestNav(input: LatestNavInput): Promise<ActionResult> {
+    cacheInvalidate();
     const parsed = updateLatestNavSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -365,6 +381,10 @@ export class CloudStore implements DataStore {
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
+    const cacheKey = `entries.cloud.${userId}.${fundId ?? "all"}.${page}.${pageSize}.${sortOrder}`;
+    const cached = cacheGet<{ entries: Entry[]; total: number }>(cacheKey);
+    if (cached) return { success: true, data: cached };
+
     let query = this.db
       .from("entries")
       .select("*", { count: "exact" })
@@ -379,13 +399,13 @@ export class CloudStore implements DataStore {
     const { data, count, error } = await query;
     if (error) return { success: false, error: error.message };
 
-    return {
-      success: true,
-      data: { entries: (data ?? []) as Entry[], total: count ?? 0 },
-    };
+    const result = { entries: (data ?? []) as Entry[], total: count ?? 0 };
+    cacheSet(cacheKey, result);
+    return { success: true, data: result };
   }
 
   async createEntry(input: EntryInput): Promise<ActionResult<Entry>> {
+    cacheInvalidate();
     const parsed = entrySchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -457,6 +477,7 @@ export class CloudStore implements DataStore {
     id: string,
     input: EntryInput
   ): Promise<ActionResult<Entry>> {
+    cacheInvalidate();
     const parsed = entrySchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -519,6 +540,7 @@ export class CloudStore implements DataStore {
   }
 
   async deleteEntry(id: string): Promise<ActionResult> {
+    cacheInvalidate();
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
@@ -538,6 +560,7 @@ export class CloudStore implements DataStore {
     fundId: string,
     rows: CsvImportRow[]
   ): Promise<ActionResult<CsvImportResult>> {
+    cacheInvalidate();
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
@@ -653,6 +676,10 @@ export class CloudStore implements DataStore {
     const userId = await this.dataUid();
     if (!userId) return [];
 
+    const cacheKey = `navhist.cloud.${userId}.${fundId ?? "all"}`;
+    const cached = cacheGet<NavHistoryRow[]>(cacheKey);
+    if (cached) return cached;
+
     let query = this.db
       .from("nav_history")
       .select("*")
@@ -662,7 +689,9 @@ export class CloudStore implements DataStore {
     if (fundId && fundId !== "all") query = query.eq("fund_id", fundId);
 
     const { data } = await query;
-    return (data ?? []) as NavHistoryRow[];
+    const rows = (data ?? []) as NavHistoryRow[];
+    cacheSet(cacheKey, rows);
+    return rows;
   }
 
   // ------------------------------------------------------------
@@ -705,6 +734,10 @@ export class CloudStore implements DataStore {
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
+    const cacheKey = `notifs.cloud.${userId}`;
+    const cached = cacheGet<NotificationItem[]>(cacheKey);
+    if (cached) return { success: true, data: cached };
+
     const { data, error } = await this.db
       .from("notifications_log")
       .select("id, title, body, type, url, is_read, created_at")
@@ -713,10 +746,13 @@ export class CloudStore implements DataStore {
       .limit(20);
 
     if (error) return { success: false, error: error.message };
-    return { success: true, data: (data ?? []) as NotificationItem[] };
+    const items = (data ?? []) as NotificationItem[];
+    cacheSet(cacheKey, items);
+    return { success: true, data: items };
   }
 
   async markNotificationRead(id: string): Promise<ActionResult> {
+    cacheInvalidate();
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
@@ -731,6 +767,7 @@ export class CloudStore implements DataStore {
   }
 
   async markAllNotificationsRead(): Promise<ActionResult> {
+    cacheInvalidate();
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 

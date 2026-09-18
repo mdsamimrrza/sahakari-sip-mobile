@@ -28,6 +28,7 @@ import { DP_CHARGE } from "../constants";
 import { csvRowSchema, entrySchema } from "../schemas/entry";
 import { fundConfigSchema, updateLatestNavSchema } from "../schemas/fund-config";
 import { computeDashboardData, computeFundRolloverCash } from "./analytics";
+import { cacheGet, cacheSet, cacheInvalidate } from "./cache";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type CsvImportRow,
@@ -133,6 +134,10 @@ export class LocalStore implements DataStore {
   async getDashboardData(
     fundId = "all"
   ): Promise<ActionResult<DashboardData>> {
+    const cacheKey = `dash.local.${this.userId}.${fundId}`;
+    const cached = cacheGet<DashboardData>(cacheKey);
+    if (cached) return { success: true, data: cached };
+
     const funds = (await this.funds()).filter((f) => f.is_active !== false);
     const allEntries = await this.entries();
     const entries =
@@ -148,15 +153,14 @@ export class LocalStore implements DataStore {
       (r) => !fundId || fundId === "all" || r.fund_id === fundId
     );
 
-    return {
-      success: true,
-      data: computeDashboardData({
-        funds,
-        entries: sorted,
-        navHistory,
-        fundId,
-      }),
-    };
+    const data = computeDashboardData({
+      funds,
+      entries: sorted,
+      navHistory,
+      fundId,
+    });
+    cacheSet(cacheKey, data);
+    return { success: true, data };
   }
 
   // ------------------------------------------------------------
@@ -164,15 +168,21 @@ export class LocalStore implements DataStore {
   // ------------------------------------------------------------
 
   async getFundConfigs(): Promise<ActionResult<FundConfig[]>> {
+    const cacheKey = `funds.local.${this.userId}`;
+    const cached = cacheGet<FundConfig[]>(cacheKey);
+    if (cached) return { success: true, data: cached };
+
     const funds = (await this.funds())
       .filter((f) => f.is_active !== false)
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    cacheSet(cacheKey, funds);
     return { success: true, data: funds };
   }
 
   async createFundConfig(
     input: FundConfigInput
   ): Promise<ActionResult<FundConfig>> {
+    cacheInvalidate();
     const parsed = fundConfigSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -206,6 +216,7 @@ export class LocalStore implements DataStore {
     id: string,
     input: FundConfigInput
   ): Promise<ActionResult<FundConfig>> {
+    cacheInvalidate();
     const parsed = fundConfigSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -241,6 +252,7 @@ export class LocalStore implements DataStore {
   }
 
   async deleteFundConfig(id: string): Promise<ActionResult> {
+    cacheInvalidate();
     const entries = await this.entries();
     const count = entries.filter((e) => e.fund_id === id).length;
 
@@ -268,6 +280,7 @@ export class LocalStore implements DataStore {
   }
 
   async updateLatestNav(input: LatestNavInput): Promise<ActionResult> {
+    cacheInvalidate();
     const parsed = updateLatestNavSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -303,6 +316,10 @@ export class LocalStore implements DataStore {
   ): Promise<ActionResult<{ entries: Entry[]; total: number }>> {
     const { fundId, page = 1, pageSize = 20, sortOrder = "desc" } = params;
 
+    const cacheKey = `entries.local.${this.userId}.${fundId ?? "all"}.${page}.${pageSize}.${sortOrder}`;
+    const cached = cacheGet<{ entries: Entry[]; total: number }>(cacheKey);
+    if (cached) return { success: true, data: cached };
+
     let list = await this.entries();
     if (fundId) list = list.filter((e) => e.fund_id === fundId);
 
@@ -316,10 +333,13 @@ export class LocalStore implements DataStore {
     const start = (page - 1) * pageSize;
     const paged = list.slice(start, start + pageSize);
 
-    return { success: true, data: { entries: paged, total } };
+    const result = { entries: paged, total };
+    cacheSet(cacheKey, result);
+    return { success: true, data: result };
   }
 
   async createEntry(input: EntryInput): Promise<ActionResult<Entry>> {
+    cacheInvalidate();
     const parsed = entrySchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -375,6 +395,7 @@ export class LocalStore implements DataStore {
     id: string,
     input: EntryInput
   ): Promise<ActionResult<Entry>> {
+    cacheInvalidate();
     const parsed = entrySchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.errors[0].message };
@@ -418,6 +439,7 @@ export class LocalStore implements DataStore {
   }
 
   async deleteEntry(id: string): Promise<ActionResult> {
+    cacheInvalidate();
     const entries = await this.entries();
     const next = entries.filter((e) => e.id !== id);
     if (next.length === entries.length) {
@@ -431,6 +453,7 @@ export class LocalStore implements DataStore {
     fundId: string,
     rows: CsvImportRow[]
   ): Promise<ActionResult<CsvImportResult>> {
+    cacheInvalidate();
     const funds = await this.funds();
     const fund = funds.find((f) => f.id === fundId);
     if (!fund) return { success: false, error: "Fund not found" };
@@ -518,12 +541,18 @@ export class LocalStore implements DataStore {
   // ------------------------------------------------------------
 
   async getNavHistory(fundId?: string): Promise<NavHistoryRow[]> {
+    const cacheKey = `navhist.local.${this.userId}.${fundId ?? "all"}`;
+    const cached = cacheGet<NavHistoryRow[]>(cacheKey);
+    if (cached) return cached;
+
     const rows = await this.navRows();
     const scoped =
       fundId && fundId !== "all"
         ? rows.filter((r) => r.fund_id === fundId)
         : rows;
-    return scoped.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
+    const sortedRows = scoped.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
+    cacheSet(cacheKey, sortedRows);
+    return sortedRows;
   }
 
   // ------------------------------------------------------------
@@ -557,13 +586,20 @@ export class LocalStore implements DataStore {
   }
 
   async getNotifications(): Promise<ActionResult<NotificationItem[]>> {
+    const cacheKey = `notifs.local.${this.userId}`;
+    const cached = cacheGet<NotificationItem[]>(cacheKey);
+    if (cached) return { success: true, data: cached };
+
     const items = (await this.notifs()).sort((a, b) =>
       b.created_at.localeCompare(a.created_at)
     );
-    return { success: true, data: items.slice(0, 20) };
+    const trimmed = items.slice(0, 20);
+    cacheSet(cacheKey, trimmed);
+    return { success: true, data: trimmed };
   }
 
   async markNotificationRead(id: string): Promise<ActionResult> {
+    cacheInvalidate();
     const items = await this.notifs();
     const idx = items.findIndex((n) => n.id === id);
     if (idx < 0) return { success: false, error: "Notification not found" };
@@ -573,6 +609,7 @@ export class LocalStore implements DataStore {
   }
 
   async markAllNotificationsRead(): Promise<ActionResult> {
+    cacheInvalidate();
     const items = await this.notifs();
     await this.setNotifs(items.map((n) => ({ ...n, is_read: true })));
     return { success: true };

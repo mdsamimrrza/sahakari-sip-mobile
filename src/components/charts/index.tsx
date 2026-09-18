@@ -79,7 +79,7 @@ function buildTicks(top: number, count = 3): number[] {
 // Line / Area chart
 // ------------------------------------------------------------
 
-export function LineChart({
+export const LineChart = React.memo(function LineChart({
   labels,
   series,
   height = 240,
@@ -408,13 +408,13 @@ export function LineChart({
       )}
     </View>
   );
-}
+});
 
 // ------------------------------------------------------------
 // Bar chart
 // ------------------------------------------------------------
 
-export function BarChart({
+export const BarChart = React.memo(function BarChart({
   labels,
   series,
   height = 220,
@@ -546,7 +546,7 @@ export function BarChart({
       )}
     </View>
   );
-}
+});
 
 // ------------------------------------------------------------
 // Donut / Pie chart
@@ -558,7 +558,7 @@ export interface PieSlice {
   color: string;
 }
 
-export function DonutChart({
+export const DonutChart = React.memo(function DonutChart({
   slices,
   size = 180,
   thickness = 26,
@@ -663,7 +663,7 @@ export function DonutChart({
       )}
     </View>
   );
-}
+});
 
 /** Legend list used next to the donut. */
 export function ChartLegend({

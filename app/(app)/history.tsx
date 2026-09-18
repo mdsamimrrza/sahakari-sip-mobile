@@ -10,7 +10,7 @@
 //   • client-side pagination (10 / 20 / 50 / All)
 // ============================================================
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View, Pressable, ScrollView } from "react-native";
 import { Pencil, Trash2, Search, ChevronDown, Plus, Upload } from "lucide-react-native";
 import { useEntries, useFunds } from "@/hooks/useData";
@@ -39,6 +39,13 @@ export default function HistoryScreen() {
   const { entries, loading, reload } = useEntries(fundId);
 
   const [search, setSearch] = useState("");
+  // Debounced search — filtering + re-sorting the whole list on every
+  // keystroke made typing feel sluggish; the query settles after 300ms.
+  const [searchQuery, setSearchQuery] = useState("");
+  useEffect(() => {
+    const id = setTimeout(() => setSearchQuery(search), 300);
+    return () => clearTimeout(id);
+  }, [search]);
   const [sortKey, setSortKey] = useState<SortKey>("purchase_date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [pageSize, setPageSize] = useState<number | "all">(10);
@@ -59,15 +66,15 @@ export default function HistoryScreen() {
   const breakdowns = useMemo(() => computeEntryBreakdowns(entries), [entries]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return entries;
-    const q = search.toLowerCase();
+    if (!searchQuery.trim()) return entries;
+    const q = searchQuery.toLowerCase();
     return entries.filter((e) => {
       const fundName = fundMap.get(e.fund_id) || "";
       return `${e.purchase_date} ${e.amount} ${e.nav} ${e.units} ${e.notes || ""} ${fundName}`
         .toLowerCase()
         .includes(q);
     });
-  }, [entries, search, fundMap]);
+  }, [entries, searchQuery, fundMap]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
