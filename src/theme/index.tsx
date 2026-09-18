@@ -1,12 +1,14 @@
 // ============================================================
 // SahakariSIP — Theme
 // ============================================================
-// "Iris" design language — a modern fintech identity:
+// "Bold Ink" design language — neo-brutalist fintech:
 //
-//   Light → "Porcelain":  cool porcelain canvas, white cards,
-//                          indigo ink, electric indigo + teal accents
-//   Dark  → "Ink":        near-black ink canvas, ink cards,
-//                          lavender-white ink, soft violet + teal accents
+//   Light → "Paper":   warm bone canvas, white cards, near-black ink,
+//                       THICK ink borders + hard ink offset shadows,
+//                       electric indigo + teal accents
+//   Dark  → "Carbon":  carbon canvas, carbon cards, chalk-white ink,
+//                       gray borders + dark offset shadows,
+//                       vivid violet + teal accents
 // ============================================================
 
 import React, {
@@ -59,34 +61,36 @@ export interface ThemeColors {
   emerald: string;
   overlay: string;
   skeleton: string;
+  /** Hard offset-shadow color (Bold Ink design — solid, no blur). */
+  cardShadow: string;
 }
 
 export const lightColors: ThemeColors = {
-  background: "#F4F4F8", // cool porcelain
-  foreground: "#16162A", // deep indigo ink
+  background: "#F4F1E8", // warm bone paper
+  foreground: "#141414", // near-black ink
   card: "#FFFFFF",
-  cardForeground: "#16162A",
+  cardForeground: "#141414",
   primary: "#5A54F9", // electric indigo
   primaryForeground: "#FFFFFF",
-  secondary: "#0FB5A6", // teal
+  secondary: "#0FB5A6", // vivid teal
   secondaryForeground: "#FFFFFF",
-  muted: "#E9E8F2",
-  mutedForeground: "#5D5D78",
+  muted: "#E9E6DC",
+  mutedForeground: "#565656",
   accent: "#0FB5A6",
   accentForeground: "#FFFFFF",
   destructive: "#F04452",
   destructiveForeground: "#FFFFFF",
-  border: "#E3E3EE",
+  border: "#141414", // THICK ink borders everywhere — the Bold Ink signature
   input: "#FFFFFF",
-  ring: "#5A54F9",
+  ring: "#141414",
 
   chartPrimary: "#5A54F9",
   chartPositive: "#12B981",
   chartNegative: "#F04452",
-  chartInvested: "#A3A8C2",
+  chartInvested: "#9B978C",
   chartFeeDrag: "#F97362",
-  chartGrid: "#E7E7F0",
-  chartText: "#5D5D78",
+  chartGrid: "#DAD6C8",
+  chartText: "#565656",
 
   success: "#12B981",
   warning: "#F59E0B",
@@ -96,47 +100,49 @@ export const lightColors: ThemeColors = {
   amber: "#F59E0B",
   rose: "#F04452",
   emerald: "#12B981",
-  overlay: "rgba(22, 22, 42, 0.5)",
-  skeleton: "#E9E8F2",
+  overlay: "rgba(20, 20, 20, 0.5)",
+  skeleton: "#E9E6DC",
+  cardShadow: "#141414", // hard ink offset shadow
 };
 
 export const darkColors: ThemeColors = {
-  background: "#101019", // near-black ink
-  foreground: "#EDEDF7", // lavender white
-  card: "#191926", // ink cards
-  cardForeground: "#EDEDF7",
-  primary: "#8E86FF", // soft violet
-  primaryForeground: "#101019",
-  secondary: "#2DD4BF", // bright teal
-  secondaryForeground: "#101019",
-  muted: "#22223A",
-  mutedForeground: "#9FA2BC",
-  accent: "#2DD4BF",
-  accentForeground: "#101019",
+  background: "#131318", // carbon
+  foreground: "#F2F2F7", // chalk white
+  card: "#1C1C24", // carbon cards
+  cardForeground: "#F2F2F7",
+  primary: "#7C74FF", // vivid violet
+  primaryForeground: "#131318",
+  secondary: "#22D3C5", // bright teal
+  secondaryForeground: "#131318",
+  muted: "#262632",
+  mutedForeground: "#A3A3B2",
+  accent: "#22D3C5",
+  accentForeground: "#131318",
   destructive: "#FF5C68",
-  destructiveForeground: "#101019",
-  border: "#272741",
-  input: "#191926",
-  ring: "#8E86FF",
+  destructiveForeground: "#131318",
+  border: "#3D3D4A", // visible chalk-gray borders in dark
+  input: "#1C1C24",
+  ring: "#F2F2F7",
 
-  chartPrimary: "#8E86FF",
-  chartPositive: "#2DD4BF",
+  chartPrimary: "#7C74FF",
+  chartPositive: "#22D3C5",
   chartNegative: "#FF5C68",
-  chartInvested: "#3C3C5C",
+  chartInvested: "#3C3C4C",
   chartFeeDrag: "#FF7A6B",
-  chartGrid: "#272741",
-  chartText: "#EDEDF7",
+  chartGrid: "#262632",
+  chartText: "#F2F2F7",
 
-  success: "#2DD4BF",
+  success: "#22D3C5",
   warning: "#FBBF24",
   info: "#5CA1FF",
   blue: "#5CA1FF",
   purple: "#A78BFA",
   amber: "#FBBF24",
   rose: "#FF5C68",
-  emerald: "#2DD4BF",
+  emerald: "#22D3C5",
   overlay: "rgba(0, 0, 0, 0.65)",
-  skeleton: "#22223A",
+  skeleton: "#262632",
+  cardShadow: "#08080C", // darker-than-canvas offset shadow
 };
 
 // ---------- Spacing / radius / type scale ----------
@@ -151,13 +157,13 @@ export const spacing = {
   xxxl: 32,
 } as const;
 
-// Sharper, tighter geometry than the previous rounded look.
+// Chunky, tighter geometry — medium radii that let the hard shadows read.
 export const radius = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 18,
-  xxl: 20,
+  sm: 4,
+  md: 8,
+  lg: 10,
+  xl: 12,
+  xxl: 14,
   pill: 999,
 } as const;
 

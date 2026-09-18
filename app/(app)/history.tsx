@@ -246,7 +246,7 @@ export default function HistoryScreen() {
               const b = breakdowns.get(entry.id);
               const isOpen = expanded === entry.id;
               return (
-                <Card key={entry.id} style={{ overflow: "hidden" }}>
+                <Card key={entry.id}>
                   <Pressable
                     onPress={() => setExpanded(isOpen ? null : entry.id)}
                     style={{ padding: spacing.lg, gap: spacing.md }}

@@ -488,7 +488,7 @@ export function AppHeader({ title }: { title?: string }) {
       style={{
         backgroundColor: colors.background,
         paddingTop: insets.top,
-        borderBottomWidth: 1,
+        borderBottomWidth: 2,
         borderBottomColor: colors.border,
       }}
     >

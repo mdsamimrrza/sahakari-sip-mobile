@@ -17,7 +17,7 @@
       "versionCode": 3,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#101019",
+        "backgroundColor": "#131318",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -36,7 +36,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#101019"
+          "backgroundColor": "#131318"
         }
       ],
       "expo-secure-store",

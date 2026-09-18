@@ -123,20 +123,33 @@ export function Card({
 }) {
   const { colors } = useTheme();
   return (
-    <View
-      style={[
-        {
-          // Flat, border-led surfaces — no drop shadows in the Iris design.
-          backgroundColor: colors.card,
+    // Bold Ink: a thick ink border + a REAL hard offset shadow (a solid
+    // block peeking out bottom-right) instead of soft blur shadows.
+    <View style={[{ position: "relative" }, style]}>
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 4,
+          left: 4,
+          right: -4,
+          bottom: -4,
+          backgroundColor: colors.cardShadow,
           borderRadius: radius.xxl,
-          borderWidth: 1,
+        }}
+      />
+      <View
+        style={{
+          position: "relative",
+          backgroundColor: colors.card,
+          borderWidth: 2,
           borderColor: colors.border,
+          borderRadius: radius.xxl,
           padding: padded ? spacing.xl : 0,
-        },
-        style,
-      ]}
-    >
-      {children}
+        }}
+      >
+        {children}
+      </View>
     </View>
   );
 }
@@ -274,11 +287,16 @@ export function Button({
           alignItems: "center",
           justifyContent: "center",
           gap: 6,
-          // Pill geometry — the Iris design's signature button shape.
+          // Bold Ink: pill geometry, thick ink border, hard offset shadow.
           borderRadius: radius.pill,
           backgroundColor: bg,
-          borderWidth: variant === "outline" ? 1 : 0,
+          borderWidth: variant === "ghost" ? 0 : 2,
           borderColor: colors.border,
+          shadowColor: colors.cardShadow,
+          shadowOpacity: variant === "ghost" ? 0 : 1,
+          shadowRadius: 0,
+          shadowOffset: { width: 2, height: 3 },
+          elevation: variant === "ghost" ? 0 : 4,
           opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1,
         },
         dims,
@@ -351,7 +369,7 @@ export function Input({
           flexDirection: "row",
           alignItems: "center",
           backgroundColor: colors.input,
-          borderWidth: 1,
+          borderWidth: 2,
           borderColor: error ? colors.destructive : colors.border,
           borderRadius: radius.lg,
           paddingHorizontal: spacing.md,
@@ -409,6 +427,8 @@ export function Badge({
           paddingHorizontal: spacing.sm + 2,
           paddingVertical: 3,
           borderRadius: radius.pill,
+          borderWidth: 1.5,
+          borderColor: color ?? colors.border,
           backgroundColor: bg ?? `${colors.muted}`,
         },
         style,
