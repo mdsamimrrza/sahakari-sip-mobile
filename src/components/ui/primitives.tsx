@@ -120,14 +120,12 @@ export function Card({
   children,
   style,
   padded = false,
-  accentColor,
 }: {
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   padded?: boolean;
-  accentColor?: string;
 }) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   return (
     <View
       style={[
@@ -137,24 +135,15 @@ export function Card({
           borderColor: colors.border,
           borderRadius: radius.xl,
           padding: padded ? spacing.xl : 0,
-          shadowColor: isDark ? "#000000" : "#0A291A",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: isDark ? 0.35 : 0.07,
-          shadowRadius: 14,
-          elevation: 3,
-          overflow: "hidden",
+          overflow: 'hidden',
         },
         style,
       ]}
     >
-      {accentColor ? (
-        <View style={{ height: 3, width: "100%", backgroundColor: accentColor }} />
-      ) : null}
       {children}
     </View>
   );
 }
-
 export function CardHeader({
   children,
   style,
@@ -293,11 +282,11 @@ export function Button({
           backgroundColor: bg,
           borderWidth: variant === "outline" ? 1.5 : 0,
           borderColor: variant === "outline" ? colors.border : "transparent",
-          shadowColor: hasShadow ? bg : "transparent",
+          shadowColor: "transparent",
           shadowOffset: { width: 0, height: pressed ? 2 : 4 },
-          shadowOpacity: hasShadow ? (isDark ? 0.4 : 0.25) : 0,
-          shadowRadius: 8,
-          elevation: hasShadow ? 4 : 0,
+          shadowOpacity: 0,
+          shadowRadius: 0,
+          elevation: 0,
           transform: [{ scale: pressed ? 0.98 : 1 }],
           opacity: isDisabled ? 0.5 : 1,
         },

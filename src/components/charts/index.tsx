@@ -60,7 +60,7 @@ const PAD_BOTTOM = 26;
 
 /** Round a max value up to a "nice" axis top with 3 divisions. */
 function niceTop(max: number, minTop = 0): number {
-  if (max <= 0) return Math.max(minTop, 1000);
+  if (max <= 0) return Math.max(minTop, 10);
   const raw = Math.max(max * 1.15, minTop);
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
   const normalized = raw / magnitude;
@@ -110,7 +110,7 @@ export const LineChart = React.memo(function LineChart({
       const timer = setTimeout(() => {
         setInternalActiveIndex(null);
         onSelectPoint?.(null);
-      }, 5000);
+      }, 50);
       return () => clearTimeout(timer);
     }
   }, [activeIndex, onSelectPoint]);
@@ -204,7 +204,7 @@ export const LineChart = React.memo(function LineChart({
                   y2="1"
                 >
                   <Stop offset="0" stopColor={s.color} stopOpacity="0.32" />
-                  <Stop offset="1" stopColor={s.color} stopOpacity="0.02" />
+                  <Stop offset="1" stopColor={s.color} stopOpacity="0.2" />
                 </LinearGradient>
               ))}
             </Defs>
@@ -342,11 +342,11 @@ export const LineChart = React.memo(function LineChart({
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,
             minWidth: series.length > 1 ? 215 : 165,
-            shadowColor: "#000",
+            shadowColor: "transparent",
             shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.2,
-            shadowRadius: 12,
-            elevation: 8,
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            elevation: 0,
           }}
         >
           <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "700", fontSize: 13, marginBottom: 6 }}>
@@ -488,7 +488,7 @@ export const BarChart = React.memo(function BarChart({
       const timer = setTimeout(() => {
         setActiveIndex(null);
         onSelectPoint?.(null);
-      }, 5000);
+      }, 50);
       return () => clearTimeout(timer);
     }
   }, [activeIndex, onSelectPoint]);
@@ -619,11 +619,11 @@ export const BarChart = React.memo(function BarChart({
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,
             minWidth: 175,
-            shadowColor: "#000",
+            shadowColor: "transparent",
             shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.2,
-            shadowRadius: 12,
-            elevation: 8,
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            elevation: 0,
           }}
         >
           <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "700", fontSize: 13, marginBottom: 4 }}>
@@ -690,7 +690,7 @@ export const DonutChart = React.memo(function DonutChart({
       const timer = setTimeout(() => {
         setInternalActiveIndex(null);
         onSelectSlice?.(null);
-      }, 5000);
+      }, 50);
       return () => clearTimeout(timer);
     }
   }, [activeIndex, onSelectSlice]);

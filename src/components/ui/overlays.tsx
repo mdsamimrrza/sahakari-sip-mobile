@@ -368,11 +368,11 @@ export function DropdownMenu({
             borderColor: colors.border,
             borderRadius: radius.xl,
             overflow: "hidden",
-            shadowColor: "#000",
+            shadowColor: "transparent",
             shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.25,
-            shadowRadius: 14,
-            elevation: 10,
+            shadowOpacity: 0,
+            shadowRadius: 0,
+            elevation: 0,
           }}
         >
           <ScrollView style={{ flexGrow: 0 }}>{children}</ScrollView>

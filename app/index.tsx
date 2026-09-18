@@ -196,14 +196,14 @@ export default function LandingScreen() {
             </Text>
           </View>
 
-          {features.map((f) => (
-            <Card key={f.title} padded accentColor={f.bg.replace("1A", "")}>
+{features.map((f) => (
+            <Card key={f.title} padded>
               <View
                 style={{
                   width: 44,
                   height: 44,
+                  backgroundColor: f.bg.replace("1A", ""),
                   borderRadius: radius.md,
-                  backgroundColor: f.bg,
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: spacing.sm,
