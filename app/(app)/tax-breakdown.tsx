@@ -94,8 +94,8 @@ function SectionHead({
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: `${accent}22`,
-            borderWidth: 1,
-            borderColor: `${accent}55`,
+            borderWidth: 2,
+            borderColor: accent,
           }}
         >
           <Text style={{ fontSize: fontSize.xs, fontWeight: "900" }} color={accent}>
@@ -214,8 +214,8 @@ function MetricTile({
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: `${accent}22`,
-                borderWidth: 1,
-                borderColor: `${accent}55`,
+                borderWidth: 2,
+                borderColor: accent,
               }}
             >
               {icon}
@@ -310,8 +310,8 @@ export default function TaxBreakdownScreen() {
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: `${colors.success}22`,
-            borderWidth: 1,
-            borderColor: `${colors.success}55`,
+            borderWidth: 2,
+            borderColor: colors.success,
           }}
         >
           <Receipt size={18} color={colors.success} />
@@ -383,7 +383,7 @@ export default function TaxBreakdownScreen() {
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: colors.card,
-            borderWidth: 1,
+            borderWidth: 2,
             borderColor: colors.border,
           }}
         >
@@ -541,7 +541,7 @@ export default function TaxBreakdownScreen() {
 
       {/* ============ SECTION 04 ============ */}
       {(showAll || section === "sec4") && (
-        <Card style={{ borderColor: `${colors.success}66`, borderWidth: 1.5 }}>
+        <Card style={{ borderColor: colors.success, borderWidth: 2 }}>
           <SectionHead
             index="04"
             title="Final Settlement Ledger (Bank Credit)"

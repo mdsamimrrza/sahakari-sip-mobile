@@ -99,8 +99,8 @@ export default function SettingsScreen() {
               alignItems: "center",
               justifyContent: "center",
               backgroundColor: `${colors.success}22`,
-              borderWidth: 1,
-              borderColor: `${colors.success}55`,
+              borderWidth: 2,
+              borderColor: colors.success,
             }}
           >
             <SettingsIcon size={22} color={colors.success} />
@@ -166,7 +166,7 @@ export default function SettingsScreen() {
                 padding: spacing.md,
                 borderRadius: radius.lg,
                 backgroundColor: colors.muted,
-                borderWidth: 1,
+                borderWidth: 2,
                 borderColor: colors.border,
               }}
             >
@@ -189,7 +189,7 @@ export default function SettingsScreen() {
                 padding: spacing.md,
                 borderRadius: radius.lg,
                 backgroundColor: colors.muted,
-                borderWidth: 1,
+                borderWidth: 2,
                 borderColor: colors.border,
               }}
             >
@@ -212,7 +212,7 @@ export default function SettingsScreen() {
                 padding: spacing.md,
                 borderRadius: radius.lg,
                 backgroundColor: colors.muted,
-                borderWidth: 1,
+                borderWidth: 2,
                 borderColor: colors.border,
               }}
             >
@@ -268,7 +268,7 @@ export default function SettingsScreen() {
             color={colors.mutedForeground}
             style={{ marginTop: 4, fontSize: fontSize.sm }}
           >
-            Royal Cream &amp; Navy in light, Royal Navy &amp; Gold in dark.
+            Paper & ink in light, carbon & chalk in dark.
           </Text>
         </CardHeader>
 
@@ -280,7 +280,7 @@ export default function SettingsScreen() {
               padding: spacing.xs,
               borderRadius: radius.xl,
               backgroundColor: colors.muted,
-              borderWidth: 1,
+              borderWidth: 2,
               borderColor: colors.border,
             }}
           >
@@ -323,7 +323,7 @@ export default function SettingsScreen() {
         {({ pressed }) => (
           <Card
             style={{
-              borderColor: `${colors.success}55`,
+              borderColor: colors.success,
               opacity: pressed ? 0.9 : 1,
             }}
           >
@@ -343,8 +343,8 @@ export default function SettingsScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   backgroundColor: `${colors.success}22`,
-                  borderWidth: 1,
-                  borderColor: `${colors.success}55`,
+                  borderWidth: 2,
+                  borderColor: colors.success,
                 }}
               >
                 <Receipt size={19} color={colors.success} />

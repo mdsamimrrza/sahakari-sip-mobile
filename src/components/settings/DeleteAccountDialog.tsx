@@ -73,7 +73,7 @@ export function DeleteAccountDialog() {
     <>
       <Card
         style={{
-          borderColor: `${colors.destructive}33`,
+          borderColor: colors.destructive,
           backgroundColor: `${colors.destructive}0D`,
         }}
       >

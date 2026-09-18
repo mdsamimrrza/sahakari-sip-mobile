@@ -68,7 +68,7 @@ function HeaderIconButton({
 }
 
 // ------------------------------------------------------------
-// Theme toggle — Sun (amber) in dark mode, Moon (navy) in light
+// Theme toggle — Sun (amber) in dark mode, Moon (ink) in light
 // ------------------------------------------------------------
 
 export function ThemeToggle() {
@@ -236,7 +236,7 @@ function NotificationBell() {
                   gap: spacing.md,
                   padding: spacing.md,
                   borderRadius: radius.lg,
-                  borderWidth: 1,
+                  borderWidth: 2,
                   borderColor: colors.border,
                   backgroundColor: pressed ? colors.muted : colors.card,
                   opacity: n.is_read ? 0.75 : 1,
@@ -356,8 +356,8 @@ function UserAvatarMenu() {
             height: 34,
             borderRadius: 17,
             backgroundColor: `${colors.emerald}26`,
-            borderWidth: 1,
-            borderColor: `${colors.emerald}55`,
+            borderWidth: 2,
+            borderColor: colors.emerald,
             alignItems: "center",
             justifyContent: "center",
             opacity: pressed ? 0.75 : 1,
@@ -385,8 +385,8 @@ function UserAvatarMenu() {
                 height: 48,
                 borderRadius: 24,
                 backgroundColor: `${colors.emerald}26`,
-                borderWidth: 1,
-                borderColor: `${colors.emerald}55`,
+                borderWidth: 2,
+                borderColor: colors.emerald,
                 alignItems: "center",
                 justifyContent: "center",
               }}

@@ -213,9 +213,9 @@ export function DataTable({
   return (
     <View
       style={{
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: colors.border,
-        borderRadius: radius.lg,
+        borderRadius: radius.xl,
         overflow: "hidden",
       }}
     >

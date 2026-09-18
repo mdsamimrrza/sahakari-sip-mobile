@@ -98,7 +98,7 @@ export function SummaryCards({
       <Card
         style={{
           padding: spacing.lg,
-          borderColor: `${colors.blue}33`,
+          borderColor: colors.blue,
           gap: spacing.md,
         }}
       >
@@ -161,8 +161,8 @@ export function SummaryCards({
                 paddingVertical: 3,
                 borderRadius: radius.pill,
                 backgroundColor: `${gainColor}1A`,
-                borderWidth: 1,
-                borderColor: `${gainColor}33`,
+                borderWidth: 2,
+                borderColor: gainColor,
               }}
             >
               {isPositive ? (

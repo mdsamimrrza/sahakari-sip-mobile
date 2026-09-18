@@ -2,8 +2,8 @@
 // SahakariSIP — Core UI Primitives
 // ============================================================
 // A small, dependency-light component set that mirrors the visual
-// language of the web app's shadcn/ui components (rounded cards, navy
-// ink, gold accents, uppercase micro-labels, tabular numerals).
+// language of the web app's shadcn/ui components (thick ink borders, hard offset shadows,
+// pill buttons, uppercase micro-labels, tabular numerals).
 // ============================================================
 
 import React from "react";
@@ -427,7 +427,7 @@ export function Badge({
           paddingHorizontal: spacing.sm + 2,
           paddingVertical: 3,
           borderRadius: radius.pill,
-          borderWidth: 1.5,
+          borderWidth: 2,
           borderColor: color ?? colors.border,
           backgroundColor: bg ?? `${colors.muted}`,
         },
@@ -514,15 +514,17 @@ export function Switch({
         padding: 3,
         justifyContent: "center",
         backgroundColor: value ? colors.success : colors.muted,
+        borderWidth: 2,
+        borderColor: colors.border,
         opacity: disabled ? 0.5 : 1,
       }}
     >
       <View
         style={{
-          width: 22,
-          height: 22,
+          width: 18,
+          height: 18,
           borderRadius: radius.pill,
-          backgroundColor: "#FFFFFF",
+          backgroundColor: colors.card,
           alignSelf: value ? "flex-end" : "flex-start",
         }}
       />
@@ -553,8 +555,8 @@ export function Checkbox({
         style={{
           width: 20,
           height: 20,
-          borderRadius: 5,
-          borderWidth: 1.5,
+          borderRadius: 6,
+          borderWidth: 2,
           borderColor: checked ? colors.primary : colors.border,
           backgroundColor: checked ? colors.primary : "transparent",
           alignItems: "center",
@@ -628,23 +630,23 @@ export function Avatar({
   bg?: string;
   color?: string;
 }) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   return (
     <View
       style={{
         width: size,
         height: size,
-        borderRadius: size / 2.5,
-        backgroundColor: bg ?? (isDark ? "rgba(45,212,191,0.18)" : "rgba(18,185,129,0.14)"),
+        borderRadius: radius.lg,
+        backgroundColor: bg ?? colors.muted,
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: 1,
-        borderColor: "rgba(45,212,191,0.4)",
+        borderWidth: 2,
+        borderColor: colors.border,
       }}
     >
       <Text
         style={{ fontSize: size * 0.42, fontWeight: "900" }}
-        color={color ?? colors.success}
+        color={color ?? colors.foreground}
       >
         {initial}
       </Text>

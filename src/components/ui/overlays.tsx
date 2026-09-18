@@ -21,7 +21,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useTheme, fontSize, radius, spacing } from "../../theme";
-import { Text } from "./primitives";
+import { Button, Text } from "./primitives";
 
 // ------------------------------------------------------------
 // Dialog / Sheet
@@ -71,13 +71,19 @@ export function Modal({
             {
               backgroundColor: colors.card,
               borderRadius: radius.xxl,
-              borderWidth: 1,
+              borderWidth: 2,
               borderColor: colors.border,
               width: "100%",
               maxWidth: position === "bottom" ? undefined : maxWidth,
               alignSelf: "center",
               maxHeight: "90%",
               overflow: "hidden",
+              // Bold Ink: hard offset shadow on floating surfaces.
+              shadowColor: colors.cardShadow,
+              shadowOpacity: position === "bottom" ? 0 : 1,
+              shadowRadius: 0,
+              shadowOffset: { width: 3, height: 4 },
+              elevation: position === "bottom" ? 0 : 8,
             },
             position === "bottom"
               ? {
@@ -194,7 +200,7 @@ export function Select<T extends string = string>({
           alignItems: "center",
           justifyContent: "space-between",
           backgroundColor: colors.input,
-          borderWidth: 1,
+          borderWidth: 2,
           borderColor: colors.border,
           borderRadius: radius.lg,
           paddingHorizontal: spacing.md,
@@ -362,15 +368,15 @@ function ToastViewport({ toasts }: { toasts: ToastEntry[] }) {
               ],
               backgroundColor: colors.card,
               borderRadius: radius.xl,
-              borderWidth: 1,
+              borderWidth: 2,
               borderColor: colors.border,
-              borderLeftWidth: 4,
+              borderLeftWidth: 6,
               borderLeftColor: accent,
               padding: spacing.lg,
-              shadowColor: "#000",
-              shadowOpacity: 0.18,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 4 },
+              shadowColor: colors.cardShadow,
+              shadowOpacity: 1,
+              shadowRadius: 0,
+              shadowOffset: { width: 3, height: 4 },
               elevation: 6,
             }}
           >
@@ -458,14 +464,14 @@ export function DropdownMenu({
             width,
             maxHeight,
             backgroundColor: colors.card,
-            borderWidth: 1,
+            borderWidth: 2,
             borderColor: colors.border,
-            borderRadius: radius.lg,
+            borderRadius: radius.xl,
             overflow: "hidden",
-            shadowColor: "#000",
-            shadowOpacity: 0.18,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 4 },
+            shadowColor: colors.cardShadow,
+            shadowOpacity: 1,
+            shadowRadius: 0,
+            shadowOffset: { width: 3, height: 4 },
             elevation: 8,
           }}
         >
@@ -532,7 +538,7 @@ export function DropdownSelect<T extends string = string>({
           alignItems: "center",
           justifyContent: "space-between",
           backgroundColor: colors.input,
-          borderWidth: 1,
+          borderWidth: 2,
           borderColor: colors.border,
           borderRadius: radius.lg,
           paddingHorizontal: spacing.md,
@@ -631,40 +637,17 @@ export function ConfirmDialog({
   return (
     <Modal visible={visible} onClose={onClose} title={title} description={description}>
       <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
-        <Pressable
-          onPress={onClose}
-          style={{
-            flex: 1,
-            height: 44,
-            borderRadius: radius.lg,
-            borderWidth: 1,
-            borderColor: colors.border,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text variant="label">Cancel</Text>
-        </Pressable>
-        <Pressable
+        <Button variant="outline" onPress={onClose} style={{ flex: 1 }}>
+          Cancel
+        </Button>
+        <Button
+          variant={destructive ? "destructive" : "default"}
           onPress={onConfirm}
-          disabled={loading}
-          style={{
-            flex: 1,
-            height: 44,
-            borderRadius: radius.lg,
-            backgroundColor: destructive ? colors.destructive : colors.primary,
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: loading ? 0.6 : 1,
-          }}
+          loading={loading}
+          style={{ flex: 1 }}
         >
-          <Text
-            variant="label"
-            color={destructive ? colors.destructiveForeground : colors.primaryForeground}
-          >
-            {loading ? "Working…" : confirmLabel}
-          </Text>
-        </Pressable>
+          {confirmLabel}
+        </Button>
       </View>
     </Modal>
   );

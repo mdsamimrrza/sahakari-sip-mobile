@@ -118,8 +118,8 @@ export function PortfolioGrowthCard({
             paddingVertical: 3,
             borderRadius: radius.pill,
             backgroundColor: `${gainColor}1A`,
-            borderWidth: 1,
-            borderColor: `${gainColor}33`,
+            borderWidth: 2,
+            borderColor: gainColor,
           }}
         >
           {isPositive ? (
@@ -425,7 +425,7 @@ function FeeDragBreakdownDialog({
               gap: spacing.md,
               padding: spacing.md,
               borderRadius: radius.lg,
-              borderWidth: 1,
+              borderWidth: 2,
               borderColor: colors.border,
               backgroundColor: colors.card,
             }}
@@ -451,8 +451,8 @@ function FeeDragBreakdownDialog({
             padding: spacing.md,
             borderRadius: radius.lg,
             backgroundColor: `${colors.rose}14`,
-            borderWidth: 1,
-            borderColor: `${colors.rose}33`,
+            borderWidth: 2,
+            borderColor: colors.rose,
           }}
         >
           <Text variant="label">Total Fee Drag</Text>

@@ -63,7 +63,7 @@ export function DateField({
           alignItems: "center",
           justifyContent: "space-between",
           backgroundColor: colors.input,
-          borderWidth: 1,
+          borderWidth: 2,
           borderColor: error ? colors.destructive : colors.border,
           borderRadius: radius.lg,
           paddingHorizontal: spacing.md,
@@ -102,6 +102,8 @@ export function DateField({
                 paddingVertical: 6,
                 borderRadius: radius.pill,
                 backgroundColor: colors.muted,
+                borderWidth: 2,
+                borderColor: colors.border,
               }}
             >
               <Text variant="caption" style={{ fontWeight: "700" }}>
@@ -116,6 +118,8 @@ export function DateField({
                   paddingVertical: 6,
                   borderRadius: radius.pill,
                   backgroundColor: colors.primary,
+                  borderWidth: 2,
+                  borderColor: colors.border,
                 }}
               >
                 <Text

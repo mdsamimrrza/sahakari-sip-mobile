@@ -108,7 +108,7 @@ const [mode, setMode] = useState<DataMode>(
     width: 46,
     height: 50,
     borderRadius: radius.lg,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: colors.input,
     textAlign: "center",

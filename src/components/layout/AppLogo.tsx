@@ -1,8 +1,8 @@
 // ============================================================
 // SahakariSIP — App logo
 // ============================================================
-// Vector port of the web app's icon.svg: a gold rounded tile with
-// navy bars and a rising arrow.
+// Vector port of the web app's icon.svg: an indigo rounded tile with
+// white bars and a rising arrow.
 // ============================================================
 
 import React from "react";

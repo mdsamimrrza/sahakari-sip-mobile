@@ -272,7 +272,7 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
               <View
                 key={fund.id}
                 style={{
-                  borderWidth: 1,
+                  borderWidth: 2,
                   borderColor: colors.border,
                   borderRadius: radius.xl,
                   backgroundColor: colors.muted,
@@ -307,7 +307,7 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
                         alignItems: "center",
                         justifyContent: "center",
                         backgroundColor: colors.card,
-                        borderWidth: 1,
+                        borderWidth: 2,
                         borderColor: colors.border,
                       }}
                     >
@@ -323,7 +323,7 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
                         alignItems: "center",
                         justifyContent: "center",
                         backgroundColor: colors.card,
-                        borderWidth: 1,
+                        borderWidth: 2,
                         borderColor: colors.border,
                       }}
                     >
@@ -367,7 +367,7 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
                   borderRadius: radius.lg,
                   alignItems: "center",
                   justifyContent: "center",
-                  borderWidth: 1,
+                  borderWidth: 2,
                   borderColor: colors.border,
                   opacity: validCurrentPage === 1 ? 0.4 : 1,
                 }}
@@ -387,7 +387,7 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
                     alignItems: "center",
                     justifyContent: "center",
                     backgroundColor: p === validCurrentPage ? colors.primary : "transparent",
-                    borderWidth: 1,
+                    borderWidth: 2,
                     borderColor: p === validCurrentPage ? colors.primary : colors.border,
                   }}
                 >
@@ -410,7 +410,7 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
                   borderRadius: radius.lg,
                   alignItems: "center",
                   justifyContent: "center",
-                  borderWidth: 1,
+                  borderWidth: 2,
                   borderColor: colors.border,
                   opacity: validCurrentPage === totalPages ? 0.4 : 1,
                 }}

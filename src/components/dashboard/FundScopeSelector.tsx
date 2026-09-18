@@ -51,7 +51,7 @@ export function FundScopeSelector({
               paddingVertical: 8,
               borderRadius: radius.pill,
               backgroundColor: active ? colors.primary : colors.card,
-              borderWidth: 1,
+              borderWidth: 2,
               borderColor: active ? colors.primary : colors.border,
             }}
           >

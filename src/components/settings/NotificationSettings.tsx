@@ -100,7 +100,7 @@ function ChannelRow({
         gap: spacing.md,
         padding: spacing.md,
         borderRadius: radius.xl,
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: colors.border,
         backgroundColor: colors.muted,
       }}
@@ -114,8 +114,8 @@ function ChannelRow({
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: `${iconColor}22`,
-            borderWidth: 1,
-            borderColor: `${iconColor}44`,
+            borderWidth: 2,
+            borderColor: iconColor,
           }}
         >
           {icon}
@@ -300,8 +300,8 @@ export function NotificationSettings({ userEmail }: { userEmail: string }) {
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: `${colors.amber}22`,
-                borderWidth: 1,
-                borderColor: `${colors.amber}55`,
+                borderWidth: 2,
+                borderColor: colors.amber,
               }}
             >
               <Bell size={16} color={colors.amber} strokeWidth={2.2} />
@@ -386,7 +386,7 @@ export function NotificationSettings({ userEmail }: { userEmail: string }) {
             padding: spacing.md,
             borderRadius: radius.lg,
             backgroundColor: colors.muted,
-            borderWidth: 1,
+            borderWidth: 2,
             borderColor: colors.border,
           }}
         >
