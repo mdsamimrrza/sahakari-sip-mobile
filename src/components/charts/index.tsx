@@ -8,8 +8,8 @@
 // unchanged.
 // ============================================================
 
-import React, { useMemo, useRef, useState } from "react";
-import { View, type LayoutChangeEvent } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { View, Pressable, type LayoutChangeEvent } from "react-native";
 import Svg, {
   Circle,
   Defs,
@@ -91,11 +91,29 @@ export const LineChart = React.memo(function LineChart({
   minTop,
   showTooltip = true,
   showLegend = false,
-}: BaseChartProps & { showTooltip?: boolean; showLegend?: boolean }) {
+  selectedIndex,
+  onSelectPoint,
+}: BaseChartProps & {
+  showTooltip?: boolean;
+  showLegend?: boolean;
+  selectedIndex?: number | null;
+  onSelectPoint?: (index: number | null) => void;
+}) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const lastTouch = useRef<{ x: number; y: number } | null>(null);
+  const [internalActiveIndex, setInternalActiveIndex] = useState<number | null>(null);
+
+  const activeIndex = selectedIndex !== undefined ? selectedIndex : internalActiveIndex;
+
+  useEffect(() => {
+    if (activeIndex !== null) {
+      const timer = setTimeout(() => {
+        setInternalActiveIndex(null);
+        onSelectPoint?.(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeIndex, onSelectPoint]);
 
   const padLeft = hideY ? 8 : PAD_LEFT;
   const padBottom = hideX ? 10 : PAD_BOTTOM;
@@ -142,43 +160,37 @@ export const LineChart = React.memo(function LineChart({
   const handleTouch = (locationX: number) => {
     if (!showTooltip || labels.length === 0) return;
     const relative = locationX - padLeft;
-    const idx =
-      stepX > 0
-        ? Math.round(relative / stepX)
-        : 0;
-    setActiveIndex(Math.max(0, Math.min(labels.length - 1, idx)));
+    const idx = stepX > 0 ? Math.round(relative / stepX) : 0;
+    const clamped = Math.max(0, Math.min(labels.length - 1, idx));
+    setInternalActiveIndex(clamped);
+    onSelectPoint?.(clamped);
   };
 
   const tooltipLeft = activeIndex !== null ? padLeft + stepX * activeIndex : 0;
+
+  // Check if we have both Portfolio Value and Total Invested for Return calculation
+  const hasReturnBreakdown =
+    activeIndex !== null &&
+    series.length >= 2 &&
+    series[0].values[activeIndex] !== null &&
+    series[1].values[activeIndex] !== null;
+
+  const returnVal = hasReturnBreakdown && activeIndex !== null
+    ? (series[0].values[activeIndex] as number) - (series[1].values[activeIndex] as number)
+    : 0;
 
   return (
     <View onLayout={onLayout} style={{ width: "100%" }}>
       {width > 0 && (
         <View
-          onStartShouldSetResponder={(e) => {
-            // Record the touch origin; do not claim — claiming every touch
-            // would stop the parent ScrollView from scrolling the page.
-            lastTouch.current = {
-              x: e.nativeEvent.pageX,
-              y: e.nativeEvent.pageY,
-            };
-            return false;
-          }}
-          onMoveShouldSetResponder={(e) => {
-            // Only claim predominantly-horizontal drags (tooltip scrubbing);
-            // vertical swipes pass through to the ScrollView.
-            if (!showTooltip) return false;
-            const cur = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
-            const prev = lastTouch.current;
-            lastTouch.current = cur;
-            if (!prev) return false;
-            const dx = Math.abs(cur.x - prev.x);
-            const dy = Math.abs(cur.y - prev.y);
-            return dx > dy * 1.4 && dx > 10;
-          }}
+          onStartShouldSetResponder={() => true}
+          onResponderTerminationRequest={() => true}
           onResponderGrant={(e) => handleTouch(e.nativeEvent.locationX)}
           onResponderMove={(e) => handleTouch(e.nativeEvent.locationX)}
-          onResponderRelease={() => setActiveIndex(null)}
+          onResponderRelease={() => {
+            // Touch release keeps the active index until auto-dismiss after 5s!
+          }}
+          onResponderTerminate={() => {}}
         >
           <Svg width={width} height={height}>
             <Defs>
@@ -264,8 +276,10 @@ export const LineChart = React.memo(function LineChart({
                         key={`${s.key}-dot-${i}`}
                         cx={p.x}
                         cy={p.y}
-                        r={3}
+                        r={activeIndex === i ? 5 : 3}
                         fill={s.color}
+                        stroke={activeIndex === i ? colors.card : undefined}
+                        strokeWidth={activeIndex === i ? 2 : 0}
                       />
                     ))}
                 </G>
@@ -279,10 +293,10 @@ export const LineChart = React.memo(function LineChart({
                 y1={PAD_TOP}
                 x2={tooltipLeft}
                 y2={PAD_TOP + plotH}
-                stroke={colors.mutedForeground}
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                opacity={0.7}
+                stroke={colors.primary}
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+                opacity={0.8}
               />
             )}
 
@@ -313,25 +327,32 @@ export const LineChart = React.memo(function LineChart({
           pointerEvents="none"
           style={{
             position: "absolute",
-            top: 4,
+            top: 6,
             left: Math.max(
-              4,
+              8,
               Math.min(
-                width - 170,
-                tooltipLeft - 80
+                width - 225,
+                tooltipLeft - 105
               )
             ),
             backgroundColor: colors.card,
             borderWidth: 1,
             borderColor: colors.border,
-            borderRadius: radius.md,
-            padding: spacing.sm + 2,
-            minWidth: 160,
+            borderRadius: radius.xl,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.md,
+            minWidth: series.length > 1 ? 215 : 165,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.2,
+            shadowRadius: 12,
+            elevation: 8,
           }}
         >
-          <Text variant="caption" color={colors.mutedForeground}>
+          <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "700", fontSize: 13, marginBottom: 6 }}>
             {formatX ? formatX(labels[activeIndex]) : labels[activeIndex]}
           </Text>
+
           {series.map((s) => {
             const v = s.values[activeIndex];
             if (v === null || v === undefined) return null;
@@ -342,29 +363,69 @@ export const LineChart = React.memo(function LineChart({
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  gap: spacing.sm,
-                  marginTop: 3,
+                  gap: spacing.lg,
+                  marginVertical: 3,
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}>
                   <View
                     style={{
-                      width: 7,
-                      height: 7,
+                      width: 8,
+                      height: 8,
                       borderRadius: 4,
                       backgroundColor: s.color,
                     }}
                   />
-                  <Text variant="caption" color={colors.mutedForeground}>
-                    {s.name}
+                  <Text variant="caption" color={colors.foreground} style={{ fontWeight: "600", fontSize: 13 }}>
+                    {s.name}:
                   </Text>
                 </View>
-                <Text variant="caption" style={{ fontWeight: "800" }} tabular>
+                <Text
+                  variant="caption"
+                  color={s.color}
+                  style={{ fontWeight: "800", fontSize: 13, flexShrink: 0 }}
+                  numberOfLines={1}
+                  tabular
+                >
                   {formatTooltipY ? formatTooltipY(v) : v.toFixed(0)}
                 </Text>
               </View>
             );
           })}
+
+          {hasReturnBreakdown ? (
+            <>
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: colors.border,
+                  marginVertical: spacing.xs + 2,
+                }}
+              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: spacing.lg,
+                }}
+              >
+                <Text variant="caption" color={colors.foreground} style={{ fontWeight: "700", fontSize: 13 }}>
+                  Return:
+                </Text>
+                <Text
+                  variant="caption"
+                  color={returnVal >= 0 ? colors.success : colors.rose}
+                  style={{ fontWeight: "800", fontSize: 13, flexShrink: 0 }}
+                  numberOfLines={1}
+                  tabular
+                >
+                  {returnVal >= 0 ? "+" : ""}
+                  {formatTooltipY ? formatTooltipY(returnVal) : returnVal.toFixed(0)}
+                </Text>
+              </View>
+            </>
+          ) : null}
         </View>
       )}
 
@@ -416,10 +477,21 @@ export const BarChart = React.memo(function BarChart({
   formatY,
   formatTooltipY,
   formatX,
-}: BaseChartProps) {
+  onSelectPoint,
+}: BaseChartProps & { onSelectPoint?: (index: number | null) => void }) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (activeIndex !== null) {
+      const timer = setTimeout(() => {
+        setActiveIndex(null);
+        onSelectPoint?.(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeIndex, onSelectPoint]);
 
   const onLayout = (e: LayoutChangeEvent) =>
     setWidth(e.nativeEvent.layout.width);
@@ -442,101 +514,140 @@ export const BarChart = React.memo(function BarChart({
   const slot = n > 0 ? plotW / n : 0;
   const barWidth = Math.max(4, Math.min(slot * 0.6, 26));
   const labelStride = Math.max(1, Math.ceil(n / 5));
+  const activeBarX = activeIndex !== null ? PAD_LEFT + slot * activeIndex + slot / 2 : 0;
+
+  const handleBarTouch = (locationX: number) => {
+    if (n === 0) return;
+    const relative = locationX - PAD_LEFT;
+    const idx = slot > 0 ? Math.floor(relative / slot) : 0;
+    const clamped = Math.max(0, Math.min(n - 1, idx));
+    setActiveIndex(clamped);
+    onSelectPoint?.(clamped);
+  };
 
   return (
     <View onLayout={onLayout} style={{ width: "100%" }}>
       {width > 0 && (
-        <Svg width={width} height={height}>
-          {ticks.map((t, i) => {
-            const y = PAD_TOP + plotH - (t / top) * plotH;
-            return (
-              <G key={`btick-${i}`}>
-                <Line
-                  x1={PAD_LEFT}
-                  y1={y}
-                  x2={PAD_LEFT + plotW}
-                  y2={y}
-                  stroke={colors.chartGrid}
-                  strokeWidth={1}
-                  strokeDasharray="3 3"
-                  opacity={0.6}
-                />
+        <View
+          onStartShouldSetResponder={() => true}
+          onResponderTerminationRequest={() => true}
+          onResponderGrant={(e) => handleBarTouch(e.nativeEvent.locationX)}
+          onResponderMove={(e) => handleBarTouch(e.nativeEvent.locationX)}
+          onResponderRelease={() => {}}
+          onResponderTerminate={() => {}}
+        >
+          <Svg width={width} height={height}>
+            {ticks.map((t, i) => {
+              const y = PAD_TOP + plotH - (t / top) * plotH;
+              return (
+                <G key={`btick-${i}`}>
+                  <Line
+                    x1={PAD_LEFT}
+                    y1={y}
+                    x2={PAD_LEFT + plotW}
+                    y2={y}
+                    stroke={colors.chartGrid}
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    opacity={0.6}
+                  />
+                  <SvgText
+                    x={PAD_LEFT - 8}
+                    y={y + 4}
+                    fill={colors.chartText}
+                    fontSize={9}
+                    textAnchor="end"
+                  >
+                    {formatY ? formatY(t) : Math.round(t).toString()}
+                  </SvgText>
+                </G>
+              );
+            })}
+
+            {labels.map((label, i) => {
+              const value = series[0]?.values[i] ?? null;
+              if (value === null || !isFinite(value)) return null;
+              const barH = Math.max(1, (value / top) * plotH);
+              const x = PAD_LEFT + slot * i + (slot - barWidth) / 2;
+              const y = PAD_TOP + plotH - barH;
+              const isActive = activeIndex === i;
+              return (
+                <G key={`bar-${i}`}>
+                  <Rect
+                    x={x}
+                    y={y}
+                    width={barWidth}
+                    height={barH}
+                    rx={4}
+                    fill={series[0].color}
+                    opacity={activeIndex === null || isActive ? 1 : 0.45}
+                  />
+                </G>
+              );
+            })}
+
+            {labels.map((label, i) => {
+              if (i % labelStride !== 0 && i !== n - 1) return null;
+              return (
                 <SvgText
-                  x={PAD_LEFT - 8}
-                  y={y + 4}
+                  key={`bx-${i}`}
+                  x={PAD_LEFT + slot * i + slot / 2}
+                  y={height - 8}
                   fill={colors.chartText}
                   fontSize={9}
-                  textAnchor="end"
+                  textAnchor="middle"
                 >
-                  {formatY ? formatY(t) : Math.round(t).toString()}
+                  {formatX ? formatX(label) : label}
                 </SvgText>
-              </G>
-            );
-          })}
-
-          {labels.map((label, i) => {
-            const value = series[0]?.values[i] ?? null;
-            if (value === null || !isFinite(value)) return null;
-            const barH = Math.max(1, (value / top) * plotH);
-            const x = PAD_LEFT + slot * i + (slot - barWidth) / 2;
-            const y = PAD_TOP + plotH - barH;
-            const isActive = activeIndex === i;
-            return (
-              <G key={`bar-${i}`}>
-                <Rect
-                  x={x}
-                  y={y}
-                  width={barWidth}
-                  height={barH}
-                  rx={4}
-                  fill={series[0].color}
-                  opacity={activeIndex === null || isActive ? 1 : 0.45}
-                  onPressIn={() => setActiveIndex(i)}
-                />
-              </G>
-            );
-          })}
-
-          {labels.map((label, i) => {
-            if (i % labelStride !== 0 && i !== n - 1) return null;
-            return (
-              <SvgText
-                key={`bx-${i}`}
-                x={PAD_LEFT + slot * i + slot / 2}
-                y={height - 8}
-                fill={colors.chartText}
-                fontSize={9}
-                textAnchor="middle"
-              >
-                {formatX ? formatX(label) : label}
-              </SvgText>
-            );
-          })}
-        </Svg>
+              );
+            })}
+          </Svg>
+        </View>
       )}
 
       {activeIndex !== null && series[0]?.values[activeIndex] != null && (
         <View
+          pointerEvents="none"
           style={{
             position: "absolute",
-            top: 4,
-            left: 48,
+            top: 6,
+            left: Math.max(8, Math.min(width - 185, activeBarX - 80)),
             backgroundColor: colors.card,
             borderWidth: 1,
             borderColor: colors.border,
-            borderRadius: radius.md,
-            paddingHorizontal: spacing.sm + 2,
-            paddingVertical: spacing.sm,
+            borderRadius: radius.xl,
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.md,
+            minWidth: 175,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.2,
+            shadowRadius: 12,
+            elevation: 8,
           }}
         >
-          <Text variant="caption" color={colors.mutedForeground}>
+          <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "700", fontSize: 13, marginBottom: 4 }}>
             {formatX ? formatX(labels[activeIndex]) : labels[activeIndex]}
           </Text>
-          <Text variant="caption" style={{ fontWeight: "800" }} tabular>
-            {formatTooltipY
-              ? formatTooltipY(series[0].values[activeIndex] as number)
-              : (series[0].values[activeIndex] as number).toFixed(0)}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.lg, marginTop: 2 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: series[0].color }} />
+              <Text variant="caption" color={colors.foreground} style={{ fontWeight: "600", fontSize: 13 }}>
+                Contribution:
+              </Text>
+            </View>
+            <Text
+              variant="caption"
+              color={series[0].color}
+              style={{ fontWeight: "800", fontSize: 13, flexShrink: 0 }}
+              numberOfLines={1}
+              tabular
+            >
+              {formatTooltipY
+                ? formatTooltipY(series[0].values[activeIndex] as number)
+                : (series[0].values[activeIndex] as number).toFixed(0)}
+            </Text>
+          </View>
         </View>
       )}
     </View>
@@ -559,14 +670,31 @@ export const DonutChart = React.memo(function DonutChart({
   thickness = 26,
   centerLabel,
   centerValue,
+  selectedIndex,
+  onSelectSlice,
 }: {
   slices: PieSlice[];
   size?: number;
   thickness?: number;
   centerLabel?: string;
   centerValue?: string;
+  selectedIndex?: number | null;
+  onSelectSlice?: (index: number | null) => void;
 }) {
   const { colors } = useTheme();
+  const [internalActiveIndex, setInternalActiveIndex] = useState<number | null>(null);
+  const activeIndex = selectedIndex !== undefined ? selectedIndex : internalActiveIndex;
+
+  useEffect(() => {
+    if (activeIndex !== null) {
+      const timer = setTimeout(() => {
+        setInternalActiveIndex(null);
+        onSelectSlice?.(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeIndex, onSelectSlice]);
+
   const total = slices.reduce((sum, s) => sum + Math.max(0, s.value), 0);
   const radiusOuter = size / 2;
   const radiusInner = radiusOuter - thickness;
@@ -578,12 +706,12 @@ export const DonutChart = React.memo(function DonutChart({
     let angle = -Math.PI / 2;
     return slices
       .filter((s) => s.value > 0)
-      .map((s) => {
+      .map((s, originalIndex) => {
         const sweep = (s.value / total) * Math.PI * 2;
         const start = angle;
         const end = angle + sweep;
         angle = end;
-        return { ...s, start, end };
+        return { ...s, start, end, originalIndex };
       });
   }, [slices, total]);
 
@@ -622,15 +750,34 @@ export const DonutChart = React.memo(function DonutChart({
     );
   }
 
+  const activeSlice = activeIndex !== null && slices[activeIndex] ? slices[activeIndex] : null;
+  const displayVal = activeSlice
+    ? `${((activeSlice.value / (total || 1)) * 100).toFixed(0)}%`
+    : centerValue;
+  const displayLabel = activeSlice ? activeSlice.name : centerLabel;
+
   return (
     <View style={{ alignItems: "center", justifyContent: "center" }}>
       <Svg width={size} height={size}>
-        {arcs.map((a, i) => (
-          <Path key={i} d={describeArc(a.start, a.end)} fill={a.color} />
-        ))}
+        {arcs.map((a) => {
+          const isActive = activeIndex === a.originalIndex;
+          return (
+            <Path
+              key={a.originalIndex}
+              d={describeArc(a.start, a.end)}
+              fill={a.color}
+              opacity={activeIndex === null || isActive ? 1 : 0.45}
+              onPress={() => {
+                const next = activeIndex === a.originalIndex ? null : a.originalIndex;
+                setInternalActiveIndex(next);
+                onSelectSlice?.(next);
+              }}
+            />
+          );
+        })}
         <Circle cx={cx} cy={cy} r={radiusInner - 1} fill={colors.card} />
       </Svg>
-      {(centerValue || centerLabel) && (
+      {(displayVal || displayLabel) && (
         <View
           style={{
             position: "absolute",
@@ -640,18 +787,18 @@ export const DonutChart = React.memo(function DonutChart({
             height: radiusInner * 2,
           }}
         >
-          {centerValue ? (
+          {displayVal ? (
             <Text
               variant="label"
-              style={{ fontSize: fontSize.md, fontWeight: "800" }}
+              style={{ fontSize: fontSize.md, fontWeight: "800", color: activeSlice?.color }}
               numberOfLines={1}
             >
-              {centerValue}
+              {displayVal}
             </Text>
           ) : null}
-          {centerLabel ? (
-            <Text variant="caption" color={colors.mutedForeground}>
-              {centerLabel}
+          {displayLabel ? (
+            <Text variant="caption" color={colors.mutedForeground} align="center" style={{ fontSize: 10 }}>
+              {displayLabel}
             </Text>
           ) : null}
         </View>
@@ -664,45 +811,54 @@ export const DonutChart = React.memo(function DonutChart({
 export function ChartLegend({
   items,
   formatValue,
+  selectedIndex,
+  onSelectSlice,
 }: {
   items: PieSlice[];
   formatValue?: (value: number) => string;
+  selectedIndex?: number | null;
+  onSelectSlice?: (index: number | null) => void;
 }) {
   const { colors } = useTheme();
   const total = items.reduce((s, i) => s + i.value, 0);
 
   return (
     <View style={{ gap: spacing.sm, flex: 1 }}>
-      {items.map((item) => (
-        <View
-          key={item.name}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: spacing.sm,
-          }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
-            <View
-              style={{
-                width: 9,
-                height: 9,
-                borderRadius: 5,
-                backgroundColor: item.color,
-              }}
-            />
-            <Text variant="caption" color={colors.mutedForeground} numberOfLines={1}>
-              {item.name}
+      {items.map((item, idx) => {
+        const isActive = selectedIndex === idx;
+        return (
+          <Pressable
+            key={item.name}
+            onPress={() => onSelectSlice?.(isActive ? null : idx)}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: spacing.sm,
+              opacity: selectedIndex === null || isActive ? 1 : 0.45,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+              <View
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 5,
+                  backgroundColor: item.color,
+                }}
+              />
+              <Text variant="caption" color={isActive ? item.color : colors.mutedForeground} numberOfLines={1} style={{ fontWeight: isActive ? "700" : "400" }}>
+                {item.name}
+              </Text>
+            </View>
+            <Text variant="caption" style={{ fontWeight: "700" }} color={isActive ? item.color : colors.foreground} tabular>
+              {formatValue
+                ? formatValue(item.value)
+                : `${((item.value / (total || 1)) * 100).toFixed(0)}%`}
             </Text>
-          </View>
-          <Text variant="caption" style={{ fontWeight: "700" }} tabular>
-            {formatValue
-              ? formatValue(item.value)
-              : `${((item.value / (total || 1)) * 100).toFixed(0)}%`}
-          </Text>
-        </View>
-      ))}
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

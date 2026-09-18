@@ -50,6 +50,10 @@ const RANGE_DAYS: Record<Exclude<TimeRange, "ALL">, number> = {
 // Portfolio growth
 // ------------------------------------------------------------
 
+// ------------------------------------------------------------
+// Portfolio growth
+// ------------------------------------------------------------
+
 export function PortfolioGrowthCard({
   data,
   summary,
@@ -59,6 +63,7 @@ export function PortfolioGrowthCard({
 }) {
   const { colors } = useTheme();
   const [range, setRange] = useState<TimeRange>("ALL");
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const filtered = useMemo(() => {
     if (data.length <= 1 || range === "ALL") return data;
@@ -69,11 +74,15 @@ export function PortfolioGrowthCard({
   }, [data, range]);
 
   const latestPoint = data.length > 0 ? data[data.length - 1] : null;
-  const currVal = summary.currentValue ?? latestPoint?.portfolioValue ?? 0;
-  const totalInv = summary.totalInvested ?? latestPoint?.totalInvested ?? 0;
-  const gainVal = summary.gainLoss ?? (currVal ? currVal - totalInv : 0);
-  const gainPct =
-    summary.gainLossPct ?? (totalInv > 0 ? (gainVal / totalInv) * 100 : 0);
+  const isSelected = selectedIndex !== null && selectedIndex < filtered.length;
+  const activePoint = isSelected ? filtered[selectedIndex] : null;
+
+  const currVal = activePoint ? activePoint.portfolioValue : (summary.currentValue ?? latestPoint?.portfolioValue ?? 0);
+  const totalInv = activePoint ? activePoint.totalInvested : (summary.totalInvested ?? latestPoint?.totalInvested ?? 0);
+  const gainVal = activePoint ? (currVal - totalInv) : (summary.gainLoss ?? (currVal ? currVal - totalInv : 0));
+  const gainPct = activePoint
+    ? (totalInv > 0 ? (gainVal / totalInv) * 100 : 0)
+    : (summary.gainLossPct ?? (totalInv > 0 ? (gainVal / totalInv) * 100 : 0));
   const isPositive = gainVal >= 0;
   const gainColor = isPositive ? colors.success : colors.rose;
 
@@ -86,22 +95,37 @@ export function PortfolioGrowthCard({
     );
   }
 
-  const maxVal = Math.max(
-    ...filtered.flatMap((d) => [d.portfolioValue, d.totalInvested]),
-    0
-  );
-
   return (
     <Card padded style={{ gap: spacing.md }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Text variant="micro" color={colors.mutedForeground}>
-          Portfolio Growth
-        </Text>
-        {summary.latestNav ? (
-          <Text variant="caption" color={colors.mutedForeground}>
-            NAV: NPR {formatNav(summary.latestNav)}
-            {summary.latestNavDate ? ` (${formatDateShort(summary.latestNavDate)})` : ""}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text variant="micro" color={colors.mutedForeground}>
+            Portfolio Growth
           </Text>
+          {summary.latestNav ? (
+            <Text variant="caption" color={colors.mutedForeground}>
+              NAV: NPR {formatNav(summary.latestNav)}
+              {summary.latestNavDate ? ` (${formatDateShort(summary.latestNavDate)})` : ""}
+            </Text>
+          ) : null}
+        </View>
+
+        {activePoint ? (
+          <Pressable
+            onPress={() => setSelectedIndex(null)}
+            style={{
+              paddingHorizontal: spacing.sm + 2,
+              paddingVertical: 3,
+              borderRadius: radius.full,
+              backgroundColor: `${colors.primary}20`,
+              borderWidth: 1,
+              borderColor: colors.primary,
+            }}
+          >
+            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
+              {formatDateShort(activePoint.date)} (Reset)
+            </Text>
+          </Pressable>
         ) : null}
       </View>
 
@@ -150,7 +174,10 @@ export function PortfolioGrowthCard({
             return (
               <Pressable
                 key={r}
-                onPress={() => setRange(r)}
+                onPress={() => {
+                  setRange(r);
+                  setSelectedIndex(null);
+                }}
                 style={{
                   paddingHorizontal: spacing.md,
                   paddingVertical: 6,
@@ -193,6 +220,8 @@ export function PortfolioGrowthCard({
         formatY={formatCompact}
         formatTooltipY={formatCurrencyWhole}
         formatX={formatDateShort}
+        selectedIndex={selectedIndex}
+        onSelectPoint={(idx) => setSelectedIndex(idx)}
         showLegend
       />
     </Card>
@@ -205,14 +234,40 @@ export function PortfolioGrowthCard({
 
 export function NavHistoryCard({ data }: { data: ChartDataPoint[] }) {
   const { colors } = useTheme();
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+  const isSelected = selectedIndex !== null && selectedIndex < data.length;
+  const activePoint = isSelected ? data[selectedIndex] : null;
 
   return (
     <Card padded style={{ gap: spacing.md }}>
-      <View>
-        <Text variant="subheading">NAV History</Text>
-        <Text variant="caption" color={colors.mutedForeground}>
-          Net Asset Value per unit over time
-        </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Text variant="subheading">NAV History</Text>
+          <Text variant="caption" color={activePoint ? colors.primary : colors.mutedForeground} style={{ fontWeight: activePoint ? "700" : "400" }}>
+            {activePoint
+              ? `NAV on ${formatDateShort(activePoint.date)}: NPR ${formatNav(activePoint.value)}`
+              : "Net Asset Value per unit over time"}
+          </Text>
+        </View>
+
+        {activePoint ? (
+          <Pressable
+            onPress={() => setSelectedIndex(null)}
+            style={{
+              paddingHorizontal: spacing.sm + 2,
+              paddingVertical: 3,
+              borderRadius: radius.full,
+              backgroundColor: `${colors.primary}20`,
+              borderWidth: 1,
+              borderColor: colors.primary,
+            }}
+          >
+            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
+              Reset
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {data.length === 0 ? (
@@ -233,11 +288,17 @@ export function NavHistoryCard({ data }: { data: ChartDataPoint[] }) {
           formatY={(v) => v.toFixed(1)}
           formatTooltipY={(v) => `NPR ${formatNav(v)}`}
           formatX={formatDateShort}
+          selectedIndex={selectedIndex}
+          onSelectPoint={(idx) => setSelectedIndex(idx)}
         />
       )}
     </Card>
   );
 }
+
+// ------------------------------------------------------------
+// Monthly contributions
+// ------------------------------------------------------------
 
 // ------------------------------------------------------------
 // Monthly contributions
@@ -249,21 +310,45 @@ export function MonthlyContributionsCard({
   data: MonthlyContribution[];
 }) {
   const { colors } = useTheme();
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
   const sorted = useMemo(
     () => [...data].sort((a, b) => a.month.localeCompare(b.month)),
     [data]
   );
 
   const total = sorted.reduce((s, d) => s + d.amount, 0);
+  const activeItem = selectedIndex !== null && sorted[selectedIndex] ? sorted[selectedIndex] : null;
 
   return (
     <Card padded style={{ gap: spacing.md }}>
-      <View>
-        <Text variant="subheading">Monthly Contributions</Text>
-        <Text variant="caption" color={colors.mutedForeground}>
-          {sorted.length} month{sorted.length === 1 ? "" : "s"} ·{" "}
-          {formatCurrencyWhole(total)} deposited
-        </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Text variant="subheading">Monthly Contributions</Text>
+          <Text variant="caption" color={activeItem ? colors.primary : colors.mutedForeground} style={{ fontWeight: activeItem ? "700" : "400" }}>
+            {activeItem
+              ? `Selected: ${formatMonth(activeItem.month)} · ${formatCurrencyWhole(activeItem.amount)}`
+              : `${sorted.length} month${sorted.length === 1 ? "" : "s"} · ${formatCurrencyWhole(total)} deposited`}
+          </Text>
+        </View>
+
+        {activeItem ? (
+          <Pressable
+            onPress={() => setSelectedIndex(null)}
+            style={{
+              paddingHorizontal: spacing.sm + 2,
+              paddingVertical: 3,
+              borderRadius: radius.full,
+              backgroundColor: `${colors.primary}20`,
+              borderWidth: 1,
+              borderColor: colors.primary,
+            }}
+          >
+            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
+              Reset
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {sorted.length === 0 ? (
@@ -301,6 +386,7 @@ export function InvestedVsGainCard({
   currentValue: number | null;
 }) {
   const { colors } = useTheme();
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const value = currentValue ?? totalInvested;
   const gain = value - totalInvested;
@@ -319,13 +405,37 @@ export function InvestedVsGainCard({
     },
   ];
 
+  const activeSlice = selectedIndex !== null && slices[selectedIndex] ? slices[selectedIndex] : null;
+
   return (
     <Card padded style={{ gap: spacing.md }}>
-      <View>
-        <Text variant="subheading">Invested vs Gain</Text>
-        <Text variant="caption" color={colors.mutedForeground}>
-          How your portfolio value splits between capital and return
-        </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Text variant="subheading">Invested vs Gain</Text>
+          <Text variant="caption" color={activeSlice ? activeSlice.color : colors.mutedForeground} style={{ fontWeight: activeSlice ? "700" : "400" }}>
+            {activeSlice
+              ? `${activeSlice.name}: ${formatCurrencyWhole(activeSlice.value)} (${((activeSlice.value / (value || 1)) * 100).toFixed(1)}%)`
+              : "How your portfolio value splits between capital and return"}
+          </Text>
+        </View>
+
+        {activeSlice ? (
+          <Pressable
+            onPress={() => setSelectedIndex(null)}
+            style={{
+              paddingHorizontal: spacing.sm + 2,
+              paddingVertical: 3,
+              borderRadius: radius.full,
+              backgroundColor: `${colors.primary}20`,
+              borderWidth: 1,
+              borderColor: colors.primary,
+            }}
+          >
+            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
+              Reset
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.lg }}>
@@ -335,10 +445,14 @@ export function InvestedVsGainCard({
           thickness={24}
           centerValue={formatCompact(value)}
           centerLabel="Value"
+          selectedIndex={selectedIndex}
+          onSelectSlice={(idx) => setSelectedIndex(idx)}
         />
         <ChartLegend
           items={slices}
           formatValue={(v) => formatCurrencyWhole(v)}
+          selectedIndex={selectedIndex}
+          onSelectSlice={(idx) => setSelectedIndex(idx)}
         />
       </View>
     </Card>

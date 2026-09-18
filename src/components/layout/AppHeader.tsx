@@ -374,16 +374,16 @@ function UserAvatarMenu() {
           visible={open}
           onClose={() => setOpen(false)}
           anchor={anchor}
-          width={290}
+          width={310}
         >
-          <View style={{ padding: spacing.md, gap: spacing.md }}>
+          <View style={{ padding: spacing.md, gap: spacing.sm }}>
           {/* User details */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
             <View
               style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
                 backgroundColor: colors.muted,
                 borderWidth: 1,
                 borderColor: colors.emerald,
@@ -391,7 +391,7 @@ function UserAvatarMenu() {
                 justifyContent: "center",
               }}
             >
-              <Text style={{ fontSize: 20, fontWeight: "900" }} color={colors.emerald}>
+              <Text style={{ fontSize: 18, fontWeight: "900" }} color={colors.emerald}>
                 {initial}
               </Text>
             </View>
@@ -410,22 +410,38 @@ function UserAvatarMenu() {
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: spacing.sm,
-              padding: spacing.md,
+              gap: spacing.md,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
               borderRadius: radius.lg,
               backgroundColor: colors.muted,
             }}
           >
-            <Clock size={14} color={colors.mutedForeground} />
-            <Text variant="micro" color={colors.mutedForeground}>
-              Session Active Since
-            </Text>
-            <Text variant="caption" style={{ fontWeight: "700", marginLeft: "auto" }}>
-              {sessionSince ?? "—"}
-            </Text>
+            <View
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Clock size={14} color={colors.emerald} />
+            </View>
+            <View style={{ flex: 1, gap: 1 }}>
+              <Text variant="micro" color={colors.mutedForeground}>
+                Session Active
+              </Text>
+              <Text variant="caption" style={{ fontWeight: "700" }} numberOfLines={1}>
+                {sessionSince ?? "—"}
+              </Text>
+            </View>
           </View>
 
-          <Separator />
+          <Separator style={{ marginVertical: 2 }} />
 
           <Pressable
             onPress={() => {
@@ -436,17 +452,17 @@ function UserAvatarMenu() {
               flexDirection: "row",
               alignItems: "center",
               gap: spacing.md,
-              paddingVertical: spacing.md,
+              paddingVertical: spacing.sm,
               paddingHorizontal: spacing.sm,
               borderRadius: radius.lg,
               opacity: pressed ? 0.7 : 1,
             })}
           >
-            <SettingsIcon size={18} color={colors.foreground} />
+            <SettingsIcon size={16} color={colors.foreground} />
             <Text variant="label">Account Settings</Text>
           </Pressable>
 
-          <Separator />
+          <Separator style={{ marginVertical: 2 }} />
 
           <Pressable
             onPress={async () => {
@@ -457,13 +473,13 @@ function UserAvatarMenu() {
               flexDirection: "row",
               alignItems: "center",
               gap: spacing.md,
-              paddingVertical: spacing.md,
+              paddingVertical: spacing.sm,
               paddingHorizontal: spacing.sm,
               borderRadius: radius.lg,
               opacity: pressed ? 0.7 : 1,
             })}
           >
-            <LogOut size={18} color={colors.rose} />
+            <LogOut size={16} color={colors.rose} />
             <Text variant="label" color={colors.rose}>
               Log Out
             </Text>

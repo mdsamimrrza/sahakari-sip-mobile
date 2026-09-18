@@ -1,13 +1,14 @@
 // ============================================================
 // SahakariSIP — Theme
 // ============================================================
-// "Editorial Ledger" design language — a printed-ledger fintech:
+// "Terrace" design language — stepped Himalayan fields, where a SIP
+// grows row by row:
 //
-//   Light → "Paper":  warm paper canvas, white cards, green-black ink,
-//                      hairline rules, sharp corners, serif display type,
-//                      ledger green + copper accents, NO shadows at all
-//   Dark  → "Night":  green-black canvas, raised ink cards, chalk text,
-//                      sage + copper accents, same hairline geometry
+//   Light → "Mist":   cool morning-mist canvas, near-white cards, pine
+//                      ink, Nepal crimson + marigold as the only loud
+//                      notes, Instrument Serif display over Hanken Grotesk
+//   Dark  → "Night":  night-terrace canvas, raised pine cards, shoot-green
+//                      + marigold accents, same quiet geometry
 // ============================================================
 
 import React, {
@@ -63,81 +64,81 @@ export interface ThemeColors {
 }
 
 export const lightColors: ThemeColors = {
-  background: "#F6F4EE", // warm paper
-  foreground: "#16211B", // green-black ink
+  background: "#F4F7F5", // crisp alpine mist with subtle emerald tint
+  foreground: "#0F1A15", // deep pine ink
   card: "#FFFFFF",
-  cardForeground: "#16211B",
-  primary: "#1E6B48", // ledger green
+  cardForeground: "#0F1A15",
+  primary: "#059669", // rich energetic emerald green
   primaryForeground: "#FFFFFF",
-  secondary: "#B4530A", // burnt copper
+  secondary: "#D97706", // warm golden amber
   secondaryForeground: "#FFFFFF",
-  muted: "#ECE9E0",
-  mutedForeground: "#5C6660",
-  accent: "#B4530A",
+  muted: "#E6ECE8",
+  mutedForeground: "#4B5B53",
+  accent: "#10B981", // vibrant mint accent
   accentForeground: "#FFFFFF",
-  destructive: "#B3261E",
+  destructive: "#DC2626", // rich crimson
   destructiveForeground: "#FFFFFF",
-  border: "#D8D3C6", // hairline rule
+  border: "#E2E9E4",
   input: "#FFFFFF",
-  ring: "#1E6B48",
+  ring: "#059669",
 
-  chartPrimary: "#1E6B48",
-  chartPositive: "#2E7D5B",
-  chartNegative: "#B3261E",
-  chartInvested: "#A8A296",
-  chartFeeDrag: "#C2620A",
-  chartGrid: "#E4E0D4",
-  chartText: "#5C6660",
+  chartPrimary: "#059669",
+  chartPositive: "#10B981",
+  chartNegative: "#DC2626",
+  chartInvested: "#64748B",
+  chartFeeDrag: "#D97706",
+  chartGrid: "#E2E9E4",
+  chartText: "#4B5B53",
 
-  success: "#2E7D5B",
-  warning: "#B4530A",
-  info: "#1D4ED8",
-  blue: "#1D4ED8",
-  purple: "#6D28D9",
-  amber: "#B4530A",
-  rose: "#B3261E",
-  emerald: "#2E7D5B",
-  overlay: "rgba(22, 33, 27, 0.45)",
-  skeleton: "#ECE9E0",
+  success: "#10B981",
+  warning: "#F59E0B",
+  info: "#2563EB",
+  blue: "#2563EB",
+  purple: "#7C3AED",
+  amber: "#D97706",
+  rose: "#E11D48",
+  emerald: "#059669",
+  overlay: "rgba(15, 26, 21, 0.5)",
+  skeleton: "#E2E9E4",
 };
 
 export const darkColors: ThemeColors = {
-  background: "#101512", // green-black night
-  foreground: "#EDEBE3", // chalk
-  card: "#18201B", // raised ink card
-  cardForeground: "#EDEBE3",
-  primary: "#6FBF8F", // sage
-  primaryForeground: "#101512",
-  secondary: "#D99A4E", // copper light
-  secondaryForeground: "#101512",
-  muted: "#202A23",
-  mutedForeground: "#9AA69D",
-  accent: "#D99A4E",
-  accentForeground: "#101512",
-  destructive: "#E07A6F",
-  destructiveForeground: "#101512",
-  border: "#2C362E", // hairline rule
-  input: "#18201B",
-  ring: "#6FBF8F",
+  background: "#070F0B", // deep midnight obsidian emerald
+  foreground: "#F0FDF4",
+  card: "#101E17", // rich elevated emerald panel
+  cardForeground: "#F0FDF4",
+  primary: "#10B981", // glowing neon emerald
+  primaryForeground: "#042F1E",
+  secondary: "#F59E0B", // bright warm gold
+  secondaryForeground: "#180E02",
+  muted: "#172A20",
+  mutedForeground: "#8DA497",
+  accent: "#34D399",
+  accentForeground: "#042F1E",
+  destructive: "#F87171",
+  destructiveForeground: "#450A0A",
+  border: "#1E3A2B",
+  input: "#101E17",
+  ring: "#10B981",
 
-  chartPrimary: "#6FBF8F",
-  chartPositive: "#6FBF8F",
-  chartNegative: "#E07A6F",
-  chartInvested: "#3A453C",
-  chartFeeDrag: "#D99A4E",
-  chartGrid: "#202A23",
-  chartText: "#EDEBE3",
+  chartPrimary: "#10B981",
+  chartPositive: "#34D399",
+  chartNegative: "#F87171",
+  chartInvested: "#334155",
+  chartFeeDrag: "#F59E0B",
+  chartGrid: "#172A20",
+  chartText: "#F0FDF4",
 
-  success: "#6FBF8F",
-  warning: "#D99A4E",
-  info: "#7FA8E8",
-  blue: "#7FA8E8",
+  success: "#34D399",
+  warning: "#FBBF24",
+  info: "#60A5FA",
+  blue: "#60A5FA",
   purple: "#A78BFA",
-  amber: "#D99A4E",
-  rose: "#E07A6F",
-  emerald: "#6FBF8F",
-  overlay: "rgba(0, 0, 0, 0.6)",
-  skeleton: "#202A23",
+  amber: "#F59E0B",
+  rose: "#F87171",
+  emerald: "#10B981",
+  overlay: "rgba(0, 0, 0, 0.75)",
+  skeleton: "#172A20",
 };
 
 // ---------- Spacing / radius / type scale ----------
@@ -152,32 +153,33 @@ export const spacing = {
   xxxl: 32,
 } as const;
 
-// Sharp, printed geometry — tight radii, no pills, no shadows.
+// Modern smooth geometry — rounded squircles & pills, subtle elevation shadows.
 export const radius = {
-  sm: 2,
-  md: 4,
-  lg: 6,
-  xl: 8,
-  xxl: 10,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  full: 9999,
 } as const;
 
-// Display faces are serif (the ledger's headline voice); body stays sans.
+// Display faces use Instrument Serif for elegant financial headlines; body uses crisp Hanken Grotesk.
 export const fontFamily = {
-  display: "serif",
+  display: "InstrumentSerif-Regular",
+  body: "HankenGrotesk",
 } as const;
 
-// Type scale — editorial proportions: large serif headlines, small
-// letter-spaced caps for labels, tabular numerals for every figure.
+// Type scale — rich financial proportions with strong contrast.
 export const fontSize = {
   xs: 12,
   sm: 13,
   base: 14,
   md: 15,
   lg: 17,
-  xl: 19,
-  xxl: 24,
-  xxxl: 30,
-  display: 34,
+  xl: 20,
+  xxl: 26,
+  xxxl: 32,
+  display: 38,
 } as const;
 
 export type ThemeMode = "light" | "dark" | "system";

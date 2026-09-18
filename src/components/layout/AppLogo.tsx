@@ -14,20 +14,20 @@ import { Text } from "../ui/primitives";
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <Rect width="32" height="32" rx="9" fill="#1E6B48" stroke="#16211B" strokeWidth="2" />
-      <Rect x="6" y="21" width="4.5" height="5.5" rx="1.5" fill="#F6F4EE" opacity="0.6" />
-      <Rect x="13.5" y="13" width="4.5" height="13.5" rx="1.5" fill="#F6F4EE" opacity="0.8" />
-      <Rect x="21" y="6" width="4.5" height="20.5" rx="1.5" fill="#F6F4EE" />
+      <Rect width="32" height="32" rx="9" fill="#2E6B4F" stroke="#182420" strokeWidth="2" />
+      <Rect x="6" y="21" width="4.5" height="5.5" rx="1.5" fill="#FBFCFA" opacity="0.6" />
+      <Rect x="13.5" y="13" width="4.5" height="13.5" rx="1.5" fill="#FBFCFA" opacity="0.8" />
+      <Rect x="21" y="6" width="4.5" height="20.5" rx="1.5" fill="#FBFCFA" />
       <Path
         d="M4 23.5L11 16.5L16 19.5L26 9.5"
-        stroke="#F6F4EE"
+        stroke="#FBFCFA"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <Path
         d="M22 8.5H27.5V14"
-        stroke="#F6F4EE"
+        stroke="#FBFCFA"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"

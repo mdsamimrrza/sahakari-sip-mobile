@@ -14,12 +14,16 @@ import React, {
 import {
   Animated,
   Modal as RNModal,
+  Platform,
   Pressable,
   ScrollView,
+  StatusBar,
+  useWindowDimensions,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { ChevronDown } from "lucide-react-native";
 import { useTheme, fontSize, radius, spacing } from "../../theme";
 import { Button, Text } from "./primitives";
 
@@ -151,16 +155,7 @@ export interface SelectOption<T extends string = string> {
   hint?: string;
 }
 
-export function Select<T extends string = string>({
-  label,
-  value,
-  options,
-  onValueChange,
-  placeholder = "Select…",
-  disabled,
-  containerStyle,
-  displayValue,
-}: {
+export function Select<T extends string = string>(props: {
   label?: string;
   value: T;
   options: SelectOption<T>[];
@@ -170,99 +165,7 @@ export function Select<T extends string = string>({
   containerStyle?: StyleProp<ViewStyle>;
   displayValue?: string;
 }) {
-  const { colors } = useTheme();
-  const [open, setOpen] = useState(false);
-
-  const selected = options.find((o) => o.value === value);
-  const shown = displayValue ?? selected?.label ?? placeholder;
-
-  return (
-    <View style={containerStyle}>
-      {label ? (
-        <Text
-          variant="caption"
-          color={colors.mutedForeground}
-          style={{ fontWeight: "600", marginBottom: 6 }}
-        >
-          {label}
-        </Text>
-      ) : null}
-
-      <Pressable
-        onPress={() => !disabled && setOpen(true)}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          backgroundColor: colors.input,
-          borderWidth: 1,
-          borderColor: colors.border,
-          borderRadius: radius.lg,
-          paddingHorizontal: spacing.md,
-          minHeight: 44,
-          opacity: disabled ? 0.5 : 1,
-        }}
-      >
-        <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>
-          {shown}
-        </Text>
-        <Text color={colors.mutedForeground} style={{ fontSize: 12 }}>
-          ▾
-        </Text>
-      </Pressable>
-
-      <Modal
-        visible={open}
-        onClose={() => setOpen(false)}
-        position="bottom"
-        title={label}
-      >
-        <View style={{ gap: spacing.xs }}>
-          {options.map((opt) => {
-            const active = opt.value === value;
-            return (
-              <Pressable
-                key={opt.value}
-                onPress={() => {
-                  onValueChange(opt.value);
-                  setOpen(false);
-                }}
-                style={{
-                  paddingVertical: spacing.md,
-                  paddingHorizontal: spacing.md,
-                  borderRadius: radius.lg,
-                  backgroundColor: active ? colors.muted : "transparent",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: spacing.sm,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text
-                    variant="body"
-                    style={{ fontWeight: active ? "700" : "500" }}
-                  >
-                    {opt.label}
-                  </Text>
-                  {opt.hint ? (
-                    <Text variant="caption" color={colors.mutedForeground}>
-                      {opt.hint}
-                    </Text>
-                  ) : null}
-                </View>
-                {active ? (
-                  <Text color={colors.success} style={{ fontWeight: "900" }}>
-                    ✓
-                  </Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      </Modal>
-    </View>
-  );
+  return <DropdownSelect {...props} />;
 }
 
 // ------------------------------------------------------------
@@ -424,16 +327,23 @@ export function DropdownMenu({
   maxHeight?: number;
 }) {
   const { colors } = useTheme();
+  const screenWidth = useWindowDimensions().width;
 
-  // Prefer aligning the panel's right edge with the trigger's right edge
-  // (dropdowns from header icons), but keep it on screen.
+  const actualWidth = Math.min(width, screenWidth - spacing.md * 2);
+
+  // Position cleanly: align right edge with anchor right edge if possible,
+  // but clamp so it never overflows left or right screen bounds!
   const left = Math.max(
-    spacing.sm,
+    spacing.md,
     Math.min(
-      anchor.x,
-      Math.max(spacing.sm, anchor.x + anchor.width - width)
+      anchor.x + anchor.width - actualWidth,
+      screenWidth - actualWidth - spacing.md
     )
   );
+
+  const statusOffset =
+    Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
+  const computedTop = anchor.y + anchor.height + 6 + statusOffset;
 
   return (
     <RNModal
@@ -449,15 +359,20 @@ export function DropdownMenu({
           onPress={(e) => e.stopPropagation()}
           style={{
             position: "absolute",
-            top: anchor.y + anchor.height + 6,
+            top: computedTop,
             left,
-            width,
+            width: actualWidth,
             maxHeight,
             backgroundColor: colors.card,
-            borderWidth: 1,
+            borderWidth: 1.5,
             borderColor: colors.border,
             borderRadius: radius.xl,
             overflow: "hidden",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.25,
+            shadowRadius: 14,
+            elevation: 10,
           }}
         >
           <ScrollView style={{ flexGrow: 0 }}>{children}</ScrollView>
@@ -480,6 +395,7 @@ export function DropdownSelect<T extends string = string>({
   placeholder = "Select…",
   disabled,
   displayValue,
+  containerStyle,
 }: {
   label?: string;
   value: T;
@@ -488,6 +404,7 @@ export function DropdownSelect<T extends string = string>({
   placeholder?: string;
   disabled?: boolean;
   displayValue?: string;
+  containerStyle?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
@@ -498,7 +415,7 @@ export function DropdownSelect<T extends string = string>({
   const shown = displayValue ?? selected?.label ?? placeholder;
 
   return (
-    <View>
+    <View style={containerStyle}>
       {label ? (
         <Text
           variant="caption"
@@ -523,20 +440,18 @@ export function DropdownSelect<T extends string = string>({
           alignItems: "center",
           justifyContent: "space-between",
           backgroundColor: colors.input,
-          borderWidth: 1,
+          borderWidth: 1.5,
           borderColor: colors.border,
-          borderRadius: radius.lg,
+          borderRadius: radius.md,
           paddingHorizontal: spacing.md,
-          minHeight: 44,
+          minHeight: 48,
           opacity: disabled ? 0.5 : 1,
         }}
       >
-        <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>
+        <Text variant="body" numberOfLines={1} style={{ flex: 1, fontWeight: "600" }}>
           {shown}
         </Text>
-        <Text color={colors.mutedForeground} style={{ fontSize: 12 }}>
-          ▾
-        </Text>
+        <ChevronDown size={18} color={colors.mutedForeground} />
       </Pressable>
 
       {anchor ? (
@@ -544,7 +459,7 @@ export function DropdownSelect<T extends string = string>({
           visible={open}
           onClose={() => setOpen(false)}
           anchor={anchor}
-          width={280}
+          width={anchor.width || 280}
         >
           <View style={{ padding: spacing.xs }}>
             {options.map((opt) => {

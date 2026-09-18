@@ -115,23 +115,25 @@ export default function LandingScreen() {
         <View style={{ alignItems: "center", gap: spacing.md, paddingTop: spacing.xl }}>
           <View
             style={{
-              paddingHorizontal: spacing.md,
-              paddingVertical: 5,
-              borderRadius: radius.md,
-              backgroundColor: colors.muted,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: 6,
+              borderRadius: radius.full,
+              backgroundColor: `${colors.primary}18`,
+              borderWidth: 1,
+              borderColor: `${colors.primary}35`,
             }}
           >
             <Text
-              style={{ fontSize: fontSize.xs, fontWeight: "800", letterSpacing: 0.5 }}
+              style={{ fontSize: fontSize.xs, fontWeight: "800", letterSpacing: 0.6 }}
               color={colors.primary}
             >
-              BUILT FOR NEPALI MUTUAL FUND SIP INVESTORS
+              BUILT FOR NEPALI MUTUAL FUND INVESTORS
             </Text>
           </View>
 
-          <Text variant="display" align="center">
+          <Text variant="display" align="center" style={{ lineHeight: 46 }}>
             Track Your Nepali Mutual Fund SIPs with{" "}
-            <Text variant="display" color={colors.secondary}>
+            <Text variant="display" color={colors.secondary} style={{ lineHeight: 46 }}>
               Precision &amp; Clarity
             </Text>
           </Text>
@@ -140,7 +142,7 @@ export default function LandingScreen() {
             variant="body"
             align="center"
             color={colors.mutedForeground}
-            style={{ maxWidth: 520 }}
+            style={{ maxWidth: 520, lineHeight: 22 }}
           >
             “{APP_TAGLINE}” Real XIRR returns, portfolio growth projections, and
             true fee drag insights in one clean dashboard.
@@ -173,8 +175,8 @@ export default function LandingScreen() {
                 key={b}
                 style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
               >
-                <CheckCircle2 size={16} color={colors.success} />
-                <Text variant="caption" color={colors.mutedForeground}>
+                <CheckCircle2 size={18} color={colors.primary} />
+                <Text variant="caption" color={colors.foreground} style={{ fontWeight: "500" }}>
                   {b}
                 </Text>
               </View>
@@ -183,7 +185,7 @@ export default function LandingScreen() {
         </View>
 
         {/* Feature grid */}
-        <View style={{ gap: spacing.md }}>
+        <View style={{ gap: spacing.md, marginTop: spacing.md }}>
           <View style={{ gap: 4 }}>
             <Text variant="heading" align="center">
               Everything you need to master your SIP portfolio
@@ -195,11 +197,11 @@ export default function LandingScreen() {
           </View>
 
           {features.map((f) => (
-            <Card key={f.title} padded>
+            <Card key={f.title} padded accentColor={f.bg.replace("1A", "")}>
               <View
                 style={{
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   borderRadius: radius.md,
                   backgroundColor: f.bg,
                   alignItems: "center",
@@ -215,7 +217,7 @@ export default function LandingScreen() {
               <Text
                 variant="caption"
                 color={colors.mutedForeground}
-                style={{ marginTop: 4, lineHeight: 18 }}
+                style={{ marginTop: 4, lineHeight: 20 }}
               >
                 {f.body}
               </Text>

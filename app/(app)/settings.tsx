@@ -268,7 +268,7 @@ export default function SettingsScreen() {
             color={colors.mutedForeground}
             style={{ marginTop: 4, fontSize: fontSize.sm }}
           >
-            Paper & ink in light, carbon & chalk in dark.
+            Mist and pine in light, night terrace in dark.
           </Text>
         </CardHeader>
 

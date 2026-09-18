@@ -9,6 +9,7 @@ import React, { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View } from "react-native";
 import { ThemeProvider, useTheme } from "@/theme";
@@ -19,10 +20,16 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function ThemedApp() {
   const { colors, isDark } = useTheme();
+  const [fontsLoaded] = useFonts({
+    "InstrumentSerif-Regular": require("../assets/fonts/InstrumentSerif-Regular.ttf"),
+    HankenGrotesk: require("../assets/fonts/HankenGrotesk.ttf"),
+  });
 
   useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
+    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

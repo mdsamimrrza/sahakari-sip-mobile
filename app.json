@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "sahakarisip",
     "userInterfaceStyle": "automatic",
-    "description": "Track your Nepali mutual fund SIP investments \u2014 see your real returns, understand fee drag, and project your growth.",
+    "description": "Track your Nepali mutual fund SIP investments — see your real returns, understand fee drag, and project your growth.",
     "ios": {
       "bundleIdentifier": "com.samimrrza.sahakarisip",
       "supportsTablet": false
@@ -17,7 +17,7 @@
       "versionCode": 3,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#F6F4EE",
+        "backgroundColor": "#F1F4F1",
         "foregroundImage": "./assets/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -36,16 +36,17 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#F6F4EE"
+          "backgroundColor": "#F1F4F1"
         }
       ],
       "expo-secure-store",
       [
         "expo-notifications",
         {
-          "color": "#1E6B48"
+          "color": "#2E6B4F"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "router": {

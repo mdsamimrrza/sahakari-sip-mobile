@@ -25,7 +25,7 @@ import { useTheme, spacing, radius } from "@/theme";
 import { Screen, PageHeader, DataTable, SectionHeader } from "@/components/ui/layout";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Text, Card, Skeleton } from "@/components/ui/primitives";
-import { DropdownSelect } from "@/components/ui/overlays";
+import { Select } from "@/components/ui/overlays";
 import { LineChart } from "@/components/charts";
 import { FundScopeSelector } from "@/components/dashboard/FundScopeSelector";
 
@@ -146,7 +146,7 @@ export default function ProjectionsScreen() {
           subtitle="Adjust return rates and annual step-up percentages to see your future trajectory."
         />
 
-        <DropdownSelect
+        <Select
           label="Annualized Return Scenario"
           value={String(returnPct)}
           onValueChange={(v) => setReturnPct(Number(v) as ReturnScenario)}
@@ -157,7 +157,7 @@ export default function ProjectionsScreen() {
           }))}
         />
 
-        <DropdownSelect
+        <Select
           label="Annual SIP Step-Up"
           value={String(stepUpPct)}
           onValueChange={(v) => setStepUpPct(Number(v) as StepUpRate)}

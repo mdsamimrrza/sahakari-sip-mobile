@@ -76,9 +76,8 @@ export function Text({
       case "micro":
         return {
           fontSize: fontSize.xs,
-          fontWeight: "700",
-          letterSpacing: 0.6,
-          textTransform: "uppercase",
+          fontWeight: "600",
+          letterSpacing: 0.2,
         };
       case "mono":
         return {
@@ -96,6 +95,7 @@ export function Text({
     <RNText
       numberOfLines={numberOfLines}
       style={[
+        { fontFamily: fontFamily.body },
         variantStyle,
         { color: color ?? colors.foreground },
         align ? { textAlign: align } : null,
@@ -112,16 +112,22 @@ export function Text({
 // Card
 // ------------------------------------------------------------
 
+// ------------------------------------------------------------
+// Card
+// ------------------------------------------------------------
+
 export function Card({
   children,
   style,
   padded = false,
+  accentColor,
 }: {
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   padded?: boolean;
+  accentColor?: string;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   return (
     <View
       style={[
@@ -131,10 +137,19 @@ export function Card({
           borderColor: colors.border,
           borderRadius: radius.xl,
           padding: padded ? spacing.xl : 0,
+          shadowColor: isDark ? "#000000" : "#0A291A",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: isDark ? 0.35 : 0.07,
+          shadowRadius: 14,
+          elevation: 3,
+          overflow: "hidden",
         },
         style,
       ]}
     >
+      {accentColor ? (
+        <View style={{ height: 3, width: "100%", backgroundColor: accentColor }} />
+      ) : null}
       {children}
     </View>
   );
@@ -162,7 +177,7 @@ export function CardTitle({
   style?: StyleProp<TextStyle>;
 }) {
   return (
-    <Text variant="subheading" style={style}>
+    <Text variant="heading" style={style}>
       {children}
     </Text>
   );
@@ -171,7 +186,7 @@ export function CardTitle({
 export function CardDescription({ children }: { children?: React.ReactNode }) {
   const { colors } = useTheme();
   return (
-    <Text variant="caption" color={colors.mutedForeground} style={{ marginTop: 4 }}>
+    <Text variant="caption" color={colors.mutedForeground} style={{ marginTop: 4, lineHeight: 18 }}>
       {children}
     </Text>
   );
@@ -219,7 +234,7 @@ export function Button({
   textColor?: string;
   fullWidth?: boolean;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const isDisabled = disabled || loading;
 
   const bg: string = (() => {
@@ -253,15 +268,17 @@ export function Button({
   const dims: ViewStyle = (() => {
     switch (size) {
       case "sm":
-        return { height: 34, paddingHorizontal: spacing.md };
+        return { height: 38, paddingHorizontal: spacing.md, borderRadius: radius.md };
       case "lg":
-        return { height: 50, paddingHorizontal: spacing.xl };
+        return { height: 52, paddingHorizontal: spacing.xxl, borderRadius: radius.lg };
       case "icon":
-        return { height: 38, width: 38, paddingHorizontal: 0 };
+        return { height: 42, width: 42, paddingHorizontal: 0, borderRadius: radius.md };
       default:
-        return { height: 42, paddingHorizontal: spacing.lg };
+        return { height: 46, paddingHorizontal: spacing.xl, borderRadius: radius.lg };
     }
   })();
+
+  const hasShadow = variant === "default" || variant === "secondary";
 
   return (
     <Pressable
@@ -272,13 +289,17 @@ export function Button({
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
-          gap: 6,
-          
-          borderRadius: radius.md,
+          gap: 8,
           backgroundColor: bg,
-          borderWidth: variant === "ghost" ? 0 : 1,
-          borderColor: colors.border,
-          opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1,
+          borderWidth: variant === "outline" ? 1.5 : 0,
+          borderColor: variant === "outline" ? colors.border : "transparent",
+          shadowColor: hasShadow ? bg : "transparent",
+          shadowOffset: { width: 0, height: pressed ? 2 : 4 },
+          shadowOpacity: hasShadow ? (isDark ? 0.4 : 0.25) : 0,
+          shadowRadius: 8,
+          elevation: hasShadow ? 4 : 0,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+          opacity: isDisabled ? 0.5 : 1,
         },
         dims,
         fullWidth ? { width: "100%" } : null,
@@ -290,7 +311,7 @@ export function Button({
         <Text
           variant="label"
           color={textColor ?? fg}
-          style={{ fontSize: size === "sm" ? fontSize.base : fontSize.md }}
+          style={{ fontSize: size === "sm" ? fontSize.base : fontSize.md, fontWeight: "700" }}
         >
           {children}
         </Text>
@@ -350,11 +371,11 @@ export function Input({
           flexDirection: "row",
           alignItems: "center",
           backgroundColor: colors.input,
-          borderWidth: 1,
+          borderWidth: 1.5,
           borderColor: error ? colors.destructive : colors.border,
-          borderRadius: radius.lg,
+          borderRadius: radius.md,
           paddingHorizontal: spacing.md,
-          minHeight: 44,
+          minHeight: 48,
         }}
       >
         <TextInput
@@ -405,12 +426,12 @@ export function Badge({
           flexDirection: "row",
           alignItems: "center",
           gap: 4,
-          paddingHorizontal: spacing.sm + 2,
-          paddingVertical: 3,
-          borderRadius: radius.md,
+          paddingHorizontal: spacing.sm + 4,
+          paddingVertical: 4,
+          borderRadius: radius.full,
           borderWidth: 1,
-          borderColor: color ?? colors.border,
-          backgroundColor: bg ?? `${colors.muted}`,
+          borderColor: color ? `${color}40` : `${colors.primary}40`,
+          backgroundColor: bg ?? (color ? `${color}15` : `${colors.primary}15`),
         },
         style,
       ]}
@@ -421,8 +442,8 @@ export function Badge({
       typeof children === "number" ||
       Array.isArray(children) ? (
         <Text
-          style={{ fontSize: fontSize.xs, fontWeight: "800" }}
-          color={color ?? colors.mutedForeground}
+          style={{ fontSize: fontSize.xs, fontWeight: "700" }}
+          color={color ?? colors.primary}
         >
           {children}
         </Text>
