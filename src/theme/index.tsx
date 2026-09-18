@@ -1,13 +1,12 @@
 // ============================================================
 // SahakariSIP — Theme
 // ============================================================
-// Direct translation of the web app's CSS custom properties
-// (src/app/globals.css) into React Native tokens.
+// "Iris" design language — a modern fintech identity:
 //
-//   Light → "Royal Cream & Navy":  cream canvas, white cards, navy ink,
-//                                   gold accents
-//   Dark  → "Royal Navy & Gold":   navy canvas, navy cards, cream ink,
-//                                   bright gold accents
+//   Light → "Porcelain":  cool porcelain canvas, white cards,
+//                          indigo ink, electric indigo + teal accents
+//   Dark  → "Ink":        near-black ink canvas, ink cards,
+//                          lavender-white ink, soft violet + teal accents
 // ============================================================
 
 import React, {
@@ -63,81 +62,81 @@ export interface ThemeColors {
 }
 
 export const lightColors: ThemeColors = {
-  background: "#F7F3E9", // cream
-  foreground: "#0D1B2A", // very dark navy
+  background: "#F4F4F8", // cool porcelain
+  foreground: "#16162A", // deep indigo ink
   card: "#FFFFFF",
-  cardForeground: "#0D1B2A",
-  primary: "#0D1B2A", // navy buttons
-  primaryForeground: "#D4AF37", // gold text on navy
-  secondary: "#D4AF37", // gold
-  secondaryForeground: "#0D1B2A",
-  muted: "#E0DCD1",
-  mutedForeground: "#415A77",
-  accent: "#D4AF37",
-  accentForeground: "#0D1B2A",
-  destructive: "#EF4444",
+  cardForeground: "#16162A",
+  primary: "#5A54F9", // electric indigo
+  primaryForeground: "#FFFFFF",
+  secondary: "#0FB5A6", // teal
+  secondaryForeground: "#FFFFFF",
+  muted: "#E9E8F2",
+  mutedForeground: "#5D5D78",
+  accent: "#0FB5A6",
+  accentForeground: "#FFFFFF",
+  destructive: "#F04452",
   destructiveForeground: "#FFFFFF",
-  border: "#E0DCD1",
+  border: "#E3E3EE",
   input: "#FFFFFF",
-  ring: "#0D1B2A",
+  ring: "#5A54F9",
 
-  chartPrimary: "#0D1B2A",
-  chartPositive: "#10B77F",
-  chartNegative: "#E21D48",
-  chartInvested: "#D4AF37",
-  chartFeeDrag: "#E21D48",
-  chartGrid: "#E0DCD1",
-  chartText: "#415A77",
+  chartPrimary: "#5A54F9",
+  chartPositive: "#12B981",
+  chartNegative: "#F04452",
+  chartInvested: "#A3A8C2",
+  chartFeeDrag: "#F97362",
+  chartGrid: "#E7E7F0",
+  chartText: "#5D5D78",
 
-  success: "#10B77F",
+  success: "#12B981",
   warning: "#F59E0B",
-  info: "#3B82F6",
-  blue: "#2563EB",
+  info: "#3E8BFF",
+  blue: "#3E8BFF",
   purple: "#8B5CF6",
   amber: "#F59E0B",
-  rose: "#E21D48",
-  emerald: "#10B77F",
-  overlay: "rgba(13, 27, 42, 0.45)",
-  skeleton: "#E7E2D6",
+  rose: "#F04452",
+  emerald: "#12B981",
+  overlay: "rgba(22, 22, 42, 0.5)",
+  skeleton: "#E9E8F2",
 };
 
 export const darkColors: ThemeColors = {
-  background: "#0D1B2A", // very dark navy
-  foreground: "#F7F3E9", // cream
-  card: "#1B263B", // dark navy cards
-  cardForeground: "#F7F3E9",
-  primary: "#EBC547", // bright gold so buttons pop
-  primaryForeground: "#0D1B2A",
-  secondary: "#415A77", // slate navy
-  secondaryForeground: "#F7F3E9",
-  muted: "#1B263B",
-  mutedForeground: "#B8C4D6", // lighter for dark-mode readability
-  accent: "#415A77",
-  accentForeground: "#D4AF37",
-  destructive: "#DC2626",
-  destructiveForeground: "#FFFFFF",
-  border: "#2C3E5C",
-  input: "#1B263B",
-  ring: "#D4AF37",
+  background: "#101019", // near-black ink
+  foreground: "#EDEDF7", // lavender white
+  card: "#191926", // ink cards
+  cardForeground: "#EDEDF7",
+  primary: "#8E86FF", // soft violet
+  primaryForeground: "#101019",
+  secondary: "#2DD4BF", // bright teal
+  secondaryForeground: "#101019",
+  muted: "#22223A",
+  mutedForeground: "#9FA2BC",
+  accent: "#2DD4BF",
+  accentForeground: "#101019",
+  destructive: "#FF5C68",
+  destructiveForeground: "#101019",
+  border: "#272741",
+  input: "#191926",
+  ring: "#8E86FF",
 
-  chartPrimary: "#D4AF37",
-  chartPositive: "#10B77F",
-  chartNegative: "#F43F5E",
-  chartInvested: "#415A77",
-  chartFeeDrag: "#F43F5E",
-  chartGrid: "#2C3E5C",
-  chartText: "#F7F3E9",
+  chartPrimary: "#8E86FF",
+  chartPositive: "#2DD4BF",
+  chartNegative: "#FF5C68",
+  chartInvested: "#3C3C5C",
+  chartFeeDrag: "#FF7A6B",
+  chartGrid: "#272741",
+  chartText: "#EDEDF7",
 
-  success: "#10B77F",
-  warning: "#F59E0B",
-  info: "#60A5FA",
-  blue: "#3B82F6",
+  success: "#2DD4BF",
+  warning: "#FBBF24",
+  info: "#5CA1FF",
+  blue: "#5CA1FF",
   purple: "#A78BFA",
   amber: "#FBBF24",
-  rose: "#F43F5E",
-  emerald: "#10B77F",
-  overlay: "rgba(0, 0, 0, 0.6)",
-  skeleton: "#243149",
+  rose: "#FF5C68",
+  emerald: "#2DD4BF",
+  overlay: "rgba(0, 0, 0, 0.65)",
+  skeleton: "#22223A",
 };
 
 // ---------- Spacing / radius / type scale ----------
@@ -152,12 +151,13 @@ export const spacing = {
   xxxl: 32,
 } as const;
 
+// Sharper, tighter geometry than the previous rounded look.
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 18,
+  xxl: 20,
   pill: 999,
 } as const;
 

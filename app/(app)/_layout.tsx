@@ -20,7 +20,7 @@ import {
   Settings,
 } from "lucide-react-native";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { useTheme, fontSize } from "@/theme";
+import { useTheme, fontSize, radius } from "@/theme";
 import { Text } from "@/components/ui/primitives";
 
 export default function AppLayout() {
@@ -36,10 +36,11 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  // With edge-to-edge the fixed paddings would place the tab strip behind the
-  // Android system navigation bar, so scale them with the real bottom inset.
+  // Floating pill tab bar — the Iris design's signature navigation: a
+  // detached rounded pill above the system nav bar instead of a full-width
+  // edge bar. Screen's bottom padding already clears this height.
   const bottomInset = Math.max(8, insets.bottom);
-  const tabBarHeight = 62 + Math.max(0, insets.bottom - 8);
+  const tabBarHeight = 62;
 
   return (
     <Tabs
@@ -48,12 +49,22 @@ export default function AppLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarStyle: {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
+          position: "absolute",
+          left: 16,
+          right: 16,
+          bottom: bottomInset + 8,
           height: tabBarHeight,
-          paddingBottom: bottomInset,
+          borderRadius: radius.pill,
+          backgroundColor: colors.card,
+          borderWidth: 1,
+          borderColor: colors.border,
+          paddingBottom: 6,
           paddingTop: 6,
+          shadowColor: "#000",
+          shadowOpacity: 0.12,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 10,
         },
         tabBarLabel: ({ color, children }) => (
           <Text

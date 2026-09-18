@@ -121,21 +121,17 @@ export function Card({
   style?: StyleProp<ViewStyle>;
   padded?: boolean;
 }) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   return (
     <View
       style={[
         {
+          // Flat, border-led surfaces — no drop shadows in the Iris design.
           backgroundColor: colors.card,
           borderRadius: radius.xxl,
           borderWidth: 1,
           borderColor: colors.border,
           padding: padded ? spacing.xl : 0,
-          shadowColor: "#000",
-          shadowOpacity: isDark ? 0 : 0.05,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 2 },
-          elevation: isDark ? 0 : 2,
         },
         style,
       ]}
@@ -278,7 +274,8 @@ export function Button({
           alignItems: "center",
           justifyContent: "center",
           gap: 6,
-          borderRadius: radius.lg,
+          // Pill geometry — the Iris design's signature button shape.
+          borderRadius: radius.pill,
           backgroundColor: bg,
           borderWidth: variant === "outline" ? 1 : 0,
           borderColor: colors.border,
@@ -614,11 +611,11 @@ export function Avatar({
         width: size,
         height: size,
         borderRadius: size / 2.5,
-        backgroundColor: bg ?? (isDark ? "rgba(16,183,127,0.18)" : "rgba(16,183,127,0.14)"),
+        backgroundColor: bg ?? (isDark ? "rgba(45,212,191,0.18)" : "rgba(18,185,129,0.14)"),
         alignItems: "center",
         justifyContent: "center",
         borderWidth: 1,
-        borderColor: "rgba(16,183,127,0.35)",
+        borderColor: "rgba(45,212,191,0.4)",
       }}
     >
       <Text

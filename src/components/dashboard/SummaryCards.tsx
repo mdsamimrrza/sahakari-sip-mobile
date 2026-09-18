@@ -449,7 +449,7 @@ export function SummaryCards({
           >
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <View>
-                <Text variant="micro" color="#DBEAFE">
+                <Text variant="micro" color="#D9D9FF">
                   Total Portfolio Value
                 </Text>
                 <Text variant="title" color="#FFFFFF" style={{ fontSize: fontSize.xxl }}>
@@ -457,7 +457,7 @@ export function SummaryCards({
                 </Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
-                <Text variant="micro" color="#DBEAFE">
+                <Text variant="micro" color="#D9D9FF">
                   Gain / Loss
                 </Text>
                 <Text variant="label" color="#FFFFFF" tabular>
@@ -476,10 +476,10 @@ export function SummaryCards({
                 paddingTop: spacing.sm,
               }}
             >
-              <Text variant="caption" color="#DBEAFE">
+              <Text variant="caption" color="#D9D9FF">
                 Invested: {formatCurrencyWhole(summary.totalInvested)}
               </Text>
-              <Text variant="caption" color="#DBEAFE">
+              <Text variant="caption" color="#D9D9FF">
                 Return:{" "}
                 {summary.gainLossPct !== null
                   ? formatPercentage(summary.gainLossPct)
