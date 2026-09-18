@@ -23,7 +23,7 @@ import { Screen, PageHeader } from "@/components/ui/layout";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Text, Card, Button, Input, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { DateField } from "@/components/ui/DateField";
-import { ConfirmDialog, Select, useToast } from "@/components/ui/overlays";
+import { ConfirmDialog, Modal, Select, useToast } from "@/components/ui/overlays";
 import { FundScopeSelector } from "@/components/dashboard/FundScopeSelector";
 import { EntryFormModal } from "@/components/entries/EntryFormModal";
 import { CsvImportModal } from "@/components/entries/CsvImportModal";
@@ -55,6 +55,9 @@ export default function HistoryScreen() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [customDateRange, setCustomDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
+  // Draft range edited inside the custom-range popup before applying.
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customDraft, setCustomDraft] = useState<{ from: string; to: string }>({ from: "", to: "" });
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
@@ -223,67 +226,123 @@ export default function HistoryScreen() {
           />
         )}
 
-        {/* Search + sort + date filter */}
-        <View style={{ gap: spacing.sm }}>
-          <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "flex-end" }}>
-            <View style={{ flex: 1 }}>
-              <Input
-                value={search}
-                onChangeText={(t) => {
-                  setSearch(t);
-                  setPage(1);
-                }}
-                placeholder="Search by date, amount, notes…"
-                rightSlot={<Search size={16} color={colors.mutedForeground} />}
+        {/* Search + Sort + Date filter — single responsive row */}
+        <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap", alignItems: "center" }}>
+          {/* Search — flexible, shrinks first */}
+          <Input
+            style={{ flex: 1, minWidth: 120 }}
+            value={search}
+            onChangeText={(t) => {
+              setSearch(t);
+              setPage(1);
+            }}
+            placeholder="Search…"
+            rightSlot={<Search size={14} color={colors.mutedForeground} />}
+          />
+
+          {/* Sort by — compact dropdown */}
+          <Select
+            containerStyle={{ minWidth: 110, maxWidth: 140 }}
+            value={sortKey}
+            onValueChange={(v) => toggleSort(v as SortKey)}
+            options={sortOptions}
+            label="Sort"
+          />
+
+          {/* Date filter — compact dropdown */}
+          <Select
+            containerStyle={{ minWidth: 120, maxWidth: 150 }}
+            value={dateFilter}
+            onValueChange={(v) => {
+              setPage(1);
+              if (v === "custom") {
+                // Open the custom-range popup with the current range as draft
+                setCustomDraft({ ...customDateRange });
+                setCustomOpen(true);
+              } else {
+                setDateFilter(v as DateFilter);
+                setCustomDateRange({ from: "", to: "" });
+              }
+            }}
+            options={[
+              { value: "all", label: "All" },
+              { value: "month", label: "Month" },
+              { value: "quarter", label: "Quarter" },
+              { value: "year", label: "Year" },
+              { value: "custom", label: "Custom" },
+            ]}
+            label="Date"
+          />
+        </View>
+
+        {/* Custom range — inline pickers appear inline when "Custom" selected */}
+        {dateFilter === "custom" && (
+          <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap", marginTop: spacing.xs }}>
+            <View style={{ flex: 1, minWidth: 140 }}>
+              <DateField
+                label="From"
+                value={customDateRange.from}
+                onChange={(v) => setCustomDateRange((r) => ({ ...r, from: v }))}
+                maxDate={customDateRange.to || undefined}
               />
             </View>
-            <Select
-              containerStyle={{ width: 160 }}
-              value={sortKey}
-              onValueChange={(v) => toggleSort(v as SortKey)}
-              options={sortOptions}
-              label="Sort by"
-            />
-            <Select
-              containerStyle={{ width: 140 }}
-              value={dateFilter}
-              onValueChange={(v) => {
-                setDateFilter(v as DateFilter);
-                setPage(1);
-                if (v !== "custom") setCustomDateRange({ from: "", to: "" });
-              }}
-              options={[
-                { value: "all", label: "All time" },
-                { value: "month", label: "This month" },
-                { value: "quarter", label: "This quarter" },
-                { value: "year", label: "This year" },
-                { value: "custom", label: "Custom range" },
-              ]}
-              label="Date"
-            />
-            {dateFilter === "custom" && (
-              <View style={{ flexDirection: "row", gap: spacing.xs, flexWrap: "wrap" }}>
-                <View style={{ flex: 1, minWidth: 140 }}>
+            <View style={{ flex: 1, minWidth: 140 }}>
+              <DateField
+                label="To"
+                value={customDateRange.to}
+                onChange={(v) => setCustomDateRange((r) => ({ ...r, to: v }))}
+                minDate={customDateRange.from || undefined}
+              />
+            </View>
+          </View>
+          )}
+
+        {/* Custom range modal */}
+        <Modal
+          visible={customOpen}
+          onClose={() => {
+            setCustomOpen(false);
+          }}
+        >
+          <View style={{ padding: spacing.lg }}>
+            <View style={{ backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                <Text variant='subheading'>Select Date Range</Text>
+                <Pressable onPress={() => setCustomOpen(false)}>
+                  <Text variant='caption' color={colors.mutedForeground}>Cancel</Text>
+                </Pressable>
+              </View>
+              <View style={{ gap: spacing.md }}>
+                <View>
+                  <Text variant='caption' color={colors.mutedForeground}>From</Text>
                   <DateField
-                    label="From"
-                    value={customDateRange.from}
-                    onChange={(v) => setCustomDateRange((r) => ({ ...r, from: v }))}
-                    maxDate={customDateRange.to || undefined}
+                    label=''
+                    value={customDraft.from}
+                    onChange={(v) => setCustomDraft((d) => ({ ...d, from: v }))}
+                    maxDate={customDraft.to || undefined}
                   />
                 </View>
-                <View style={{ flex: 1, minWidth: 140 }}>
+                <View>
+                  <Text variant='caption' color={colors.mutedForeground}>To</Text>
                   <DateField
-                    label="To"
-                    value={customDateRange.to}
-                    onChange={(v) => setCustomDateRange((r) => ({ ...r, to: v }))}
-                    minDate={customDateRange.from || undefined}
+                    label=''
+                    value={customDraft.to}
+                    onChange={(v) => setCustomDraft((d) => ({ ...d, to: v }))}
+                    minDate={customDraft.from || undefined}
                   />
                 </View>
               </View>
-            )}
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.lg }}>
+                <Pressable onPress={() => {
+                  setCustomDateRange(customDraft);
+                  setCustomOpen(false);
+                }}>
+                  <Button variant='outline'>Apply</Button>
+                </Pressable>
+              </View>
+            </View>
           </View>
-        </View>
-
+        </Modal>
         {/* Ledger */}
         {loading && entries.length === 0 ? (
           <View style={{ gap: spacing.sm }}>
