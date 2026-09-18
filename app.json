@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "SahakariSIP",
+    "slug": "sahakarisip",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "sahakarisip",
+    "userInterfaceStyle": "automatic",
+    "description": "Track your Nepali mutual fund SIP investments — see your real returns, understand fee drag, and project your growth.",
+    "ios": {
+      "bundleIdentifier": "com.samimrrza.sahakarisip",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.samimrrza.sahakarisip",
+      "versionCode": 2,
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "backgroundColor": "#0D1B2A",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#0D1B2A"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#D4AF37"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  }
+}

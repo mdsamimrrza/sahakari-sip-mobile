@@ -1,0 +1,35 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Local environment (see .env.example). Only EXPO_PUBLIC_* values belong
+# here — never the web app's server-side secrets.
+.env
+.env.local
+.env.*.local
+
+# Native build output
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/release/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Metro
+.metro-health-check*
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+.DS_Store
+*.pem
