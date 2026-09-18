@@ -28,6 +28,7 @@ import { EntryFormModal } from "@/components/entries/EntryFormModal";
 import { CsvImportModal } from "@/components/entries/CsvImportModal";
 
 type SortKey = "purchase_date" | "amount" | "nav" | "units" | "rollover";
+type DateFilter = "all" | "month" | "quarter" | "year" | "custom";
 
 export default function HistoryScreen() {
   const { colors } = useTheme();
@@ -51,6 +52,8 @@ export default function HistoryScreen() {
   const [pageSize, setPageSize] = useState<number | "all">(10);
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [customDateRange, setCustomDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
@@ -66,15 +69,49 @@ export default function HistoryScreen() {
   const breakdowns = useMemo(() => computeEntryBreakdowns(entries), [entries]);
 
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return entries;
+    let result = entries;
+
+    // Apply date filter
+    if (dateFilter !== "all") {
+      const now = new Date();
+      let cutoff: Date;
+      switch (dateFilter) {
+        case "month":
+          cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case "quarter":
+          cutoff = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+          break;
+        case "year":
+          cutoff = new Date(now.getFullYear(), 0, 1);
+          break;
+        case "custom":
+          if (customDateRange.from && customDateRange.to) {
+            const fromDate = new Date(customDateRange.from);
+            const toDate = new Date(customDateRange.to);
+            toDate.setHours(23, 59, 59, 999);
+            result = result.filter((e) => {
+              const entryDate = new Date(e.purchase_date);
+              return entryDate >= fromDate && entryDate <= toDate;
+            });
+          }
+          break;
+      }
+      if (dateFilter !== "custom") {
+        result = result.filter((e) => new Date(e.purchase_date) >= cutoff);
+      }
+    }
+
+    // Apply search query
+    if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase();
-    return entries.filter((e) => {
+    return result.filter((e) => {
       const fundName = fundMap.get(e.fund_id) || "";
       return `${e.purchase_date} ${e.amount} ${e.nav} ${e.units} ${e.notes || ""} ${fundName}`
         .toLowerCase()
         .includes(q);
     });
-  }, [entries, searchQuery, fundMap]);
+  }, [entries, searchQuery, fundMap, dateFilter, customDateRange]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -185,40 +222,62 @@ export default function HistoryScreen() {
           />
         )}
 
-        {/* Search + sort */}
+        {/* Search + sort + date filter */}
         <View style={{ gap: spacing.sm }}>
-          <Input
-            value={search}
-            onChangeText={(t) => {
-              setSearch(t);
-              setPage(1);
-            }}
-            placeholder="Search by date, amount, notes…"
-            rightSlot={<Search size={16} color={colors.mutedForeground} />}
-          />
-          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "flex-end" }}>
+            <View style={{ flex: 1 }}>
+              <Input
+                value={search}
+                onChangeText={(t) => {
+                  setSearch(t);
+                  setPage(1);
+                }}
+                placeholder="Search by date, amount, notes…"
+                rightSlot={<Search size={16} color={colors.mutedForeground} />}
+              />
+            </View>
             <Select
-              containerStyle={{ flex: 1 }}
+              containerStyle={{ width: 160 }}
               value={sortKey}
               onValueChange={(v) => toggleSort(v as SortKey)}
               options={sortOptions}
               label="Sort by"
             />
             <Select
-              containerStyle={{ flex: 1 }}
-              value={String(pageSize)}
+              containerStyle={{ width: 140 }}
+              value={dateFilter}
               onValueChange={(v) => {
-                setPageSize(v === "all" ? "all" : Number(v));
+                setDateFilter(v as DateFilter);
                 setPage(1);
+                if (v !== "custom") setCustomDateRange({ from: "", to: "" });
               }}
               options={[
-                { value: "10", label: "10 per page" },
-                { value: "20", label: "20 per page" },
-                { value: "50", label: "50 per page" },
-                { value: "all", label: "All entries" },
+                { value: "all", label: "All time" },
+                { value: "month", label: "This month" },
+                { value: "quarter", label: "This quarter" },
+                { value: "year", label: "This year" },
+                { value: "custom", label: "Custom range" },
               ]}
-              label="Per page"
+              label="Date"
             />
+            {dateFilter === "custom" && (
+              <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                <Input
+                  style={{ width: 110 }}
+                  value={customDateRange.from}
+                  onChangeText={(v) => setCustomDateRange((r) => ({ ...r, from: v }))}
+                  placeholder="From"
+                  rightSlot={<ChevronDown size={14} color={colors.mutedForeground} />}
+                />
+                <Input
+                  style={{ width: 110 }}
+                  value={customDateRange.to}
+                  onChangeText={(v) => setCustomDateRange((r) => ({ ...r, to: v }))}
+                  placeholder="To"
+                  rightSlot={<ChevronDown size={14} color={colors.mutedForeground} />}
+                />
+              </View>
+            )}
           </View>
         </View>
 
@@ -370,11 +429,30 @@ export default function HistoryScreen() {
         {/* Pagination footer */}
         {totalEntries > 0 && (
           <View style={{ gap: spacing.md }}>
-            <Text variant="caption" color={colors.mutedForeground} align="center">
-              Showing {totalEntries > 0 ? startIndex + 1 : 0}–
-              {Math.min(startIndex + effectivePageSize, totalEntries)} of{" "}
-              {totalEntries} entries
-            </Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: spacing.sm }}>
+              <Text variant="caption" color={colors.mutedForeground}>
+                Showing {totalEntries > 0 ? startIndex + 1 : 0}–
+                {Math.min(startIndex + effectivePageSize, totalEntries)} of{" "}
+                {totalEntries} entries
+              </Text>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => {
+                  setPageSize(v === "all" ? "all" : Number(v));
+                  setPage(1);
+                }}
+                options={[
+                  { value: "10", label: "10" },
+                  { value: "20", label: "20" },
+                  { value: "50", label: "50" },
+                  { value: "all", label: "All" },
+                ]}
+                label="Per page"
+                displayValue={
+                  pageSize === "all" ? "All" : `${pageSize}`
+                }
+              />
+            </View>
 
             {pageSize !== "all" && totalPages > 1 && (
               <View
