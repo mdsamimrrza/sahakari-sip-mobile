@@ -336,6 +336,7 @@ export default function HistoryScreen() {
                 <Pressable onPress={() => {
                   setCustomDateRange(customDraft);
                   setCustomOpen(false);
+                  setPage(1); // Reset to first page when applying new date filter
                 }}>
                   <Button variant='outline'>Apply</Button>
                 </Pressable>
