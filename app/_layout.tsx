@@ -29,7 +29,17 @@ function ThemedApp() {
     if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) return null;
+if (!fontsLoaded) {
+      return (
+        <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primaryForeground, justifyContent: "center", alignItems: "center" }}>
+              <View style={{ width: 6, height: 6, backgroundColor: colors.primary, borderRadius: 3 }} />
+            </View>
+          </View>
+        </View>
+      );
+    }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

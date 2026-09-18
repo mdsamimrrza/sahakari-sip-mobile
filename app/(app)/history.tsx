@@ -22,6 +22,7 @@ import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { Screen, PageHeader } from "@/components/ui/layout";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Text, Card, Button, Input, EmptyState, Skeleton } from "@/components/ui/primitives";
+import { DateField } from "@/components/ui/DateField";
 import { ConfirmDialog, Select, useToast } from "@/components/ui/overlays";
 import { FundScopeSelector } from "@/components/dashboard/FundScopeSelector";
 import { EntryFormModal } from "@/components/entries/EntryFormModal";
@@ -261,21 +262,23 @@ export default function HistoryScreen() {
               label="Date"
             />
             {dateFilter === "custom" && (
-              <View style={{ flexDirection: "row", gap: spacing.xs }}>
-                <Input
-                  style={{ width: 110 }}
-                  value={customDateRange.from}
-                  onChangeText={(v) => setCustomDateRange((r) => ({ ...r, from: v }))}
-                  placeholder="From"
-                  rightSlot={<ChevronDown size={14} color={colors.mutedForeground} />}
-                />
-                <Input
-                  style={{ width: 110 }}
-                  value={customDateRange.to}
-                  onChangeText={(v) => setCustomDateRange((r) => ({ ...r, to: v }))}
-                  placeholder="To"
-                  rightSlot={<ChevronDown size={14} color={colors.mutedForeground} />}
-                />
+              <View style={{ flexDirection: "row", gap: spacing.xs, flexWrap: "wrap" }}>
+                <View style={{ flex: 1, minWidth: 140 }}>
+                  <DateField
+                    label="From"
+                    value={customDateRange.from}
+                    onChange={(v) => setCustomDateRange((r) => ({ ...r, from: v }))}
+                    maxDate={customDateRange.to || undefined}
+                  />
+                </View>
+                <View style={{ flex: 1, minWidth: 140 }}>
+                  <DateField
+                    label="To"
+                    value={customDateRange.to}
+                    onChange={(v) => setCustomDateRange((r) => ({ ...r, to: v }))}
+                    minDate={customDateRange.from || undefined}
+                  />
+                </View>
               </View>
             )}
           </View>
@@ -436,6 +439,7 @@ export default function HistoryScreen() {
                 {totalEntries} entries
               </Text>
               <Select
+                containerStyle={{ flex: 1, minWidth: 120 }}
                 value={String(pageSize)}
                 onValueChange={(v) => {
                   setPageSize(v === "all" ? "all" : Number(v));
