@@ -414,7 +414,11 @@ export function Badge({
         style,
       ]}
     >
-      {typeof children === "string" ? (
+      {/* Strings, numbers, and mixed content (e.g. {x}% fee) must all be
+          rendered inside a <Text>; only JSX elements pass through raw. */}
+      {typeof children === "string" ||
+      typeof children === "number" ||
+      Array.isArray(children) ? (
         <Text
           style={{ fontSize: fontSize.xs, fontWeight: "800" }}
           color={color ?? colors.mutedForeground}
