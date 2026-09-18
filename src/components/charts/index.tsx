@@ -322,16 +322,11 @@ export const LineChart = React.memo(function LineChart({
               )
             ),
             backgroundColor: colors.card,
-            borderWidth: 2,
+            borderWidth: 1,
             borderColor: colors.border,
             borderRadius: radius.md,
             padding: spacing.sm + 2,
             minWidth: 160,
-            shadowColor: colors.cardShadow,
-            shadowOpacity: 1,
-            shadowRadius: 0,
-            shadowOffset: { width: 3, height: 3 },
-            elevation: 4,
           }}
         >
           <Text variant="caption" color={colors.mutedForeground}>
@@ -527,7 +522,7 @@ export const BarChart = React.memo(function BarChart({
             top: 4,
             left: 48,
             backgroundColor: colors.card,
-            borderWidth: 2,
+            borderWidth: 1,
             borderColor: colors.border,
             borderRadius: radius.md,
             paddingHorizontal: spacing.sm + 2,

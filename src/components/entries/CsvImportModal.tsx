@@ -283,7 +283,7 @@ export function CsvImportModal({
             </Text>
             <View
               style={{
-                borderWidth: 2,
+                borderWidth: 1,
                 borderColor: colors.border,
                 borderRadius: radius.lg,
                 overflow: "hidden",

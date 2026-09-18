@@ -98,7 +98,7 @@ export function SummaryCards({
       <Card
         style={{
           padding: spacing.lg,
-          borderColor: colors.blue,
+          borderColor: colors.primary,
           gap: spacing.md,
         }}
       >
@@ -116,7 +116,7 @@ export function SummaryCards({
                 width: 32,
                 height: 32,
                 borderRadius: radius.md,
-                backgroundColor: colors.blue,
+                backgroundColor: colors.primary,
                 alignItems: "center",
                 justifyContent: "center",
               }}
@@ -134,8 +134,8 @@ export function SummaryCards({
               style={{
                 width: 34,
                 height: 34,
-                borderRadius: radius.pill,
-                backgroundColor: colors.blue,
+                borderRadius: radius.md,
+                backgroundColor: colors.primary,
                 alignItems: "center",
                 justifyContent: "center",
               }}
@@ -159,9 +159,9 @@ export function SummaryCards({
                 alignSelf: "flex-start",
                 paddingHorizontal: spacing.sm + 2,
                 paddingVertical: 3,
-                borderRadius: radius.pill,
-                backgroundColor: `${gainColor}1A`,
-                borderWidth: 2,
+                borderRadius: radius.md,
+                backgroundColor: colors.muted,
+                borderWidth: 1,
                 borderColor: gainColor,
               }}
             >
@@ -193,7 +193,7 @@ export function SummaryCards({
               width: 34,
               height: 34,
               borderRadius: radius.md,
-              backgroundColor: `${colors.purple}1A`,
+              backgroundColor: colors.muted,
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -246,7 +246,7 @@ export function SummaryCards({
               width: 34,
               height: 34,
               borderRadius: radius.md,
-              backgroundColor: `${colors.success}1A`,
+              backgroundColor: colors.muted,
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -303,7 +303,7 @@ export function SummaryCards({
                 width: 34,
                 height: 34,
                 borderRadius: radius.md,
-                backgroundColor: `${colors.amber}1A`,
+                backgroundColor: colors.muted,
                 alignItems: "center",
                 justifyContent: "center",
               }}
@@ -322,8 +322,8 @@ export function SummaryCards({
               gap: 4,
               paddingHorizontal: spacing.sm + 2,
               paddingVertical: 3,
-              borderRadius: radius.pill,
-              backgroundColor: `${colors.amber}1A`,
+              borderRadius: radius.md,
+              backgroundColor: colors.muted,
             }}
           >
             <Flame size={12} color={colors.amber} />
@@ -428,11 +428,11 @@ export function SummaryCards({
               style={{
                 paddingHorizontal: spacing.md,
                 paddingVertical: 3,
-                borderRadius: radius.pill,
-                backgroundColor: `${colors.blue}1A`,
+                borderRadius: radius.md,
+                backgroundColor: colors.muted,
               }}
             >
-              <Text variant="caption" color={colors.blue} style={{ fontWeight: "800" }}>
+              <Text variant="caption" color={colors.primary} style={{ fontWeight: "800" }}>
                 {formatStreak(summary.sipStreak)} STREAK
               </Text>
             </View>
@@ -441,7 +441,7 @@ export function SummaryCards({
           {/* Hero */}
           <View
             style={{
-              backgroundColor: colors.blue,
+              backgroundColor: colors.primary,
               borderRadius: radius.xl,
               padding: spacing.lg,
               gap: spacing.md,
@@ -449,7 +449,7 @@ export function SummaryCards({
           >
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <View>
-                <Text variant="micro" color="#D9D9FF">
+                <Text variant="micro" color="rgba(255,255,255,0.72)">
                   Total Portfolio Value
                 </Text>
                 <Text variant="title" color="#FFFFFF" style={{ fontSize: fontSize.xxl }}>
@@ -457,7 +457,7 @@ export function SummaryCards({
                 </Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
-                <Text variant="micro" color="#D9D9FF">
+                <Text variant="micro" color="rgba(255,255,255,0.72)">
                   Gain / Loss
                 </Text>
                 <Text variant="label" color="#FFFFFF" tabular>
@@ -476,10 +476,10 @@ export function SummaryCards({
                 paddingTop: spacing.sm,
               }}
             >
-              <Text variant="caption" color="#D9D9FF">
+              <Text variant="caption" color="rgba(255,255,255,0.72)">
                 Invested: {formatCurrencyWhole(summary.totalInvested)}
               </Text>
-              <Text variant="caption" color="#D9D9FF">
+              <Text variant="caption" color="rgba(255,255,255,0.72)">
                 Return:{" "}
                 {summary.gainLossPct !== null
                   ? formatPercentage(summary.gainLossPct)
@@ -539,7 +539,7 @@ export function SummaryCards({
             <ReconRow
               label="(−) Rollover Wallet Cash"
               value={`-${formatCurrencyWhole(summary.unallottedCash)}`}
-              color={colors.blue}
+              color={colors.primary}
             />
             <ReconRow
               label="Effective Deployed Capital"

@@ -350,7 +350,7 @@ export function EntryFormModal({
                       alignItems: "center",
                       justifyContent: "space-between",
                       gap: spacing.sm,
-                      backgroundColor: `${colors.success}1A`,
+                      backgroundColor: colors.muted,
                       borderRadius: radius.md,
                       padding: spacing.sm,
                       marginTop: 4,

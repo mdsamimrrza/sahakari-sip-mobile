@@ -108,7 +108,7 @@ const [mode, setMode] = useState<DataMode>(
     width: 46,
     height: 50,
     borderRadius: radius.lg,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.input,
     textAlign: "center",
@@ -288,7 +288,7 @@ const [mode, setMode] = useState<DataMode>(
                 width: 64,
                 height: 64,
                 borderRadius: 32,
-                backgroundColor: `${colors.success}1F`,
+                backgroundColor: colors.muted,
                 alignItems: "center",
                 justifyContent: "center",
               }}

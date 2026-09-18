@@ -116,9 +116,9 @@ export function PortfolioGrowthCard({
             gap: 4,
             paddingHorizontal: spacing.sm + 2,
             paddingVertical: 3,
-            borderRadius: radius.pill,
-            backgroundColor: `${gainColor}1A`,
-            borderWidth: 2,
+            borderRadius: radius.md,
+            backgroundColor: colors.muted,
+            borderWidth: 1,
             borderColor: gainColor,
           }}
         >
@@ -140,7 +140,7 @@ export function PortfolioGrowthCard({
           style={{
             flexDirection: "row",
             backgroundColor: colors.muted,
-            borderRadius: radius.pill,
+            borderRadius: radius.md,
             padding: 3,
             gap: 2,
           }}
@@ -154,7 +154,7 @@ export function PortfolioGrowthCard({
                 style={{
                   paddingHorizontal: spacing.md,
                   paddingVertical: 6,
-                  borderRadius: radius.pill,
+                  borderRadius: radius.md,
                   backgroundColor: active ? colors.primary : "transparent",
                 }}
               >
@@ -425,7 +425,7 @@ function FeeDragBreakdownDialog({
               gap: spacing.md,
               padding: spacing.md,
               borderRadius: radius.lg,
-              borderWidth: 2,
+              borderWidth: 1,
               borderColor: colors.border,
               backgroundColor: colors.card,
             }}
@@ -450,8 +450,8 @@ function FeeDragBreakdownDialog({
             justifyContent: "space-between",
             padding: spacing.md,
             borderRadius: radius.lg,
-            backgroundColor: `${colors.rose}14`,
-            borderWidth: 2,
+            backgroundColor: colors.muted,
+            borderWidth: 1,
             borderColor: colors.rose,
           }}
         >
@@ -502,7 +502,7 @@ export function FeeDragCard({
             gap: 4,
             paddingHorizontal: spacing.sm + 2,
             paddingVertical: 5,
-            borderRadius: radius.pill,
+            borderRadius: radius.md,
             backgroundColor: colors.muted,
             opacity: pressed ? 0.7 : 1,
           })}

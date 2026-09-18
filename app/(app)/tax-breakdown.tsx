@@ -93,8 +93,8 @@ function SectionHead({
             borderRadius: radius.md,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: `${accent}22`,
-            borderWidth: 2,
+            backgroundColor: colors.muted,
+            borderWidth: 1,
             borderColor: accent,
           }}
         >
@@ -213,8 +213,8 @@ function MetricTile({
                 borderRadius: radius.md,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: `${accent}22`,
-                borderWidth: 2,
+                backgroundColor: colors.muted,
+                borderWidth: 1,
                 borderColor: accent,
               }}
             >
@@ -309,8 +309,8 @@ export default function TaxBreakdownScreen() {
             borderRadius: radius.lg,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: `${colors.success}22`,
-            borderWidth: 2,
+            backgroundColor: colors.muted,
+            borderWidth: 1,
             borderColor: colors.success,
           }}
         >
@@ -383,7 +383,7 @@ export default function TaxBreakdownScreen() {
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: colors.card,
-            borderWidth: 2,
+            borderWidth: 1,
             borderColor: colors.border,
           }}
         >

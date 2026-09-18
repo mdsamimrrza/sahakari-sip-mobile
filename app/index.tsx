@@ -117,8 +117,8 @@ export default function LandingScreen() {
             style={{
               paddingHorizontal: spacing.md,
               paddingVertical: 5,
-              borderRadius: radius.pill,
-              backgroundColor: `${colors.primary}14`,
+              borderRadius: radius.md,
+              backgroundColor: colors.muted,
             }}
           >
             <Text

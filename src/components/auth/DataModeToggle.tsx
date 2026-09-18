@@ -29,7 +29,7 @@ export function DataModeToggle({
       style={{
         flexDirection: "row",
         backgroundColor: colors.muted,
-        borderRadius: radius.pill,
+        borderRadius: radius.md,
         padding: 3,
         gap: 3,
       }}
@@ -44,7 +44,7 @@ export function DataModeToggle({
             style={{
               flex: 1,
               paddingVertical: 8,
-              borderRadius: radius.pill,
+              borderRadius: radius.md,
               alignItems: "center",
               backgroundColor: active ? colors.primary : "transparent",
               opacity: disabled ? 0.45 : 1,

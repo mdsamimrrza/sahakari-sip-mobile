@@ -98,8 +98,8 @@ export default function SettingsScreen() {
               borderRadius: radius.xl,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: `${colors.success}22`,
-              borderWidth: 2,
+              backgroundColor: colors.muted,
+              borderWidth: 1,
               borderColor: colors.success,
             }}
           >
@@ -166,7 +166,7 @@ export default function SettingsScreen() {
                 padding: spacing.md,
                 borderRadius: radius.lg,
                 backgroundColor: colors.muted,
-                borderWidth: 2,
+                borderWidth: 1,
                 borderColor: colors.border,
               }}
             >
@@ -189,7 +189,7 @@ export default function SettingsScreen() {
                 padding: spacing.md,
                 borderRadius: radius.lg,
                 backgroundColor: colors.muted,
-                borderWidth: 2,
+                borderWidth: 1,
                 borderColor: colors.border,
               }}
             >
@@ -212,7 +212,7 @@ export default function SettingsScreen() {
                 padding: spacing.md,
                 borderRadius: radius.lg,
                 backgroundColor: colors.muted,
-                borderWidth: 2,
+                borderWidth: 1,
                 borderColor: colors.border,
               }}
             >
@@ -280,7 +280,7 @@ export default function SettingsScreen() {
               padding: spacing.xs,
               borderRadius: radius.xl,
               backgroundColor: colors.muted,
-              borderWidth: 2,
+              borderWidth: 1,
               borderColor: colors.border,
             }}
           >
@@ -342,8 +342,8 @@ export default function SettingsScreen() {
                   borderRadius: radius.lg,
                   alignItems: "center",
                   justifyContent: "center",
-                  backgroundColor: `${colors.success}22`,
-                  borderWidth: 2,
+                  backgroundColor: colors.muted,
+                  borderWidth: 1,
                   borderColor: colors.success,
                 }}
               >

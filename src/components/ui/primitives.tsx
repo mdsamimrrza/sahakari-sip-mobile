@@ -1,9 +1,9 @@
 // ============================================================
 // SahakariSIP — Core UI Primitives
 // ============================================================
-// A small, dependency-light component set that mirrors the visual
-// language of the web app's shadcn/ui components (thick ink borders, hard offset shadows,
-// pill buttons, uppercase micro-labels, tabular numerals).
+// A small, dependency-light component set in the "Editorial Ledger"
+// language: hairline rules, sharp corners, serif display type, uppercase
+// micro-labels, tabular numerals, and no shadows.
 // ============================================================
 
 import React from "react";
@@ -19,7 +19,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { useTheme, fontSize, radius, spacing } from "../../theme";
+import { useTheme, fontFamily, fontSize, radius, spacing } from "../../theme";
 
 // ------------------------------------------------------------
 // Text
@@ -62,11 +62,11 @@ export function Text({
   const variantStyle: TextStyle = (() => {
     switch (variant) {
       case "display":
-        return { fontSize: fontSize.display, fontWeight: "800", letterSpacing: -0.8 };
+        return { fontSize: fontSize.display, fontFamily: fontFamily.display, fontWeight: "700", letterSpacing: -0.5 };
       case "title":
-        return { fontSize: fontSize.xxl, fontWeight: "800", letterSpacing: -0.5 };
+        return { fontSize: fontSize.xxl, fontFamily: fontFamily.display, fontWeight: "700", letterSpacing: -0.3 };
       case "heading":
-        return { fontSize: fontSize.xl, fontWeight: "700", letterSpacing: -0.3 };
+        return { fontSize: fontSize.xl, fontFamily: fontFamily.display, fontWeight: "700", letterSpacing: -0.2 };
       case "subheading":
         return { fontSize: fontSize.lg, fontWeight: "700" };
       case "label":
@@ -123,33 +123,19 @@ export function Card({
 }) {
   const { colors } = useTheme();
   return (
-    // Bold Ink: a thick ink border + a REAL hard offset shadow (a solid
-    // block peeking out bottom-right) instead of soft blur shadows.
-    <View style={[{ position: "relative" }, style]}>
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 4,
-          left: 4,
-          right: -4,
-          bottom: -4,
-          backgroundColor: colors.cardShadow,
-          borderRadius: radius.xxl,
-        }}
-      />
-      <View
-        style={{
-          position: "relative",
+    <View
+      style={[
+        {
           backgroundColor: colors.card,
-          borderWidth: 2,
+          borderWidth: 1,
           borderColor: colors.border,
-          borderRadius: radius.xxl,
+          borderRadius: radius.xl,
           padding: padded ? spacing.xl : 0,
-        }}
-      >
-        {children}
-      </View>
+        },
+        style,
+      ]}
+    >
+      {children}
     </View>
   );
 }
@@ -287,16 +273,11 @@ export function Button({
           alignItems: "center",
           justifyContent: "center",
           gap: 6,
-          // Bold Ink: pill geometry, thick ink border, hard offset shadow.
-          borderRadius: radius.pill,
+          
+          borderRadius: radius.md,
           backgroundColor: bg,
-          borderWidth: variant === "ghost" ? 0 : 2,
+          borderWidth: variant === "ghost" ? 0 : 1,
           borderColor: colors.border,
-          shadowColor: colors.cardShadow,
-          shadowOpacity: variant === "ghost" ? 0 : 1,
-          shadowRadius: 0,
-          shadowOffset: { width: 2, height: 3 },
-          elevation: variant === "ghost" ? 0 : 4,
           opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1,
         },
         dims,
@@ -369,7 +350,7 @@ export function Input({
           flexDirection: "row",
           alignItems: "center",
           backgroundColor: colors.input,
-          borderWidth: 2,
+          borderWidth: 1,
           borderColor: error ? colors.destructive : colors.border,
           borderRadius: radius.lg,
           paddingHorizontal: spacing.md,
@@ -426,8 +407,8 @@ export function Badge({
           gap: 4,
           paddingHorizontal: spacing.sm + 2,
           paddingVertical: 3,
-          borderRadius: radius.pill,
-          borderWidth: 2,
+          borderRadius: radius.md,
+          borderWidth: 1,
           borderColor: color ?? colors.border,
           backgroundColor: bg ?? `${colors.muted}`,
         },
@@ -510,11 +491,11 @@ export function Switch({
       style={{
         width: 48,
         height: 28,
-        borderRadius: radius.pill,
+        borderRadius: radius.md,
         padding: 3,
         justifyContent: "center",
         backgroundColor: value ? colors.success : colors.muted,
-        borderWidth: 2,
+        borderWidth: 1,
         borderColor: colors.border,
         opacity: disabled ? 0.5 : 1,
       }}
@@ -523,7 +504,7 @@ export function Switch({
         style={{
           width: 18,
           height: 18,
-          borderRadius: radius.pill,
+          borderRadius: radius.md,
           backgroundColor: colors.card,
           alignSelf: value ? "flex-end" : "flex-start",
         }}
@@ -556,7 +537,7 @@ export function Checkbox({
           width: 20,
           height: 20,
           borderRadius: 6,
-          borderWidth: 2,
+          borderWidth: 1,
           borderColor: checked ? colors.primary : colors.border,
           backgroundColor: checked ? colors.primary : "transparent",
           alignItems: "center",
@@ -597,7 +578,7 @@ export function ProgressBar({
     <View
       style={{
         height,
-        borderRadius: radius.pill,
+        borderRadius: radius.md,
         backgroundColor: colors.muted,
         overflow: "hidden",
         width: "100%",
@@ -608,7 +589,7 @@ export function ProgressBar({
           width: `${pct}%`,
           height: "100%",
           backgroundColor: color ?? colors.primary,
-          borderRadius: radius.pill,
+          borderRadius: radius.md,
         }}
       />
     </View>
@@ -640,7 +621,7 @@ export function Avatar({
         backgroundColor: bg ?? colors.muted,
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: 2,
+        borderWidth: 1,
         borderColor: colors.border,
       }}
     >

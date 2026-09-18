@@ -70,20 +70,15 @@ export function Modal({
           style={[
             {
               backgroundColor: colors.card,
-              borderRadius: radius.xxl,
-              borderWidth: 2,
+              borderRadius: radius.xl,
+              borderWidth: 1,
               borderColor: colors.border,
               width: "100%",
               maxWidth: position === "bottom" ? undefined : maxWidth,
               alignSelf: "center",
               maxHeight: "90%",
               overflow: "hidden",
-              // Bold Ink: hard offset shadow on floating surfaces.
-              shadowColor: colors.cardShadow,
-              shadowOpacity: position === "bottom" ? 0 : 1,
-              shadowRadius: 0,
-              shadowOffset: { width: 3, height: 4 },
-              elevation: position === "bottom" ? 0 : 8,
+              
             },
             position === "bottom"
               ? {
@@ -200,7 +195,7 @@ export function Select<T extends string = string>({
           alignItems: "center",
           justifyContent: "space-between",
           backgroundColor: colors.input,
-          borderWidth: 2,
+          borderWidth: 1,
           borderColor: colors.border,
           borderRadius: radius.lg,
           paddingHorizontal: spacing.md,
@@ -368,16 +363,11 @@ function ToastViewport({ toasts }: { toasts: ToastEntry[] }) {
               ],
               backgroundColor: colors.card,
               borderRadius: radius.xl,
-              borderWidth: 2,
+              borderWidth: 1,
               borderColor: colors.border,
               borderLeftWidth: 6,
               borderLeftColor: accent,
               padding: spacing.lg,
-              shadowColor: colors.cardShadow,
-              shadowOpacity: 1,
-              shadowRadius: 0,
-              shadowOffset: { width: 3, height: 4 },
-              elevation: 6,
             }}
           >
             <Text variant="label" style={{ fontSize: fontSize.md }}>
@@ -464,15 +454,10 @@ export function DropdownMenu({
             width,
             maxHeight,
             backgroundColor: colors.card,
-            borderWidth: 2,
+            borderWidth: 1,
             borderColor: colors.border,
             borderRadius: radius.xl,
             overflow: "hidden",
-            shadowColor: colors.cardShadow,
-            shadowOpacity: 1,
-            shadowRadius: 0,
-            shadowOffset: { width: 3, height: 4 },
-            elevation: 8,
           }}
         >
           <ScrollView style={{ flexGrow: 0 }}>{children}</ScrollView>
@@ -538,7 +523,7 @@ export function DropdownSelect<T extends string = string>({
           alignItems: "center",
           justifyContent: "space-between",
           backgroundColor: colors.input,
-          borderWidth: 2,
+          borderWidth: 1,
           borderColor: colors.border,
           borderRadius: radius.lg,
           paddingHorizontal: spacing.md,

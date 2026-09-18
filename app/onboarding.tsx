@@ -140,7 +140,7 @@ export default function OnboardingScreen() {
               style={{
                 height: 8,
                 width: i <= step ? 32 : 16,
-                borderRadius: radius.pill,
+                borderRadius: radius.md,
                 backgroundColor: i <= step ? colors.primary : colors.muted,
               }}
             />
