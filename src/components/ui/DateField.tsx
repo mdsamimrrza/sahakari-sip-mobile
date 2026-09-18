@@ -9,7 +9,7 @@
 import React, { useState } from "react";
 import { View, Pressable, Platform } from "react-native";
 import DateTimePicker, {
-  type DateTimePickerEvent,
+  type DateTimePickerChangeEvent,
 } from "@react-native-community/datetimepicker";
 import { Calendar } from "lucide-react-native";
 import { useTheme, radius, spacing } from "../../theme";
@@ -37,12 +37,22 @@ export function DateField({
   const current = value ? parseDateSafe(value) : new Date();
   const safeCurrent = isNaN(current.getTime()) ? new Date() : current;
 
-  function handleChange(event: DateTimePickerEvent, selected?: Date) {
-    // Android fires "dismissed" and closes itself
-    if (Platform.OS === "android") setOpen(false);
-    if (event.type === "dismissed" || !selected) return;
-    onChange(toDateKey(selected));
-  }
+  const handleValueChange = ({ nativeEvent }: DateTimePickerChangeEvent) => {
+    // Extract the date from the timestamp
+    const date = new Date(nativeEvent.timestamp);
+    onChange(toDateKey(date));
+    // Close picker on value change (works for both platforms)
+    setOpen(false);
+  };
+
+  const handleDismiss = () => {
+    setOpen(false);
+  };
+
+  const handleNeutralPress = () => {
+    onChange(toDateKey(new Date()));
+    setOpen(false);
+  };
 
   return (
     <View>
@@ -86,7 +96,9 @@ export function DateField({
             value={safeCurrent}
             mode="date"
             display={Platform.OS === "ios" ? "spinner" : "default"}
-            onChange={handleChange}
+            onChange={handleValueChange}
+            onDismiss={handleDismiss}
+            onNeutralButtonPress={handleNeutralPress}
             maximumDate={maxDate ? parseDateSafe(maxDate) : new Date()}
             minimumDate={minDate ? parseDateSafe(minDate) : undefined}
             themeVariant={undefined}
