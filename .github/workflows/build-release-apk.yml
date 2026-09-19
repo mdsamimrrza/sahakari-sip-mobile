@@ -57,5 +57,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk SahakariSIP-${{ inputs.tag }}.apk
-          gh release upload "${{ inputs.tag }}" "SahakariSIP-${{ inputs.tag }}.apk" --clobber --repo "$GITHUB_REPOSITORY"
+          cp android/app/build/outputs/apk/release/app-release.apk SahakariSIP.apk
+          gh release upload "${{ inputs.tag }}" "SahakariSIP.apk" --clobber --repo "$GITHUB_REPOSITORY"
