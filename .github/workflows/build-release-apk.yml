@@ -1,4 +1,4 @@
-﻿name: Build & attach release APK
+name: Build & attach release APK
 
 on:
   push:
@@ -87,17 +87,15 @@ jobs:
           cp "$SRC" "SahakariSIP-${TAG}.apk"
           cp "$SRC" "SahakariSIP.apk"
 
-          # Create the release if it does not already exist (handles tag-only pushes)
-          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release create "$TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "SahakariSIP Mobile ${TAG}" \
-              --notes "Automated release for ${TAG}. Download the APK below and sideload it on any Android device." \
-              --latest
-          fi
+          # Delete existing release object (e.g. draft releases) without deleting git tag
+          gh release delete "$TAG" --yes --repo "$GITHUB_REPOSITORY" || true
 
-          # Upload (or overwrite) both APK assets
-          gh release upload "$TAG" \
+          # Create published GitHub Release and attach APKs
+          gh release create "$TAG" \
             "SahakariSIP-${TAG}.apk" \
             "SahakariSIP.apk" \
-            --clobber --repo "$GITHUB_REPOSITORY"
+            --repo "$GITHUB_REPOSITORY" \
+            --title "SahakariSIP Mobile ${TAG}" \
+            --notes "Automated release for ${TAG}. Download the APK below and sideload it on any Android device." \
+            --latest
+
