@@ -296,7 +296,12 @@ export function Button({
       ]}
     >
       {loading ? <ActivityIndicator size="small" color={fg} /> : null}
-      {typeof children === "string" ? (
+      {/* Strings, numbers, and mixed text (e.g. Import {n} Rows) must all
+          be rendered inside a <Text>; only JSX elements pass through raw. */}
+      {typeof children === "string" ||
+      typeof children === "number" ||
+      (Array.isArray(children) &&
+        children.every((c) => typeof c === "string" || typeof c === "number")) ? (
         <Text
           variant="label"
           color={textColor ?? fg}

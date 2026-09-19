@@ -11,7 +11,7 @@
 
 import React, { useMemo, useState } from "react";
 import { View, Pressable, ScrollView } from "react-native";
-import { ArrowUpRight, ArrowDownRight, Info } from "lucide-react-native";
+import { ArrowUpRight, ArrowDownRight, Info, Pencil } from "lucide-react-native";
 import type {
   ChartDataPoint,
   DashboardSummary,
@@ -23,6 +23,7 @@ import { FUND_PRESETS } from "@/lib/constants";
 import {
   formatCompact,
   formatCurrencyWhole,
+  formatDate,
   formatDateShort,
   formatMonth,
   formatMonthShort,
@@ -31,8 +32,37 @@ import {
 } from "@/lib/format";
 import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { Text, Card, EmptyState } from "@/components/ui/primitives";
+import { SectionHeader } from "@/components/ui/layout";
 import { Modal } from "@/components/ui/overlays";
 import { BarChart, DonutChart, ChartLegend, LineChart } from "@/components/charts";
+
+const SHADOW = {
+  shadowColor: "#000",
+  shadowOpacity: 0.07,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 2,
+} as const;
+
+/** Frosted reset pill shared by every chart card. */
+function ResetPill({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: spacing.sm + 2,
+        paddingVertical: 5,
+        borderRadius: radius.full,
+        backgroundColor: `${colors.primary}14`,
+      }}
+    >
+      <Text variant="caption" color={colors.primary} style={{ fontWeight: "800" }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
 
 const TIME_RANGES = ["1M", "3M", "6M", "1Y", "3Y", "5Y", "ALL"] as const;
 type TimeRange = (typeof TIME_RANGES)[number];
@@ -84,11 +114,12 @@ export function PortfolioGrowthCard({
     ? (totalInv > 0 ? (gainVal / totalInv) * 100 : 0)
     : (summary.gainLossPct ?? (totalInv > 0 ? (gainVal / totalInv) * 100 : 0));
   const isPositive = gainVal >= 0;
-  const gainColor = isPositive ? colors.success : colors.rose;
+  // Income green in profit, rust in loss — the portfolio line follows it.
+  const gainColor = isPositive ? colors.emerald : colors.rose;
 
   if (data.length === 0) {
     return (
-      <Card padded>
+      <Card padded style={{ borderWidth: 0, ...SHADOW }}>
         <Text variant="subheading">Portfolio Growth</Text>
         <EmptyState title="Add entries to see your portfolio growth" />
       </Card>
@@ -96,36 +127,18 @@ export function PortfolioGrowthCard({
   }
 
   return (
-    <Card padded style={{ gap: spacing.md }}>
+    <Card style={{ borderWidth: 0, ...SHADOW }}>
+      <View style={{ padding: spacing.xl, gap: spacing.md }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Text variant="micro" color={colors.mutedForeground}>
-            Portfolio Growth
-          </Text>
-          {summary.latestNav ? (
-            <Text variant="caption" color={colors.mutedForeground}>
-              NAV: NPR {formatNav(summary.latestNav)}
-              {summary.latestNavDate ? ` (${formatDateShort(summary.latestNavDate)})` : ""}
-            </Text>
-          ) : null}
-        </View>
+        <Text variant="micro" color={colors.mutedForeground}>
+          Portfolio Growth
+        </Text>
 
         {activePoint ? (
-          <Pressable
+          <ResetPill
+            label={`${formatDateShort(activePoint.date)} (Reset)`}
             onPress={() => setSelectedIndex(null)}
-            style={{
-              paddingHorizontal: spacing.sm + 2,
-              paddingVertical: 3,
-              borderRadius: radius.full,
-              backgroundColor: `${colors.primary}20`,
-              borderWidth: 1,
-              borderColor: colors.primary,
-            }}
-          >
-            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
-              {formatDateShort(activePoint.date)} (Reset)
-            </Text>
-          </Pressable>
+          />
         ) : null}
       </View>
 
@@ -139,11 +152,9 @@ export function PortfolioGrowthCard({
             alignItems: "center",
             gap: 4,
             paddingHorizontal: spacing.sm + 2,
-            paddingVertical: 3,
-            borderRadius: radius.md,
-            backgroundColor: colors.muted,
-            borderWidth: 1,
-            borderColor: gainColor,
+            paddingVertical: 5,
+            borderRadius: radius.full,
+            backgroundColor: `${gainColor}14`,
           }}
         >
           {isPositive ? (
@@ -164,8 +175,8 @@ export function PortfolioGrowthCard({
           style={{
             flexDirection: "row",
             backgroundColor: colors.muted,
-            borderRadius: radius.md,
-            padding: 3,
+            borderRadius: radius.lg,
+            padding: 4,
             gap: 2,
           }}
         >
@@ -180,14 +191,19 @@ export function PortfolioGrowthCard({
                 }}
                 style={{
                   paddingHorizontal: spacing.md,
-                  paddingVertical: 6,
+                  paddingVertical: 7,
                   borderRadius: radius.md,
-                  backgroundColor: active ? colors.primary : "transparent",
+                  backgroundColor: active ? colors.card : "transparent",
+                  shadowColor: active ? "#000" : "transparent",
+                  shadowOpacity: active ? 0.08 : 0,
+                  shadowRadius: 4,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: active ? 2 : 0,
                 }}
               >
                 <Text
                   variant="caption"
-                  color={active ? colors.primaryForeground : colors.mutedForeground}
+                  color={active ? colors.foreground : colors.mutedForeground}
                   style={{ fontWeight: "800" }}
                 >
                   {r}
@@ -203,15 +219,19 @@ export function PortfolioGrowthCard({
         series={[
           {
             key: "portfolio",
-            name: "Portfolio Value",
-            color: colors.blue,
+            name: "Portfolio Value (Updated NAV)",
+            tooltipName: "Portfolio Value",
+            color: "#2563EB",
+            dots: true,
             values: filtered.map((d) => d.portfolioValue),
           },
           {
             key: "invested",
             name: "Total Invested",
-            color: colors.mutedForeground,
+            color: colors.mutedForeground, // quiet grey reference line
             dashed: true,
+            dots: false,
+            strokeWidth: 1.5,
             values: filtered.map((d) => d.totalInvested),
           },
         ]}
@@ -224,6 +244,7 @@ export function PortfolioGrowthCard({
         onSelectPoint={(idx) => setSelectedIndex(idx)}
         showLegend
       />
+      </View>
     </Card>
   );
 }
@@ -232,66 +253,149 @@ export function PortfolioGrowthCard({
 // NAV history
 // ------------------------------------------------------------
 
-export function NavHistoryCard({ data }: { data: ChartDataPoint[] }) {
+export function NavHistoryCard({
+  data,
+  onEditNav,
+}: {
+  data: ChartDataPoint[];
+  /** Opens the NAV editor — the single home for NAV actions. */
+  onEditNav?: () => void;
+}) {
   const { colors } = useTheme();
+  const [range, setRange] = useState<TimeRange>("ALL");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  const isSelected = selectedIndex !== null && selectedIndex < data.length;
-  const activePoint = isSelected ? data[selectedIndex] : null;
+  const filtered = useMemo(() => {
+    if (data.length <= 1 || range === "ALL") return data;
+    const lastDate = new Date(data[data.length - 1].date).getTime();
+    const cutoff = RANGE_DAYS[range] * 24 * 60 * 60 * 1000;
+    const kept = data.filter((d) => lastDate - new Date(d.date).getTime() <= cutoff);
+    return kept.length >= 2 ? kept : data.slice(-2);
+  }, [data, range]);
+
+  const latestNav = data.length > 0 ? data[data.length - 1].value : null;
 
   return (
-    <Card padded style={{ gap: spacing.md }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="subheading">NAV History</Text>
-          <Text variant="caption" color={activePoint ? colors.primary : colors.mutedForeground} style={{ fontWeight: activePoint ? "700" : "400" }}>
-            {activePoint
-              ? `NAV on ${formatDateShort(activePoint.date)}: NPR ${formatNav(activePoint.value)}`
-              : "Net Asset Value per unit over time"}
+    <Card style={{ borderWidth: 0, ...SHADOW }}>
+      <View style={{ padding: spacing.xl, gap: spacing.md }}>
+        {/* Header — title + green NAV chip + Update NAV action */}
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm }}>
+          <Text variant="subheading" style={{ fontWeight: "900" }}>
+            NAV History
           </Text>
+          {latestNav ? (
+            <View
+              style={{
+                paddingHorizontal: spacing.sm + 2,
+                paddingVertical: 4,
+                borderRadius: radius.md,
+                backgroundColor: `${colors.emerald}1A`,
+              }}
+            >
+              <Text
+                variant="caption"
+                color={colors.emerald}
+                style={{ fontWeight: "800" }}
+                tabular
+              >
+                NPR {formatNav(latestNav)}
+              </Text>
+            </View>
+          ) : null}
+          {onEditNav ? (
+            <Pressable
+              onPress={onEditNav}
+              accessibilityRole="button"
+              accessibilityLabel="Update NAV"
+              style={({ pressed }) => ({
+                marginLeft: "auto",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingHorizontal: spacing.sm + 2,
+                paddingVertical: 6,
+                borderRadius: radius.full,
+                backgroundColor: colors.primary,
+                opacity: pressed ? 0.8 : 1,
+              })}
+            >
+              <Pencil size={12} color={colors.primaryForeground} />
+              <Text
+                variant="caption"
+                color={colors.primaryForeground}
+                style={{ fontWeight: "800" }}
+              >
+                Update NAV
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
-        {activePoint ? (
-          <Pressable
-            onPress={() => setSelectedIndex(null)}
+        {/* Range tabs — brass-tinted pill bar, active range in dark ink */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View
             style={{
-              paddingHorizontal: spacing.sm + 2,
-              paddingVertical: 3,
+              flexDirection: "row",
+              backgroundColor: "#F0E3C8", // brass tint
               borderRadius: radius.full,
-              backgroundColor: `${colors.primary}20`,
-              borderWidth: 1,
-              borderColor: colors.primary,
+              padding: 4,
+              gap: 2,
             }}
           >
-            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
-              Reset
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+            {TIME_RANGES.map((r) => {
+              const active = r === range;
+              return (
+                <Pressable
+                  key={r}
+                  onPress={() => {
+                    setRange(r);
+                    setSelectedIndex(null);
+                  }}
+                  style={{
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: 7,
+                    borderRadius: radius.full,
+                    backgroundColor: active ? colors.foreground : "transparent",
+                  }}
+                >
+                  <Text
+                    variant="caption"
+                    color={active ? colors.card : colors.warning}
+                    style={{ fontWeight: "800" }}
+                  >
+                    {r}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
 
-      {data.length === 0 ? (
-        <EmptyState title="No NAV history yet" description="Add entries or update the NAV." />
-      ) : (
-        <LineChart
-          labels={data.map((d) => d.date)}
-          series={[
-            {
-              key: "nav",
-              name: "NAV",
-              color: colors.success,
-              area: true,
-              values: data.map((d) => d.value),
-            },
-          ]}
-          height={200}
-          formatY={(v) => v.toFixed(1)}
-          formatTooltipY={(v) => `NPR ${formatNav(v)}`}
-          formatX={formatDateShort}
-          selectedIndex={selectedIndex}
-          onSelectPoint={(idx) => setSelectedIndex(idx)}
-        />
-      )}
+        {data.length === 0 ? (
+          <EmptyState title="No NAV history yet" description="Add entries or update the NAV." />
+        ) : (
+          <LineChart
+            labels={filtered.map((d) => d.date)}
+            series={[
+              {
+                key: "nav",
+                name: "NAV",
+                color: "#10B981",
+                dots: true,
+                values: filtered.map((d) => d.value),
+              },
+            ]}
+            height={200}
+            formatY={(v) => v.toFixed(1)}
+            formatTooltipY={(v) => `NPR ${formatNav(v)}`}
+            formatX={formatDateShort}
+            // Tooltip shows the full date: month, day, and year.
+            formatTooltipX={(d) => formatDate(d)}
+            selectedIndex={selectedIndex}
+            onSelectPoint={(idx) => setSelectedIndex(idx)}
+          />
+        )}
+      </View>
     </Card>
   );
 }
@@ -321,35 +425,21 @@ export function MonthlyContributionsCard({
   const activeItem = selectedIndex !== null && sorted[selectedIndex] ? sorted[selectedIndex] : null;
 
   return (
-    <Card padded style={{ gap: spacing.md }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="subheading">Monthly Contributions</Text>
-          <Text variant="caption" color={activeItem ? colors.primary : colors.mutedForeground} style={{ fontWeight: activeItem ? "700" : "400" }}>
-            {activeItem
-              ? `Selected: ${formatMonth(activeItem.month)} · ${formatCurrencyWhole(activeItem.amount)}`
-              : `${sorted.length} month${sorted.length === 1 ? "" : "s"} · ${formatCurrencyWhole(total)} deposited`}
-          </Text>
-        </View>
-
-        {activeItem ? (
-          <Pressable
-            onPress={() => setSelectedIndex(null)}
-            style={{
-              paddingHorizontal: spacing.sm + 2,
-              paddingVertical: 3,
-              borderRadius: radius.full,
-              backgroundColor: `${colors.primary}20`,
-              borderWidth: 1,
-              borderColor: colors.primary,
-            }}
-          >
-            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
-              Reset
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+    <Card style={{ borderWidth: 0, ...SHADOW }}>
+      <View style={{ padding: spacing.xl, gap: spacing.md }}>
+      <SectionHeader
+        title="Monthly Contributions"
+        subtitle={
+          activeItem
+            ? `Selected: ${formatMonth(activeItem.month)} · ${formatCurrencyWhole(activeItem.amount)}`
+            : `${sorted.length} month${sorted.length === 1 ? "" : "s"} · ${formatCurrencyWhole(total)} deposited`
+        }
+        right={
+          activeItem ? (
+            <ResetPill label="Reset" onPress={() => setSelectedIndex(null)} />
+          ) : undefined
+        }
+      />
 
       {sorted.length === 0 ? (
         <EmptyState title="No contributions recorded yet" />
@@ -360,7 +450,7 @@ export function MonthlyContributionsCard({
             {
               key: "contrib",
               name: "Contribution",
-              color: colors.blue,
+              color: colors.primary,
               values: sorted.map((d) => d.amount),
             },
           ]}
@@ -370,6 +460,7 @@ export function MonthlyContributionsCard({
           formatX={(m) => formatMonthShort(m)}
         />
       )}
+      </View>
     </Card>
   );
 }
@@ -381,9 +472,12 @@ export function MonthlyContributionsCard({
 export function InvestedVsGainCard({
   totalInvested,
   currentValue,
+  compact,
 }: {
   totalInvested: number;
   currentValue: number | null;
+  /** Smaller donut for the two-column dashboard row. */
+  compact?: boolean;
 }) {
   const { colors } = useTheme();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -391,60 +485,52 @@ export function InvestedVsGainCard({
   const value = currentValue ?? totalInvested;
   const gain = value - totalInvested;
   const gainPositive = gain >= 0;
+  const gainPct = value > 0 ? (gain / value) * 100 : 0;
+  // Vivid reference colors (deliberately brighter than the parchment palette,
+  // matching the banking-style donut design the user signed off on).
+  const investedColor = "#2563EB";
+  const gainColor = gainPositive ? "#10B981" : colors.rose;
 
   const slices = [
     {
       name: "Invested Capital",
       value: Math.max(0, Math.min(totalInvested, value)),
-      color: colors.blue,
+      color: investedColor,
     },
     {
       name: gainPositive ? "Unrealised Gain" : "Unrealised Loss",
       value: Math.abs(gain),
-      color: gainPositive ? colors.success : colors.rose,
+      color: gainColor,
     },
   ];
 
   const activeSlice = selectedIndex !== null && slices[selectedIndex] ? slices[selectedIndex] : null;
 
   return (
-    <Card padded style={{ gap: spacing.md }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="subheading">Invested vs Gain</Text>
-          <Text variant="caption" color={activeSlice ? activeSlice.color : colors.mutedForeground} style={{ fontWeight: activeSlice ? "700" : "400" }}>
-            {activeSlice
-              ? `${activeSlice.name}: ${formatCurrencyWhole(activeSlice.value)} (${((activeSlice.value / (value || 1)) * 100).toFixed(1)}%)`
-              : "How your portfolio value splits between capital and return"}
-          </Text>
-        </View>
+    <Card style={{ borderWidth: 0, ...SHADOW }}>
+      <View style={{ padding: spacing.xl, gap: spacing.md }}>
+      <SectionHeader
+        title="Invested vs Gain"
+        subtitle={
+          activeSlice
+            ? `${activeSlice.name}: ${formatCurrencyWhole(activeSlice.value)} (${((activeSlice.value / (value || 1)) * 100).toFixed(1)}%)`
+            : "How your portfolio value splits between capital and return"
+        }
+        right={
+          activeSlice ? (
+            <ResetPill label="Reset" onPress={() => setSelectedIndex(null)} />
+          ) : undefined
+        }
+      />
 
-        {activeSlice ? (
-          <Pressable
-            onPress={() => setSelectedIndex(null)}
-            style={{
-              paddingHorizontal: spacing.sm + 2,
-              paddingVertical: 3,
-              borderRadius: radius.full,
-              backgroundColor: `${colors.primary}20`,
-              borderWidth: 1,
-              borderColor: colors.primary,
-            }}
-          >
-            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
-              Reset
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.lg }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: compact ? spacing.md : spacing.lg }}>
         <DonutChart
           slices={slices}
-          size={150}
-          thickness={24}
-          centerValue={formatCompact(value)}
-          centerLabel="Value"
+          size={compact ? 120 : 150}
+          thickness={compact ? 20 : 24}
+          centerValue={`${gain >= 0 ? "+" : ""}${gainPct.toFixed(2)}%`}
+          centerLabel={gainPositive ? "PROFIT" : "LOSS"}
+          centerColor={gainColor}
           selectedIndex={selectedIndex}
           onSelectSlice={(idx) => setSelectedIndex(idx)}
         />
@@ -454,6 +540,7 @@ export function InvestedVsGainCard({
           selectedIndex={selectedIndex}
           onSelectSlice={(idx) => setSelectedIndex(idx)}
         />
+      </View>
       </View>
     </Card>
   );
@@ -539,11 +626,28 @@ function FeeDragBreakdownDialog({
               gap: spacing.md,
               padding: spacing.md,
               borderRadius: radius.lg,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.card,
+              backgroundColor: colors.muted,
             }}
           >
+            <View
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: `${r.color}1F`,
+              }}
+            >
+              <View
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: r.color,
+                }}
+              />
+            </View>
             <View style={{ flex: 1 }}>
               <Text variant="label">{r.label}</Text>
               <Text variant="caption" color={colors.mutedForeground}>
@@ -564,9 +668,7 @@ function FeeDragBreakdownDialog({
             justifyContent: "space-between",
             padding: spacing.md,
             borderRadius: radius.lg,
-            backgroundColor: colors.muted,
-            borderWidth: 1,
-            borderColor: colors.rose,
+            backgroundColor: `${colors.rose}0F`,
           }}
         >
           <Text variant="label">Total Fee Drag</Text>
@@ -599,7 +701,8 @@ export function FeeDragCard({
   const latest = data.length > 0 ? data[data.length - 1].cumulativeDrag : 0;
 
   return (
-    <Card padded style={{ gap: spacing.md }}>
+    <Card style={{ borderWidth: 0, ...SHADOW }}>
+      <View style={{ padding: spacing.xl, gap: spacing.md }}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.sm }}>
         <View style={{ flex: 1 }}>
           <Text variant="subheading">Cumulative Fee Drag</Text>
@@ -616,7 +719,7 @@ export function FeeDragCard({
             gap: 4,
             paddingHorizontal: spacing.sm + 2,
             paddingVertical: 5,
-            borderRadius: radius.md,
+            borderRadius: radius.full,
             backgroundColor: colors.muted,
             opacity: pressed ? 0.7 : 1,
           })}
@@ -673,6 +776,7 @@ export function FeeDragCard({
         fundName={fundName}
         totalDrag={latest}
       />
+      </View>
     </Card>
   );
 }

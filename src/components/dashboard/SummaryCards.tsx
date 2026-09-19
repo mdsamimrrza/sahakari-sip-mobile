@@ -11,16 +11,16 @@
 // ============================================================
 
 import React, { useState } from "react";
-import { View, Pressable } from "react-native";
+import { View, Pressable, ScrollView } from "react-native";
 import {
   Wallet,
   TrendingUp,
-  BarChart3,
   Coins,
   Flame,
-  Plus,
   ArrowUpRight,
   ArrowDownRight,
+  ChevronDown,
+  Check,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import type { DashboardSummary, FundConfig } from "@/lib/types";
@@ -29,8 +29,8 @@ import {
   formatPercentage,
   formatUnits,
   formatStreak,
-  formatNav,
 } from "@/lib/format";
+import { formatFundShortName } from "@/lib/utils";
 import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { Text, Card, Button, Skeleton } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/overlays";
@@ -43,7 +43,6 @@ export function SummaryCards({
   onFundChange,
   activeFund,
   loading,
-  onAddEntry,
 }: {
   summary: DashboardSummary;
   funds: FundConfig[];
@@ -51,11 +50,11 @@ export function SummaryCards({
   onFundChange: (id: string) => void;
   activeFund?: FundConfig;
   loading?: boolean;
-  onAddEntry?: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [fundMenuOpen, setFundMenuOpen] = useState(false);
 
   if (loading) {
     return (
@@ -87,92 +86,112 @@ export function SummaryCards({
 
   return (
     <View style={{ gap: spacing.md }}>
-      {/* Fund scope */}
-      <FundScopeSelector
-        funds={funds}
-        selectedFundId={selectedFundId}
-        onChange={onFundChange}
-      />
-
-      {/* ---------- CARD 1: Portfolio Value ---------- */}
-      <Card
+      {/* HERO: Portfolio Value — wrapper lets the fund dropdown overlay
+          the card without being clipped by its overflow:"hidden" */}
+      <View>
+      <View
         style={{
-          padding: spacing.lg,
-          borderColor: colors.primary,
-          gap: spacing.md,
+          backgroundColor: isDark ? "#1E293B" : colors.primary,
+          marginHorizontal: -spacing.lg,
+          marginTop: -spacing.xs,
+          paddingHorizontal: spacing.xl,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.lg,
+          borderBottomLeftRadius: 24,
+          borderBottomRightRadius: 24,
+          overflow: "hidden",
         }}
       >
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: -46,
+            right: -30,
+            width: 130,
+            height: 130,
+            borderRadius: 65,
+            backgroundColor: "#FFFFFF",
+            opacity: 0.12,
+          }}
+        />
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            bottom: -60,
+            right: 60,
+            width: 150,
+            height: 150,
+            borderRadius: 75,
+            backgroundColor: colors.secondary,
+            opacity: 0.28,
+          }}
+        />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 11,
+              backgroundColor: "#FFFFFF2E",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Wallet size={16} color="#FFFFFF" />
+          </View>
+          <Text variant="micro" color="#FFFFFF" style={{ opacity: 0.85, flex: 1 }}>
+            PORTFOLIO VALUE
+          </Text>
+        </View>
+
+        <Text
+          style={{
+            fontSize: 30,
+            fontWeight: "900",
+            color: "#FFFFFF",
+            fontVariant: ["tabular-nums"],
+            marginTop: spacing.xs,
+          }}
+          numberOfLines={1}
+        >
+          {currentValueDisplay}
+        </Text>
+        <Text style={{ fontSize: fontSize.sm, color: "#FFFFFF", opacity: 0.85, marginTop: 2 }}>
+          Invested {formatCurrencyWhole(summary.totalInvested)}
+        </Text>
+
         <View
           style={{
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
             gap: spacing.sm,
+            marginTop: spacing.sm,
+            flexWrap: "wrap",
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: radius.md,
-                backgroundColor: colors.primary,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Wallet size={16} color="#FFFFFF" />
-            </View>
-            <Text variant="micro" color={colors.mutedForeground}>
-              Portfolio Value
-            </Text>
-          </View>
-
-          {onAddEntry ? (
-            <Pressable
-              onPress={onAddEntry}
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: radius.md,
-                backgroundColor: colors.primary,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Plus size={19} color="#FFFFFF" strokeWidth={2.6} />
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={{ gap: 6 }}>
-          <Text variant="display" style={{ fontSize: 30 }}>
-            {currentValueDisplay}
-          </Text>
-
-          {summary.gainLoss !== null && (
+          {summary.gainLoss !== null ? (
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 4,
-                alignSelf: "flex-start",
-                paddingHorizontal: spacing.sm + 2,
-                paddingVertical: 3,
-                borderRadius: radius.md,
-                backgroundColor: colors.muted,
-                borderWidth: 1,
-                borderColor: gainColor,
+                paddingHorizontal: spacing.md,
+                paddingVertical: 5,
+                borderRadius: radius.full,
+                backgroundColor: "#FFFFFF2E",
               }}
             >
               {isPositive ? (
-                <ArrowUpRight size={13} color={gainColor} strokeWidth={2.6} />
+                <ArrowUpRight size={13} color="#FFFFFF" strokeWidth={2.6} />
               ) : (
-                <ArrowDownRight size={13} color={gainColor} strokeWidth={2.6} />
+                <ArrowDownRight size={13} color="#FFFFFF" strokeWidth={2.6} />
               )}
               <Text
                 variant="caption"
-                color={gainColor}
+                color="#FFFFFF"
                 style={{ fontWeight: "800" }}
                 tabular
               >
@@ -181,194 +200,196 @@ export function SummaryCards({
                 {formatPercentage(summary.gainLossPct ?? 0)})
               </Text>
             </View>
-          )}
-        </View>
-      </Card>
-
-      {/* ---------- CARD 2: Invested & Return ---------- */}
-      <Card style={{ padding: spacing.lg, gap: spacing.md }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: radius.md,
-              backgroundColor: colors.muted,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Coins size={17} color={colors.purple} />
-          </View>
-          <Text variant="micro" color={colors.mutedForeground}>
-            Invested &amp; Return
-          </Text>
-        </View>
-
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            gap: spacing.md,
-          }}
-        >
-          <View>
-            <Text variant="caption" color={colors.mutedForeground}>
-              Invested
-            </Text>
-            <Text variant="subheading" tabular>
-              {formatCurrencyWhole(summary.totalInvested)}
-            </Text>
-          </View>
-          <View style={{ alignItems: "flex-end" }}>
-            <Text variant="caption" color={colors.mutedForeground}>
-              Net Gain / Loss
-            </Text>
-            <Text
-              variant="subheading"
-              color={summary.gainLoss !== null ? gainColor : colors.foreground}
-              tabular
-            >
-              {summary.gainLoss !== null
-                ? formatCurrencyWhole(summary.gainLoss, true)
-                : "NPR 0"}
-            </Text>
-          </View>
-        </View>
-      </Card>
-
-      {/* ---------- CARD 3: Cash & NAV ---------- */}
-      <Card style={{ padding: spacing.lg, gap: spacing.md }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: radius.md,
-              backgroundColor: colors.muted,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <BarChart3 size={17} color={colors.success} />
-          </View>
-          <Text variant="micro" color={colors.mutedForeground}>
-            Cash &amp; NAV
-          </Text>
-        </View>
-
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            gap: spacing.md,
-          }}
-        >
-          <View>
-            <Text variant="caption" color={colors.mutedForeground}>
-              Unallotted Cash
-            </Text>
-            <Text variant="subheading" tabular>
-              {formatCurrencyWhole(summary.unallottedCash)}
-            </Text>
-          </View>
-          {summary.latestNav ? (
-            <View style={{ alignItems: "flex-end" }}>
-              <Text variant="caption" color={colors.mutedForeground}>
-                NAV (Net Asset Value)
-              </Text>
-              <Text variant="subheading" color={colors.success} tabular>
-                NPR {formatNav(summary.latestNav)}
-              </Text>
-            </View>
           ) : null}
-        </View>
-      </Card>
-
-      {/* ---------- CARD 4: Performance ---------- */}
-      <Card style={{ padding: spacing.lg, gap: spacing.md }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: spacing.sm,
-          }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: radius.md,
-                backgroundColor: colors.muted,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <TrendingUp size={17} color={colors.amber} />
-            </View>
-            <Text variant="micro" color={colors.mutedForeground}>
-              Performance
-            </Text>
-          </View>
-
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
               gap: 4,
-              paddingHorizontal: spacing.sm + 2,
-              paddingVertical: 3,
-              borderRadius: radius.md,
-              backgroundColor: colors.muted,
+              paddingHorizontal: spacing.md,
+              paddingVertical: 5,
+              borderRadius: radius.full,
+              backgroundColor: "#FFFFFF2E",
             }}
           >
-            <Flame size={12} color={colors.amber} />
-            <Text variant="caption" color={colors.amber} style={{ fontWeight: "800" }}>
+            <Flame size={13} color="#FFFFFF" strokeWidth={2.4} />
+            <Text variant="caption" color="#FFFFFF" style={{ fontWeight: "800" }}>
               {formatStreak(summary.sipStreak)}
             </Text>
           </View>
         </View>
 
-        <View
+      </View>
+
+      {/* Fund dropdown chip — overlaid on the card's top-right corner */}
+      <View
+        style={{
+          position: "absolute",
+          top: spacing.md + 2,
+          right: spacing.lg,
+          zIndex: 41,
+        }}
+      >
+        {fundMenuOpen ? (
+          <Pressable
+            onPress={() => setFundMenuOpen(false)}
+            style={{
+              position: "absolute",
+              top: -2000,
+              left: -2000,
+              right: -2000,
+              bottom: -2000,
+              zIndex: 40,
+            }}
+          />
+        ) : null}
+        <Pressable
+          onPress={() => setFundMenuOpen((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel="Choose fund"
           style={{
             flexDirection: "row",
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            gap: spacing.md,
+            alignItems: "center",
+            gap: 4,
+            paddingHorizontal: spacing.md,
+            paddingVertical: 5,
+            borderRadius: radius.full,
+            backgroundColor: "#FFFFFF",
+            zIndex: 41,
           }}
         >
-          <View style={{ flex: 1 }}>
-            <Text variant="caption" color={colors.mutedForeground}>
-              XIRR Return (Extended Internal Rate of Return)
-            </Text>
-            <Text variant="subheading" tabular>
-              {summary.xirr !== null ? formatPercentage(summary.xirr * 100) : "—"}
-            </Text>
+          <Text
+            style={{ fontSize: fontSize.xs, fontWeight: "800", color: isDark ? "#1E293B" : colors.primary }}
+            numberOfLines={1}
+          >
+            {selectedFundId === "all"
+              ? `${funds.length} ${funds.length === 1 ? "fund" : "funds"}`
+              : formatFundShortName(activeFund?.fund_name ?? "")}
+          </Text>
+          <ChevronDown size={13} color={isDark ? "#1E293B" : colors.primary} strokeWidth={2.6} />
+        </Pressable>
+        {fundMenuOpen ? (
+          <View
+            style={{
+              position: "absolute",
+              top: 36,
+              right: 0,
+              zIndex: 42,
+              minWidth: 210,
+              backgroundColor: colors.card,
+              borderRadius: radius.lg,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingVertical: spacing.xs,
+              shadowColor: "#000",
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 8,
+            }}
+          >
+            {[
+              { id: "all", label: "All Funds" },
+              ...funds.map((f) => ({
+                id: f.id,
+                label: formatFundShortName(f.fund_name),
+              })),
+            ].map((opt) => {
+              const active = opt.id === selectedFundId;
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => {
+                    setFundMenuOpen(false);
+                    onFundChange(opt.id);
+                  }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: spacing.sm,
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: 10,
+                    borderRadius: radius.md,
+                    backgroundColor: active ? colors.muted : "transparent",
+                  }}
+                >
+                  <Text
+                    variant="caption"
+                    color={active ? colors.foreground : colors.mutedForeground}
+                    style={{ fontWeight: active ? "800" : "500" }}
+                    numberOfLines={1}
+                  >
+                    {opt.label}
+                  </Text>
+                  {active ? (
+                    <Check size={14} color={colors.success} strokeWidth={3} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
           </View>
-          <View style={{ alignItems: "flex-end" }}>
-            <Text variant="caption" color={colors.mutedForeground}>
-              Total Units
-            </Text>
-            <Text variant="subheading" tabular>
-              {formatUnits(summary.totalUnits)}
-            </Text>
-          </View>
-        </View>
-      </Card>
+        ) : null}
+      </View>
+      </View>
+
+      {/* ---------- KPI strip ---------- */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
+      >
+        <KpiChip
+          tint={gainColor}
+          icon={
+            isPositive ? (
+              <ArrowUpRight size={15} color={gainColor} />
+            ) : (
+              <ArrowDownRight size={15} color={gainColor} />
+            )
+          }
+          label="Net Gain"
+          value={
+            summary.gainLoss !== null
+              ? formatCurrencyWhole(summary.gainLoss, true)
+              : "NPR 0"
+          }
+        />
+        <KpiChip
+          tint={colors.amber}
+          icon={<TrendingUp size={15} color={colors.amber} />}
+          label="XIRR Return"
+          value={summary.xirr !== null ? formatPercentage(summary.xirr * 100) : "—"}
+        />
+        <KpiChip
+          tint={colors.info}
+          icon={<Wallet size={15} color={colors.info} />}
+          label="Total Units"
+          value={formatUnits(summary.totalUnits)}
+        />
+        <KpiChip
+          tint={colors.purple}
+          icon={<Coins size={15} color={colors.purple} />}
+          label="Rollover Cash"
+          value={formatCurrencyWhole(summary.unallottedCash)}
+        />
+      </ScrollView>
 
       {/* ---------- Personal Summary banner ---------- */}
       <Pressable onPress={() => setSummaryOpen(true)}>
         <Card
           style={{
+            borderWidth: 0,
             padding: spacing.lg,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
             gap: spacing.md,
+            shadowColor: "#000",
+            shadowOpacity: 0.07,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 2,
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, flex: 1 }}>
@@ -493,9 +514,14 @@ export function SummaryCards({
             {[
               {
                 label: "Latest NAV",
-                value: activeFund?.latest_nav
-                  ? `NPR ${Number(activeFund.latest_nav).toFixed(2)}`
-                  : "—",
+                // Selected fund's NAV, else the freshest NAV across funds —
+                // never a bare "—" when we know the last updated NAV.
+                value:
+                  activeFund?.latest_nav
+                    ? `NPR ${Number(activeFund.latest_nav).toFixed(2)}`
+                    : summary.latestNav
+                      ? `NPR ${Number(summary.latestNav).toFixed(2)}`
+                      : "—",
               },
               { label: "Total Units", value: formatUnits(summary.totalUnits) },
               {
@@ -602,6 +628,64 @@ export function SummaryCards({
           </Button>
         </View>
       </Modal>
+    </View>
+  );
+}
+
+function KpiChip({
+  tint,
+  icon,
+  label,
+  value,
+}: {
+  tint: string;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        minWidth: 132,
+        gap: spacing.sm,
+        padding: spacing.md,
+        borderRadius: radius.xl,
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: colors.border,
+        shadowColor: "#000",
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+      }}
+    >
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 9,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: `${tint}1F`,
+        }}
+      >
+        {icon}
+      </View>
+      <View style={{ gap: 1 }}>
+        <Text
+          variant="caption"
+          color={colors.mutedForeground}
+          style={{ fontWeight: "600", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase" }}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        <Text variant="label" tabular style={{ fontWeight: "800", fontSize: fontSize.md }} numberOfLines={1}>
+          {value}
+        </Text>
+      </View>
     </View>
   );
 }

@@ -73,13 +73,31 @@ export function DeleteAccountDialog() {
     <>
       <Card
         style={{
-          borderColor: colors.destructive,
-          backgroundColor: colors.muted,
+          borderWidth: 0,
+          borderLeftWidth: 3,
+          borderLeftColor: colors.destructive,
+          backgroundColor: `${colors.destructive}0F`,
+          shadowColor: "#000",
+          shadowOpacity: 0.07,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 2,
         }}
       >
         <CardHeader>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-            <AlertTriangle size={17} color={colors.destructive} />
+            <View
+              style={{
+                height: 32,
+                width: 32,
+                borderRadius: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: `${colors.destructive}1F`,
+              }}
+            >
+              <AlertTriangle size={16} color={colors.destructive} />
+            </View>
             <CardTitle style={{ color: colors.destructive, fontWeight: "900" }}>
               Danger Zone
             </CardTitle>

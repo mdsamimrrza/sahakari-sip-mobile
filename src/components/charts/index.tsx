@@ -27,6 +27,8 @@ import { Text } from "../ui/primitives";
 export interface ChartSeries {
   key: string;
   name: string;
+  /** Shorter name for the tooltip row (falls back to `name`). */
+  tooltipName?: string;
   color: string;
   /** Dashed stroke — used for "Total Invested" and "Projected" lines. */
   dashed?: boolean;
@@ -34,6 +36,8 @@ export interface ChartSeries {
   area?: boolean;
   /** Draw a point marker per data point (auto-suppressed on dense data). */
   dots?: boolean;
+  /** Override the stroke width (reference lines look better thinner). */
+  strokeWidth?: number;
   /** Values aligned 1:1 with `labels`. Use null for a gap. */
   values: Array<number | null>;
 }
@@ -45,6 +49,8 @@ interface BaseChartProps {
   formatY?: (value: number) => string;
   formatTooltipY?: (value: number) => string;
   formatX?: (label: string) => string;
+  /** Longer date format for the tooltip title (axis keeps `formatX`). */
+  formatTooltipX?: (label: string) => string;
   /** Hide the y axis (used by compact sparkline-ish cards). */
   hideY?: boolean;
   /** Hide the x axis labels. */
@@ -86,16 +92,20 @@ export const LineChart = React.memo(function LineChart({
   formatY,
   formatTooltipY,
   formatX,
+  formatTooltipX,
   hideY,
   hideX,
   minTop,
   showTooltip = true,
   showLegend = false,
+  tooltipVariant = "light",
   selectedIndex,
   onSelectPoint,
 }: BaseChartProps & {
   showTooltip?: boolean;
   showLegend?: boolean;
+  /** "dark" = ink pill with light text (web NAV History style). */
+  tooltipVariant?: "light" | "dark";
   selectedIndex?: number | null;
   onSelectPoint?: (index: number | null) => void;
 }) {
@@ -110,7 +120,7 @@ export const LineChart = React.memo(function LineChart({
       const timer = setTimeout(() => {
         setInternalActiveIndex(null);
         onSelectPoint?.(null);
-      }, 50);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [activeIndex, onSelectPoint]);
@@ -264,7 +274,7 @@ export const LineChart = React.memo(function LineChart({
                   <Path
                     d={path}
                     stroke={s.color}
-                    strokeWidth={s.area ? 2 : 2.5}
+                    strokeWidth={s.strokeWidth ?? (s.area ? 2 : 2.5)}
                     strokeDasharray={s.dashed ? "6 4" : undefined}
                     fill="none"
                     strokeLinecap="round"
@@ -335,8 +345,8 @@ export const LineChart = React.memo(function LineChart({
                 tooltipLeft - 105
               )
             ),
-            backgroundColor: colors.card,
-            borderWidth: 1,
+            backgroundColor: tooltipVariant === "dark" ? colors.foreground : colors.card,
+            borderWidth: tooltipVariant === "dark" ? 0 : 1,
             borderColor: colors.border,
             borderRadius: radius.xl,
             paddingHorizontal: spacing.lg,
@@ -349,8 +359,16 @@ export const LineChart = React.memo(function LineChart({
             elevation: 0,
           }}
         >
-          <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "700", fontSize: 13, marginBottom: 6 }}>
-            {formatX ? formatX(labels[activeIndex]) : labels[activeIndex]}
+          <Text
+            variant="caption"
+            color={tooltipVariant === "dark" ? "#FFFFFF" : colors.mutedForeground}
+            style={{ fontWeight: "700", fontSize: 13, marginBottom: 6 }}
+          >
+            {formatTooltipX
+              ? formatTooltipX(labels[activeIndex])
+              : formatX
+                ? formatX(labels[activeIndex])
+                : labels[activeIndex]}
           </Text>
 
           {series.map((s) => {
@@ -376,8 +394,12 @@ export const LineChart = React.memo(function LineChart({
                       backgroundColor: s.color,
                     }}
                   />
-                  <Text variant="caption" color={colors.foreground} style={{ fontWeight: "600", fontSize: 13 }}>
-                    {s.name}:
+                  <Text
+                    variant="caption"
+                    color={tooltipVariant === "dark" ? colors.card : colors.foreground}
+                    style={{ fontWeight: "600", fontSize: 13 }}
+                  >
+                    {(s.tooltipName ?? s.name)}:
                   </Text>
                 </View>
                 <Text
@@ -488,7 +510,7 @@ export const BarChart = React.memo(function BarChart({
       const timer = setTimeout(() => {
         setActiveIndex(null);
         onSelectPoint?.(null);
-      }, 50);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [activeIndex, onSelectPoint]);
@@ -670,6 +692,7 @@ export const DonutChart = React.memo(function DonutChart({
   thickness = 26,
   centerLabel,
   centerValue,
+  centerColor,
   selectedIndex,
   onSelectSlice,
 }: {
@@ -678,6 +701,8 @@ export const DonutChart = React.memo(function DonutChart({
   thickness?: number;
   centerLabel?: string;
   centerValue?: string;
+  /** Color for the center value when no slice is selected (e.g. green profit). */
+  centerColor?: string;
   selectedIndex?: number | null;
   onSelectSlice?: (index: number | null) => void;
 }) {
@@ -690,7 +715,7 @@ export const DonutChart = React.memo(function DonutChart({
       const timer = setTimeout(() => {
         setInternalActiveIndex(null);
         onSelectSlice?.(null);
-      }, 50);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [activeIndex, onSelectSlice]);
@@ -790,7 +815,7 @@ export const DonutChart = React.memo(function DonutChart({
           {displayVal ? (
             <Text
               variant="label"
-              style={{ fontSize: fontSize.md, fontWeight: "800", color: activeSlice?.color }}
+              style={{ fontSize: fontSize.md, fontWeight: "800", color: activeSlice?.color ?? centerColor }}
               numberOfLines={1}
             >
               {displayVal}

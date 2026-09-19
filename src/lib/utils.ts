@@ -20,8 +20,25 @@ export function round(value: number, decimals = 2): number {
   return Math.round(value * f) / f;
 }
 
-/** UUID v4 generator that works without the `crypto` polyfill. */
+// expo-crypto is a native module — resolve it lazily so plain-Node scripts
+// (e.g. _verify/verify.test.ts) can still import this module.
+let cryptoUuid: (() => string) | null | undefined;
+function platformUuid(): string | null {
+  if (cryptoUuid === undefined) {
+    try {
+      cryptoUuid = require("expo-crypto").randomUUID ?? null;
+    } catch {
+      cryptoUuid = null;
+    }
+  }
+  return cryptoUuid ? cryptoUuid() : null;
+}
+
+/** UUID v4 from the platform CSPRNG (used for ids and password salts). */
 export function uuid(): string {
+  const native = platformUuid();
+  if (native) return native;
+  // Non-native fallback (Node scripts). Never used for secrets in the app.
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === "x" ? r : (r & 0x3) | 0x8;
@@ -35,18 +52,16 @@ export function num(value: unknown, fallback = 0): number {
   return isNaN(n) || !isFinite(n) ? fallback : n;
 }
 
-/** Shorten long fund names for compact pills (mirrors web SummaryCards). */
+/** Codes/nicknames sometimes stored as fund names → full display names. */
+const FUND_NAME_ALIASES: Record<string, string> = {
+  NMBSBFE: "NMB Saral Bachat Fund-E",
+  NIBLSF: "NIBL Sahabhagita Fund",
+};
+
+/** Always show the full fund name — resolve stored codes to real names. */
 export function formatFundShortName(name: string): string {
   if (!name) return "";
-  const lowerName = name.toLowerCase();
-  if (lowerName.includes("nibl sahabhagita") || lowerName.includes("nibl saha"))
-    return "NIBLSF";
-  if (lowerName.includes("nmb saral")) return "NMB Saral";
-  const words = name.split(" ");
-  if (words.length >= 2 && name.length > 12) {
-    return `${words[0]} ${words[1]}`;
-  }
-  return name;
+  return FUND_NAME_ALIASES[name.trim().toUpperCase()] ?? name;
 }
 
 /** Capitalize the first letter (avatar initials). */

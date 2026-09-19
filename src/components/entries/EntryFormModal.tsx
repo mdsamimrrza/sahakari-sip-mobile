@@ -241,21 +241,25 @@ export function EntryFormModal({
           minDate={activeFund?.start_date}
         />
 
-        <Input
-          label="Amount (NPR)"
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="decimal-pad"
-          placeholder="e.g. 5000"
-        />
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          <Input
+            label="Amount (NPR)"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 5000"
+            containerStyle={{ flex: 1 }}
+          />
 
-        <Input
-          label="NAV at Purchase"
-          value={nav}
-          onChangeText={setNav}
-          keyboardType="decimal-pad"
-          placeholder="e.g. 13.25"
-        />
+          <Input
+            label="NAV at Purchase"
+            value={nav}
+            onChangeText={setNav}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 13.25"
+            containerStyle={{ flex: 1 }}
+          />
+        </View>
 
         <View style={{ gap: spacing.sm }}>
           <View
@@ -295,7 +299,7 @@ export function EntryFormModal({
           {!overrideUnits && (
             <View
               style={{
-                backgroundColor: colors.muted,
+                backgroundColor: `${colors.success}0A`,
                 borderRadius: radius.lg,
                 padding: spacing.md,
                 gap: spacing.sm,
@@ -350,7 +354,7 @@ export function EntryFormModal({
                       alignItems: "center",
                       justifyContent: "space-between",
                       gap: spacing.sm,
-                      backgroundColor: colors.muted,
+                      backgroundColor: `${colors.success}14`,
                       borderRadius: radius.md,
                       padding: spacing.sm,
                       marginTop: 4,

@@ -6,7 +6,7 @@
 // app's `router.refresh()` after every mutation.
 // ============================================================
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "../lib/auth/AuthContext";
 import type { DashboardData, FundConfig, Entry } from "../lib/types";
@@ -16,6 +16,12 @@ export function useDashboard(fundId: string = "all") {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Stale-while-revalidate: keep last data visible on refocus instead of
+  // flashing the skeleton on every tab switch.
+  const dataRef = useRef<DashboardData | null>(null);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const reload = useCallback(async () => {
     if (!store) {
@@ -35,7 +41,7 @@ export function useDashboard(fundId: string = "all") {
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      setLoading(true);
+      if (!dataRef.current) setLoading(true);
       (async () => {
         if (!store) return;
         const res = await store.getDashboardData(fundId);

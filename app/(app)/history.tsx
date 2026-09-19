@@ -10,9 +10,18 @@
 //   • client-side pagination (10 / 20 / 50 / All)
 // ============================================================
 
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Pressable, ScrollView } from "react-native";
-import { Pencil, Trash2, Search, ChevronDown, Plus, Upload } from "lucide-react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  View,
+  Pressable,
+  TextInput,
+  LayoutAnimation,
+  Platform,
+  UIManager,
+  Modal as RNModal,
+  useWindowDimensions,
+} from "react-native";
+import { Pencil, Trash2, Search, ChevronDown, Plus, Upload, Calendar, ArrowUpDown } from "lucide-react-native";
 import { useEntries, useFunds } from "@/hooks/useData";
 import { computeEntryBreakdowns } from "@/lib/data/analytics";
 import { formatCurrency, formatDate, formatNav, formatUnits } from "@/lib/format";
@@ -21,9 +30,10 @@ import type { Entry } from "@/lib/types";
 import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { Screen, PageHeader } from "@/components/ui/layout";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { Text, Card, Button, Input, EmptyState, Skeleton } from "@/components/ui/primitives";
+import { Text, Card, Button, Badge, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { DateField } from "@/components/ui/DateField";
-import { ConfirmDialog, Modal, Select, useToast } from "@/components/ui/overlays";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ConfirmDialog, Modal, useToast } from "@/components/ui/overlays";
 import { FundScopeSelector } from "@/components/dashboard/FundScopeSelector";
 import { EntryFormModal } from "@/components/entries/EntryFormModal";
 import { CsvImportModal } from "@/components/entries/CsvImportModal";
@@ -31,8 +41,23 @@ import { CsvImportModal } from "@/components/entries/CsvImportModal";
 type SortKey = "purchase_date" | "amount" | "nav" | "units" | "rollover";
 type DateFilter = "all" | "month" | "quarter" | "year" | "custom";
 
+const SHADOW = {
+  shadowColor: "#000",
+  shadowOpacity: 0.07,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 2,
+} as const;
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+function animateLayout() {
+  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+}
+
 export default function HistoryScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { store } = useAuth();
   const { toast } = useToast();
 
@@ -57,6 +82,13 @@ export default function HistoryScreen() {
   const [customDateRange, setCustomDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   // Draft range edited inside the custom-range popup before applying.
   const [customOpen, setCustomOpen] = useState(false);
+  const [dateSheetOpen, setDateSheetOpen] = useState(false);
+  const [sortSheetOpen, setSortSheetOpen] = useState(false);
+  // Anchored dropdowns: screen position of the tapped icon, so the options
+  // card drops down just below it instead of sliding up as a bottom sheet.
+  const dateBtnRef = useRef<any>(null);
+  const sortBtnRef = useRef<any>(null);
+  const [iconRect, setIconRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [customDraft, setCustomDraft] = useState<{ from: string; to: string }>({ from: "", to: "" });
 
   const [formOpen, setFormOpen] = useState(false);
@@ -117,6 +149,14 @@ export default function HistoryScreen() {
     });
   }, [entries, searchQuery, fundMap, dateFilter, customDateRange]);
 
+  const totals = useMemo(
+    () => ({
+      count: filtered.length,
+      invested: filtered.reduce((sum, e) => sum + Number(e.amount), 0),
+    }),
+    [filtered]
+  );
+
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       let aVal: number | string;
@@ -156,6 +196,14 @@ export default function HistoryScreen() {
     setPage(1);
   }
 
+  /** Measure the tapped icon, then open its dropdown anchored below it. */
+  function openDropdown(ref: { current: any } | null, open: () => void) {
+    ref?.current?.measureInWindow((x: number, y: number, w: number, h: number) => {
+      setIconRect({ x, y, w, h });
+      open();
+    });
+  }
+
   async function handleDelete() {
     if (!store || !deleteId) return;
     setDeleting(true);
@@ -187,161 +235,405 @@ export default function HistoryScreen() {
     { value: "rollover", label: "Rollover Leftover" },
   ];
 
+  const dateChipOptions: Array<{ value: DateFilter; label: string }> = [
+    { value: "all", label: "All dates" },
+    { value: "month", label: "This month" },
+    { value: "quarter", label: "This quarter" },
+    { value: "year", label: "This year" },
+    { value: "custom", label: "Custom…" },
+  ];
+
+  const customChipLabel =
+    dateFilter === "custom" && customDateRange.from && customDateRange.to
+      ? `${customDateRange.from} → ${customDateRange.to}`
+      : "Custom…";
+
+  const activeSortLabel = sortOptions.find((o) => o.value === sortKey)?.label ?? "Date";
+  const activeDateLabel =
+    dateFilter === "custom"
+      ? customChipLabel
+      : (dateChipOptions.find((o) => o.value === dateFilter)?.label ?? "All dates");
+
+  function pickDateFilter(v: DateFilter) {
+    animateLayout();
+    setPage(1);
+    if (v === "custom") {
+      // Open the custom-range popup with the current range as draft.
+      // Android: opening a native dialog while the dropdown's dialog is
+      // still animating out leaves the new one touch-dead (Apply ignores
+      // taps), so wait for the dropdown to fully dismiss first.
+      setCustomDraft({ ...customDateRange });
+      setTimeout(() => setCustomOpen(true), 350);
+      return;
+    }
+    if (v === dateFilter) {
+      // Tapping the active chip clears back to all dates
+      setDateFilter("all");
+      setCustomDateRange({ from: "", to: "" });
+      return;
+    }
+    setDateFilter(v);
+    setCustomDateRange({ from: "", to: "" });
+  }
+
   return (
     <>
       <Screen refreshing={loading} onRefresh={reload} header={<AppHeader />}>
-        <PageHeader
-          title="SIP History"
-          subtitle="View, edit, or import your past monthly purchase records."
-        />
-
-        {/* Actions */}
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
-          <Button variant="outline" style={{ flex: 1 }} onPress={() => setCsvOpen(true)}>
-            <Upload size={16} color={colors.foreground} />
-            <Text variant="label">Import CSV</Text>
-          </Button>
-          <Button
-            style={{ flex: 1 }}
-            onPress={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus size={17} color={colors.primaryForeground} />
-            <Text variant="label" color={colors.primaryForeground}>
-              Add Entry
-            </Text>
-          </Button>
-        </View>
-
-        {funds.length > 1 && (
-          <FundScopeSelector
-            funds={funds}
-            selectedFundId={fundId}
-            onChange={(id) => {
-              setFundId(id);
-              setPage(1);
-            }}
-          />
-        )}
-
-        {/* Search + Sort + Date filter — single responsive row */}
-        <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap", alignItems: "center" }}>
-          {/* Search — flexible, shrinks first */}
-          <Input
-            style={{ flex: 1, minWidth: 120 }}
-            value={search}
-            onChangeText={(t) => {
-              setSearch(t);
-              setPage(1);
-            }}
-            placeholder="Search…"
-            rightSlot={<Search size={14} color={colors.mutedForeground} />}
-          />
-
-          {/* Sort by — compact dropdown */}
-          <Select
-            containerStyle={{ minWidth: 110, maxWidth: 140 }}
-            value={sortKey}
-            onValueChange={(v) => toggleSort(v as SortKey)}
-            options={sortOptions}
-            label="Sort"
-          />
-
-          {/* Date filter — compact dropdown */}
-          <Select
-            containerStyle={{ minWidth: 120, maxWidth: 150 }}
-            value={dateFilter}
-            onValueChange={(v) => {
-              setPage(1);
-              if (v === "custom") {
-                // Open the custom-range popup with the current range as draft
-                setCustomDraft({ ...customDateRange });
-                setCustomOpen(true);
-              } else {
-                setDateFilter(v as DateFilter);
-                setCustomDateRange({ from: "", to: "" });
-              }
-            }}
-            options={[
-              { value: "all", label: "All" },
-              { value: "month", label: "Month" },
-              { value: "quarter", label: "Quarter" },
-              { value: "year", label: "Year" },
-              { value: "custom", label: "Custom" },
-            ]}
-            label="Date"
-          />
-        </View>
-
-        {/* Custom range — inline pickers appear inline when "Custom" selected */}
-        {dateFilter === "custom" && (
-          <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap", marginTop: spacing.xs }}>
-            <View style={{ flex: 1, minWidth: 140 }}>
-              <DateField
-                label="From"
-                value={customDateRange.from}
-                onChange={(v) => setCustomDateRange((r) => ({ ...r, from: v }))}
-                maxDate={customDateRange.to || undefined}
-              />
-            </View>
-            <View style={{ flex: 1, minWidth: 140 }}>
-              <DateField
-                label="To"
-                value={customDateRange.to}
-                onChange={(v) => setCustomDateRange((r) => ({ ...r, to: v }))}
-                minDate={customDateRange.from || undefined}
-              />
-            </View>
-          </View>
-          )}
-
-        {/* Custom range modal */}
-        <Modal
-          visible={customOpen}
-          onClose={() => {
-            setCustomOpen(false);
+        {/* ---------- Statement hero ---------- */}
+        <View
+          style={{
+            marginHorizontal: -spacing.lg,
+            marginTop: -spacing.xs,
+            backgroundColor: isDark ? "#1E293B" : colors.primary,
+            paddingHorizontal: spacing.xl,
+            paddingTop: spacing.lg,
+            paddingBottom: spacing.xl,
+            borderBottomLeftRadius: 24,
+            borderBottomRightRadius: 24,
+            overflow: "hidden",
           }}
         >
-          <View style={{ padding: spacing.lg }}>
-            <View style={{ backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-                <Text variant='subheading'>Select Date Range</Text>
-                <Pressable onPress={() => setCustomOpen(false)}>
-                  <Text variant='caption' color={colors.mutedForeground}>Cancel</Text>
-                </Pressable>
-              </View>
-              <View style={{ gap: spacing.md }}>
-                <View>
-                  <Text variant='caption' color={colors.mutedForeground}>From</Text>
-                  <DateField
-                    label=''
-                    value={customDraft.from}
-                    onChange={(v) => setCustomDraft((d) => ({ ...d, from: v }))}
-                    maxDate={customDraft.to || undefined}
-                  />
-                </View>
-                <View>
-                  <Text variant='caption' color={colors.mutedForeground}>To</Text>
-                  <DateField
-                    label=''
-                    value={customDraft.to}
-                    onChange={(v) => setCustomDraft((d) => ({ ...d, to: v }))}
-                    minDate={customDraft.from || undefined}
-                  />
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: spacing.lg }}>
-                <Pressable onPress={() => {
-                  setCustomDateRange(customDraft);
-                  setCustomOpen(false);
-                  setPage(1); // Reset to first page when applying new date filter
-                }}>
-                  <Button variant='outline'>Apply</Button>
-                </Pressable>
-              </View>
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: -52,
+              right: -36,
+              width: 148,
+              height: 148,
+              borderRadius: 74,
+              backgroundColor: "#FFFFFF",
+              opacity: 0.12,
+            }}
+          />
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              bottom: -70,
+              right: 70,
+              width: 170,
+              height: 170,
+              borderRadius: 85,
+              backgroundColor: colors.secondary,
+              opacity: 0.3,
+            }}
+          />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+            <Text variant="title" color="#FFFFFF" numberOfLines={1} style={{ flex: 1 }}>
+              SIP History
+            </Text>
+            <View
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: 5,
+                borderRadius: radius.full,
+                backgroundColor: "#FFFFFF",
+              }}
+            >
+              <Text
+                style={{ fontSize: fontSize.xs, fontWeight: "800", color: isDark ? "#1E293B" : colors.primary }}
+                numberOfLines={1}
+              >
+                {totals.count} {totals.count === 1 ? "payment" : "payments"}
+              </Text>
             </View>
+          </View>
+          {loading && entries.length === 0 ? (
+            <View style={{ marginTop: spacing.sm }}>
+              <Skeleton height={34} width="60%" />
+            </View>
+          ) : (
+            <>
+              <Text
+                style={{
+                  fontSize: fontSize.xxxl,
+                  fontWeight: "900",
+                  color: "#FFFFFF",
+                  fontVariant: ["tabular-nums"],
+                  marginTop: spacing.xs,
+                }}
+                numberOfLines={1}
+              >
+                {formatCurrency(totals.invested)}
+              </Text>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.sm,
+                  marginTop: 6,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Text style={{ fontSize: fontSize.sm, color: "#FFFFFF", opacity: 0.85, flexShrink: 1 }}>
+                  Total deposited
+                  {searchQuery.trim() || dateFilter !== "all" || fundId !== "all" ? " in view" : ""}
+                </Text>
+                <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                  <Pressable
+                    onPress={() => {
+                      setEditing(null);
+                      setFormOpen(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add entry"
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 5,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: 7,
+                      borderRadius: radius.full,
+                      backgroundColor: "#FFFFFF",
+                    }}
+                  >
+                    <Plus size={16} color={isDark ? "#1E293B" : colors.primary} strokeWidth={2.8} />
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: "800", color: isDark ? "#1E293B" : colors.primary }}>
+                      Add
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setCsvOpen(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Import CSV"
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 5,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: 7,
+                      borderRadius: radius.full,
+                      backgroundColor: "#FFFFFF2E",
+                    }}
+                  >
+                    <Upload size={15} color="#FFFFFF" />
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: "800", color: "#FFFFFF" }}>
+                      Import
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Controls — compact search + icon-only sheets in one card */}
+        <Card style={{ borderWidth: 0, ...SHADOW }}>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: spacing.sm,
+              alignItems: "center",
+              padding: spacing.md,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                backgroundColor: colors.muted,
+                borderRadius: radius.lg,
+                paddingHorizontal: spacing.sm,
+                paddingVertical: 4,
+              }}
+            >
+              <Search size={15} color={colors.mutedForeground} />
+              <TextInput
+                value={search}
+                onChangeText={(t) => {
+                  setSearch(t);
+                  setPage(1);
+                }}
+                placeholder="Search…"
+                placeholderTextColor={colors.mutedForeground}
+                style={{ flex: 1, color: colors.foreground, fontSize: fontSize.sm, paddingVertical: 4 }}
+              />
+              {search.length > 0 && (
+                <Pressable
+                  onPress={() => {
+                    setSearch("");
+                    setPage(1);
+                  }}
+                  hitSlop={8}
+                  accessibilityLabel="Clear search"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: colors.card,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "800" }} color={colors.mutedForeground}>
+                    ×
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            <Pressable
+              ref={dateBtnRef}
+              onPress={() => openDropdown(dateBtnRef, () => setDateSheetOpen(true))}
+              accessibilityRole="button"
+              accessibilityLabel={`Show payments from: ${activeDateLabel}`}
+              style={{
+                height: 40,
+                width: 40,
+                borderRadius: radius.md,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.muted,
+              }}
+            >
+              <Calendar size={17} color={colors.emerald} />
+              {dateFilter !== "all" && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    right: 6,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: colors.primary,
+                  }}
+                />
+              )}
+            </Pressable>
+            <Pressable
+              ref={sortBtnRef}
+              onPress={() => openDropdown(sortBtnRef, () => setSortSheetOpen(true))}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort payments by: ${activeSortLabel}`}
+              style={{
+                height: 40,
+                width: 40,
+                borderRadius: radius.md,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.muted,
+              }}
+            >
+              <ArrowUpDown size={17} color={colors.primary} />
+              {(sortKey !== "purchase_date" || sortDir !== "desc") && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    right: 6,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: colors.primary,
+                  }}
+                />
+              )}
+            </Pressable>
+          </View>
+        </Card>
+
+        <FundScopeSelector
+          funds={funds}
+          selectedFundId={fundId}
+          onChange={(id) => {
+            setFundId(id);
+            setPage(1);
+          }}
+        />
+
+        {/* Date dropdown — anchored just below the calendar icon */}
+        <AnchorDropdown
+          visible={dateSheetOpen}
+          onClose={() => setDateSheetOpen(false)}
+          anchor={iconRect}
+          title="Show payments from"
+        >
+          {dateChipOptions.map((opt) => (
+            <SheetRow
+              key={opt.value}
+              label={opt.value === "custom" ? customChipLabel : opt.label}
+              active={dateFilter === opt.value}
+              onPress={() => {
+                setDateSheetOpen(false);
+                pickDateFilter(opt.value);
+              }}
+            />
+          ))}
+        </AnchorDropdown>
+
+        {/* Sort dropdown — anchored just below the sort icon */}
+        <AnchorDropdown
+          visible={sortSheetOpen}
+          onClose={() => setSortSheetOpen(false)}
+          anchor={iconRect}
+          title="Sort payments by"
+        >
+          {sortOptions.map((opt) => (
+            <SheetRow
+              key={opt.value}
+              label={
+                sortKey === opt.value
+                  ? `${opt.label} ${sortDir === "asc" ? "↑" : "↓"}`
+                  : opt.label
+              }
+              active={sortKey === opt.value}
+              onPress={() => {
+                toggleSort(opt.value);
+                setSortSheetOpen(false);
+              }}
+            />
+          ))}
+        </AnchorDropdown>
+
+        {/* Custom range popup */}
+        <Modal
+          visible={customOpen}
+          onClose={() => setCustomOpen(false)}
+          title="Custom date range"
+          description="Pick the first and last day to show."
+          footer={
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              <Button
+                variant="outline"
+                style={{ flex: 1 }}
+                onPress={() => setCustomOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                style={{ flex: 1 }}
+                disabled={!customDraft.from || !customDraft.to}
+                onPress={() => {
+                  animateLayout();
+                  setCustomDateRange(customDraft);
+                  setDateFilter("custom");
+                  setPage(1);
+                  setCustomOpen(false);
+                }}
+              >
+                Apply
+              </Button>
+            </View>
+          }
+        >
+          <View style={{ gap: spacing.md }}>
+            <DateField
+              label="From"
+              value={customDraft.from}
+              onChange={(v) => setCustomDraft((d) => ({ ...d, from: v }))}
+              maxDate={customDraft.to || undefined}
+            />
+            <DateField
+              label="To"
+              value={customDraft.to}
+              onChange={(v) => setCustomDraft((d) => ({ ...d, to: v }))}
+              minDate={customDraft.from || undefined}
+            />
           </View>
         </Modal>
         {/* Ledger */}
@@ -352,25 +644,69 @@ export default function HistoryScreen() {
             <Skeleton height={90} />
           </View>
         ) : entries.length === 0 ? (
-          <Card padded>
+          <Card padded style={{ borderWidth: 0, ...SHADOW }}>
             <EmptyState
               title="No SIP entries recorded yet"
               description='Tap "Add Entry" or "Import CSV" to populate your history.'
             />
           </Card>
         ) : paginated.length === 0 ? (
-          <Card padded>
+          <Card padded style={{ borderWidth: 0, ...SHADOW }}>
             <EmptyState title="No entries match your search" />
           </Card>
         ) : (
           <View style={{ gap: spacing.sm }}>
-            {paginated.map((entry) => {
+            {paginated.map((entry, idx) => {
               const b = breakdowns.get(entry.id);
               const isOpen = expanded === entry.id;
+              const monthLabel = new Date(entry.purchase_date).toLocaleString("en-US", {
+                month: "long",
+                year: "numeric",
+              });
+              const prev = idx > 0 ? paginated[idx - 1] : null;
+              const showMonth =
+                !prev ||
+                new Date(prev.purchase_date).toLocaleString("en-US", {
+                  month: "long",
+                  year: "numeric",
+                }) !== monthLabel;
               return (
-                <Card key={entry.id}>
+                <React.Fragment key={entry.id}>
+                  {showMonth && (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing.sm,
+                        marginTop: idx === 0 ? spacing.xs : spacing.sm,
+                        marginHorizontal: spacing.xs,
+                      }}
+                    >
+                      <Text
+                        variant="caption"
+                        color={colors.mutedForeground}
+                        style={{ fontWeight: "800" }}
+                      >
+                        {monthLabel}
+                      </Text>
+                      <View
+                        style={{ flex: 1, height: 1, backgroundColor: colors.border }}
+                      />
+                    </View>
+                  )}
+                <Card
+                  style={{
+                    borderWidth: 0,
+                    borderLeftWidth: 3,
+                    borderLeftColor: colors.emerald,
+                    ...SHADOW,
+                  }}
+                >
                   <Pressable
-                    onPress={() => setExpanded(isOpen ? null : entry.id)}
+                    onPress={() => {
+                      animateLayout();
+                      setExpanded(isOpen ? null : entry.id);
+                    }}
                     style={{ padding: spacing.lg, gap: spacing.md }}
                   >
                     <View
@@ -381,15 +717,19 @@ export default function HistoryScreen() {
                         gap: spacing.sm,
                       }}
                     >
-                      <View style={{ flex: 1 }}>
-                        <Text variant="label">{formatDate(entry.purchase_date)}</Text>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text variant="label" style={{ fontWeight: "800" }}>
+                          {formatDate(entry.purchase_date)}
+                        </Text>
                         {funds.length > 1 && (
-                          <Text variant="caption" color={colors.mutedForeground}>
-                            {fundMap.get(entry.fund_id) || "—"}
-                          </Text>
+                          <View style={{ alignSelf: "flex-start" }}>
+                            <Badge bg={`${colors.info}14`} color={colors.info}>
+                              {fundMap.get(entry.fund_id) || "—"}
+                            </Badge>
+                          </View>
                         )}
                       </View>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
                         <Pressable
                           hitSlop={8}
                           onPress={(e) => {
@@ -397,8 +737,17 @@ export default function HistoryScreen() {
                             setEditing(entry);
                             setFormOpen(true);
                           }}
+                          accessibilityLabel="Edit entry"
+                          style={{
+                            height: 32,
+                            width: 32,
+                            borderRadius: radius.md,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: colors.muted,
+                          }}
                         >
-                          <Pencil size={16} color={colors.mutedForeground} />
+                          <Pencil size={14} color={colors.mutedForeground} />
                         </Pressable>
                         <Pressable
                           hitSlop={8}
@@ -406,8 +755,17 @@ export default function HistoryScreen() {
                             e.stopPropagation();
                             setDeleteId(entry.id);
                           }}
+                          accessibilityLabel="Delete entry"
+                          style={{
+                            height: 32,
+                            width: 32,
+                            borderRadius: radius.md,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: `${colors.rose}14`,
+                          }}
                         >
-                          <Trash2 size={16} color={colors.rose} />
+                          <Trash2 size={14} color={colors.rose} />
                         </Pressable>
                         <ChevronDown
                           size={17}
@@ -442,7 +800,7 @@ export default function HistoryScreen() {
                     {isOpen && b && (
                       <View
                         style={{
-                          backgroundColor: colors.muted,
+                          backgroundColor: `${colors.success}0A`,
                           borderRadius: radius.lg,
                           padding: spacing.md,
                           gap: 6,
@@ -484,6 +842,7 @@ export default function HistoryScreen() {
                     )}
                   </Pressable>
                 </Card>
+                </React.Fragment>
               );
             })}
           </View>
@@ -491,32 +850,53 @@ export default function HistoryScreen() {
 
         {/* Pagination footer */}
         {totalEntries > 0 && (
-          <View style={{ gap: spacing.md }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: spacing.sm }}>
-              <Text variant="caption" color={colors.mutedForeground}>
-                Showing {totalEntries > 0 ? startIndex + 1 : 0}–
-                {Math.min(startIndex + effectivePageSize, totalEntries)} of{" "}
-                {totalEntries} entries
-              </Text>
-              <Select
-                containerStyle={{ flex: 1, minWidth: 120 }}
-                value={String(pageSize)}
-                onValueChange={(v) => {
-                  setPageSize(v === "all" ? "all" : Number(v));
-                  setPage(1);
+          <Card style={{ borderWidth: 0, ...SHADOW }}>
+            <View style={{ padding: spacing.lg, gap: spacing.md }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: spacing.sm,
                 }}
-                options={[
-                  { value: "10", label: "10" },
-                  { value: "20", label: "20" },
-                  { value: "50", label: "50" },
-                  { value: "all", label: "All" },
-                ]}
-                label="Per page"
-                displayValue={
-                  pageSize === "all" ? "All" : `${pageSize}`
-                }
-              />
-            </View>
+              >
+                <Text variant="caption" color={colors.mutedForeground} numberOfLines={1} style={{ flex: 1 }}>
+                  Showing {totalEntries > 0 ? startIndex + 1 : 0}–
+                  {Math.min(startIndex + effectivePageSize, totalEntries)} of{" "}
+                  {totalEntries}
+                </Text>
+                <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                  {(["10", "20", "50", "all"] as const).map((size) => {
+                    const active =
+                      pageSize === "all" ? size === "all" : String(pageSize) === size;
+                    return (
+                      <Pressable
+                        key={size}
+                        onPress={() => {
+                          setPageSize(size === "all" ? "all" : Number(size));
+                          setPage(1);
+                        }}
+                        style={{
+                          height: 30,
+                          minWidth: 34,
+                          paddingHorizontal: spacing.sm,
+                          borderRadius: radius.full,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: active ? colors.primary : colors.muted,
+                        }}
+                      >
+                        <Text
+                          style={{ fontSize: fontSize.xs, fontWeight: "800" }}
+                          color={active ? colors.primaryForeground : colors.mutedForeground}
+                        >
+                          {size === "all" ? "All" : size}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
 
             {pageSize !== "all" && totalPages > 1 && (
               <View
@@ -524,7 +904,8 @@ export default function HistoryScreen() {
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: spacing.md,
+                  gap: spacing.xs,
+                  flexWrap: "wrap",
                 }}
               >
                 <Button
@@ -535,9 +916,37 @@ export default function HistoryScreen() {
                 >
                   Prev
                 </Button>
-                <Text variant="label" tabular>
-                  {validPage} / {totalPages}
-                </Text>
+                {totalPages <= 7
+                  ? Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                      <Pressable
+                        key={p}
+                        onPress={() => setPage(p)}
+                        style={{
+                          height: 34,
+                          minWidth: 34,
+                          paddingHorizontal: spacing.sm,
+                          borderRadius: radius.lg,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: p === validPage ? colors.primary : colors.card,
+                          borderWidth: p === validPage ? 0 : 1,
+                          borderColor: colors.border,
+                        }}
+                      >
+                        <Text
+                          variant="caption"
+                          color={p === validPage ? colors.primaryForeground : colors.foreground}
+                          style={{ fontWeight: "800" }}
+                        >
+                          {p}
+                        </Text>
+                      </Pressable>
+                    ))
+                  : (
+                    <Text variant="label" tabular>
+                      {validPage} / {totalPages}
+                    </Text>
+                  )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -548,7 +957,8 @@ export default function HistoryScreen() {
                 </Button>
               </View>
             )}
-          </View>
+            </View>
+          </Card>
         )}
       </Screen>
 
@@ -583,6 +993,143 @@ export default function HistoryScreen() {
         confirmLabel="Delete"
       />
     </>
+  );
+}
+
+/**
+ * A dropdown options card that appears anchored just below the icon that
+ * opened it (anchor = measured screen rect of the icon). Full-screen
+ * transparent Modal provides the tap-outside-to-dismiss backdrop and the
+ * Android back button handling; statusBarTranslucent keeps the Modal's
+ * coordinate space equal to measureInWindow's window space.
+ */
+function AnchorDropdown({
+  visible,
+  onClose,
+  anchor,
+  title,
+  width = 250,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  anchor: { x: number; y: number; w: number; h: number } | null;
+  title: string;
+  width?: number;
+  children: React.ReactNode;
+}) {
+  const { colors } = useTheme();
+  const { width: screenW } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  if (!anchor) return null;
+  const left = Math.min(
+    Math.max(8, anchor.x + anchor.w - width),
+    Math.max(8, screenW - 8 - width)
+  );
+  // Android quirk: measureInWindow's y excludes the status bar, but a
+  // statusBarTranslucent Modal's space includes it — without this offset
+  // the card renders ~status-bar-height above the icon.
+  const top =
+    anchor.y + anchor.h + 6 + (Platform.OS === "android" ? insets.top : 0);
+
+  return (
+    <RNModal
+      transparent
+      visible={visible}
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.25)" }} onPress={onClose}>
+        <Pressable
+          onPress={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            top,
+            left,
+            width,
+            backgroundColor: colors.card,
+            borderRadius: radius.lg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            paddingVertical: spacing.xs,
+            ...SHADOW,
+          }}
+        >
+          <Text
+            variant="caption"
+            color={colors.mutedForeground}
+            style={{
+              fontWeight: "800",
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.xs,
+              paddingBottom: 2,
+            }}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          {children}
+        </Pressable>
+      </Pressable>
+    </RNModal>
+  );
+}
+
+function SheetRow({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button">
+      {({ pressed }) => (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.md,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.md,
+            borderRadius: radius.lg,
+            backgroundColor: active ? colors.muted : "transparent",
+            opacity: pressed ? 0.6 : 1,
+          }}
+        >
+          <Text variant="label" style={{ flex: 1, fontWeight: active ? "800" : "500" }}>
+            {label}
+          </Text>
+          <View
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              borderWidth: 2,
+              borderColor: active ? colors.primary : colors.border,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {active ? (
+              <View
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: colors.primary,
+                }}
+              />
+            ) : null}
+          </View>
+        </View>
+      )}
+    </Pressable>
   );
 }
 

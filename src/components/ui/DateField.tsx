@@ -95,7 +95,11 @@ export function DateField({
           <DateTimePicker
             value={safeCurrent}
             mode="date"
-            display={Platform.OS === "ios" ? "spinner" : "default"}
+            // iOS: inline spinner. Android: inline material calendar — NOT
+            // "default", whose native dialog window intermittently leaves
+            // the RN Modal underneath touch-dead after it closes (Apply
+            // needed multiple taps). Inline rendering = no second window.
+            display={Platform.OS === "ios" ? "spinner" : "calendar"}
             onChange={handleValueChange}
             onDismiss={handleDismiss}
             onNeutralButtonPress={handleNeutralPress}

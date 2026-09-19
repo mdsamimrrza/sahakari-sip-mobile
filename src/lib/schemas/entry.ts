@@ -23,18 +23,21 @@ export const entrySchema = z.object({
       required_error: "Amount is required",
       invalid_type_error: "Amount must be a number",
     })
+    .finite("Amount must be a finite number")
     .positive("Amount must be greater than 0"),
   nav: z
     .number({
       required_error: "NAV is required",
       invalid_type_error: "NAV must be a number",
     })
+    .finite("NAV must be a finite number")
     .positive("NAV must be greater than 0"),
   units: z
     .number({
       required_error: "Units are required",
       invalid_type_error: "Units must be a number",
     })
+    .finite("Units must be a finite number")
     .positive("Units must be greater than 0"),
   notes: z
     .string()
@@ -51,9 +54,9 @@ export const csvRowSchema = z.object({
     const d = new Date(val);
     return !isNaN(d.getTime()) && d <= new Date();
   }, "Invalid or future date"),
-  amount: z.coerce.number().positive("Amount must be greater than 0"),
-  nav: z.coerce.number().positive("NAV must be greater than 0"),
-  units: z.coerce.number().positive("Units must be greater than 0").optional(),
+  amount: z.coerce.number().finite("Amount must be a finite number").positive("Amount must be greater than 0"),
+  nav: z.coerce.number().finite("NAV must be a finite number").positive("NAV must be greater than 0"),
+  units: z.coerce.number().finite("Units must be a finite number").positive("Units must be greater than 0").optional(),
   notes: z.string().max(MAX_NOTES_LENGTH).optional(),
 });
 

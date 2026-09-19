@@ -3,9 +3,10 @@
 // PART A: pure math (hand-computed expected values)
 // PART B: validation schemas
 // PART C: live backend behavior + dashboard math on live-shaped data
-// NOTE: lives OUTSIDE the app project — the admin key below is for
-// creating/deleting a throwaway test account and is NEVER shipped
-// inside the APK.
+// NOTE: lives OUTSIDE the app project. The live-backend part (PART C's
+// main()) needs a service_role key, which is loaded from the environment
+// / .env — NEVER hardcoded here. If you ever committed or shared one,
+// rotate it in Supabase (Dashboard → Settings → API) and purge history.
 // ============================================================
 
 import { calculateXirr, buildCashFlows } from "../src/lib/calculations/xirr";
@@ -206,8 +207,11 @@ const uuid = "123e4567-e89b-42d3-a456-426614174000";
 // ================= PART C: live backend + dashboard math =================
 console.log("\n===== PART C: LIVE BACKEND + DASHBOARD MATH =====");
 
-const SUPA_URL = "https://entbhjpnhdjfhcctcvmt.supabase.co";
-const SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVudGJoanBuaGRqZmhjY3Rjdm10Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjM3NDIxMiwiZXhwIjoyMTAxOTUwMjEyfQ.pkDD-vVO8zu7PinJM3xqQovTInaEiwYGoH1znPk92WY";
+// Credentials come from the environment (or the gitignored .env this script
+// loads above). A service_role key bypasses RLS and administers users, so
+// it must never live in source control.
+const SUPA_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 const TEST_EMAIL = `sahakari.apk.e2e.${Date.now()}@gmail.com`;
 const TEST_PASSWORD = "TestE2E!2026";
 
@@ -265,6 +269,18 @@ const TEST_PASSWORD = "TestE2E!2026";
 }
 
 async function main() {
+  // The live-backend section needs the project URL and a service_role key
+  // from the environment. Without them, report what ran (PART A/B + the
+  // offline dashboard math) and exit — never fall back to a hardcoded key.
+  if (!SUPA_URL || !SERVICE_KEY) {
+    console.log(
+      "(live backend checks skipped: set EXPO_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env — the service key must stay out of source control)"
+    );
+    console.log(`\n========== RESULT: ${passed} passed, ${failed} failed ==========`);
+    process.exitCode = failed > 0 ? 1 : 0;
+    return;
+  }
+
   const { getSupabase } = await import("../src/lib/supabase");
   const { CloudStore } = await import("../src/lib/data/cloud");
 

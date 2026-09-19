@@ -33,3 +33,10 @@ yarn-error.*
 
 .DS_Store
 *.pem
+
+# Release signing identity (publisher-only)
+*.keystore
+android/keystore.properties
+
+# Agent tooling
+.zcode/

@@ -405,6 +405,13 @@ export class LocalStore implements DataStore {
     const fund = funds.find((f) => f.id === input.fund_id);
     if (!fund) return { success: false, error: "Fund not found" };
 
+    if (input.purchase_date < fund.start_date) {
+      return {
+        success: false,
+        error: `Purchase date cannot be before the fund's start date (${fund.start_date})`,
+      };
+    }
+
     const entries = await this.entries();
     const idx = entries.findIndex((e) => e.id === id);
     if (idx < 0) return { success: false, error: "Entry not found" };
@@ -485,6 +492,15 @@ export class LocalStore implements DataStore {
             2,
             "0"
           )}-${`${dateKey.getDate()}`.padStart(2, "0")}`;
+
+      if (purchaseDate < fund.start_date) {
+        skipped++;
+        errors.push({
+          row: i + 1,
+          message: `Date ${purchaseDate} is before the fund's start date (${fund.start_date})`,
+        });
+        continue;
+      }
 
       valid.push({
         id: uuid(),

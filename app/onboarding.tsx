@@ -11,21 +11,30 @@ import React, { useState } from "react";
 import { View, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronRight, ChevronLeft, CheckCircle } from "lucide-react-native";
+import {
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle,
+  Building2,
+  Percent,
+  Coins,
+  CalendarDays,
+  TrendingUp,
+} from "lucide-react-native";
 import { useAuth } from "@/lib/auth/AuthContext";
-import { FUND_PRESETS } from "@/lib/constants";
+import { FUND_PRESETS, MIN_SIP_AMOUNT } from "@/lib/constants";
 import { todayKey } from "@/lib/format";
-import { useTheme, spacing, radius } from "@/theme";
+import { useTheme, spacing, radius, fontSize } from "@/theme";
 import { Text, Button, Input, Card } from "@/components/ui/primitives";
 import { Select, useToast } from "@/components/ui/overlays";
 import { AppLogo } from "@/components/layout/AppLogo";
 
 const STEPS = [
-  { title: "Choose Fund", description: "Which fund are you tracking?" },
-  { title: "Fee Rate", description: "Annual fee percentage" },
-  { title: "Monthly SIP", description: "Your planned monthly investment" },
-  { title: "Start Date", description: "When did you start?" },
-  { title: "Current NAV", description: "Current market NAV of the fund" },
+  { title: "Choose Fund", description: "Which fund are you tracking?", icon: Building2, tintKey: "purple" as const },
+  { title: "Fee Rate", description: "Annual fee percentage", icon: Percent, tintKey: "amber" as const },
+  { title: "Monthly SIP", description: "Your planned monthly investment", icon: Coins, tintKey: "emerald" as const },
+  { title: "Start Date", description: "When did you start?", icon: CalendarDays, tintKey: "info" as const },
+  { title: "Current NAV", description: "Current market NAV of the fund", icon: TrendingUp, tintKey: "success" as const },
 ];
 
 export default function OnboardingScreen() {
@@ -64,7 +73,7 @@ export default function OnboardingScreen() {
       case 1:
         return parseFloat(feeRate) > 0;
       case 2:
-        return parseFloat(monthlySip) > 0;
+        return parseFloat(monthlySip) >= MIN_SIP_AMOUNT;
       case 3:
         return startDate.length > 0;
       case 4:
@@ -125,39 +134,75 @@ export default function OnboardingScreen() {
           <AppLogo size={30} />
         </View>
 
-        {/* Progress dots */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-          }}
-        >
-          {STEPS.map((_, i) => (
+        {/* Progress — bar + step count */}
+        <View style={{ gap: spacing.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "800" }}>
+              STEP {step + 1} OF {STEPS.length}
+            </Text>
+            <Text variant="caption" color={colors.primary} style={{ fontWeight: "800" }}>
+              {Math.round(((step + 1) / STEPS.length) * 100)}%
+            </Text>
+          </View>
+          <View
+            style={{
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: colors.muted,
+              overflow: "hidden",
+            }}
+          >
             <View
-              key={i}
               style={{
+                width: `${((step + 1) / STEPS.length) * 100}%`,
                 height: 8,
-                width: i <= step ? 32 : 16,
-                borderRadius: radius.md,
-                backgroundColor: i <= step ? colors.primary : colors.muted,
+                borderRadius: 4,
+                backgroundColor: colors.primary,
               }}
             />
-          ))}
+          </View>
         </View>
 
-        <Card padded>
-          <Text variant="heading">{STEPS[step].title}</Text>
-          <Text
-            variant="caption"
-            color={colors.mutedForeground}
-            style={{ marginTop: 2, marginBottom: spacing.lg }}
-          >
-            {STEPS[step].description}
-          </Text>
+        <Card
+          padded
+          style={{
+            borderWidth: 0,
+            shadowColor: "#000",
+            shadowOpacity: 0.07,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 2,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+            <View
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: 15,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: `${colors[STEPS[step].tintKey]}1F`,
+              }}
+            >
+              {React.createElement(STEPS[step].icon, {
+                size: 22,
+                color: colors[STEPS[step].tintKey],
+              })}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="heading">{STEPS[step].title}</Text>
+              <Text
+                variant="caption"
+                color={colors.mutedForeground}
+                style={{ marginTop: 2 }}
+              >
+                {STEPS[step].description}
+              </Text>
+            </View>
+          </View>
 
-          <View style={{ gap: spacing.lg }}>
+          <View style={{ gap: spacing.lg, marginTop: spacing.lg }}>
             {step === 0 && (
               <>
                 <Select
@@ -204,7 +249,7 @@ export default function OnboardingScreen() {
 
             {step === 2 && (
               <Input
-                label="Monthly SIP Amount (NPR)"
+                label={`Monthly SIP Amount (NPR) — minimum ${MIN_SIP_AMOUNT.toLocaleString("en-IN")}`}
                 value={monthlySip}
                 onChangeText={setMonthlySip}
                 keyboardType="number-pad"

@@ -21,6 +21,7 @@ import type {
   NotificationItem,
   NotificationPreferences,
 } from "../types";
+import { z } from "zod";
 import { DP_CHARGE } from "../constants";
 import { csvRowSchema, entrySchema } from "../schemas/entry";
 import { fundConfigSchema, updateLatestNavSchema } from "../schemas/fund-config";
@@ -38,12 +39,30 @@ import {
 } from "./store";
 import { todayKey, toDateKey } from "../format";
 
+/** Boundary validation for notification preferences (owner id is never part of it). */
+const notificationPreferencesSchema = z.object({
+  push_enabled: z.boolean(),
+  email_enabled: z.boolean(),
+  reminder_day: z.number().int().min(0).max(6),
+  notify_days_before: z.number().int().min(0).max(30),
+});
+
 export class CloudStore implements DataStore {
   readonly mode = "cloud" as const;
 
   async getUserId(): Promise<string | null> {
     const { data } = await getSupabase().auth.getUser();
     return data.user?.id ?? null;
+  }
+
+  /**
+   * Public accessor for the effective data id (web NextAuth id mapped from
+   * the Supabase Auth uid, falling back to the auth id). Exposed for the
+   * one-time local→cloud merge (src/lib/data/merge.ts), which reads raw
+   * cloud rows for backup/dedup while writes go through the store methods.
+   */
+  async getEffectiveUserId(): Promise<string | null> {
+    return this.dataUid();
   }
 
   private get db() {
@@ -111,16 +130,8 @@ export class CloudStore implements DataStore {
     const cached = cacheGet<DashboardData>(cacheKey);
     if (cached) return { success: true, data: cached };
 
-    const { data: fundsRaw, error: fundsError } = await this.db
-      .from("fund_config")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: true });
-
-    if (fundsError) return { success: false, error: fundsError.message };
-    const funds = (fundsRaw ?? []) as FundConfig[];
-
+    // The three queries are independent — run them in one round trip
+    // instead of three sequential awaits.
     let entriesQuery = this.db
       .from("entries")
       .select("*")
@@ -130,10 +141,6 @@ export class CloudStore implements DataStore {
     if (fundId && fundId !== "all") {
       entriesQuery = entriesQuery.eq("fund_id", fundId);
     }
-
-    const { data: entriesRaw, error: entriesError } = await entriesQuery;
-    if (entriesError) return { success: false, error: entriesError.message };
-    const entries = (entriesRaw ?? []) as Entry[];
 
     let navQuery = this.db
       .from("nav_history")
@@ -145,7 +152,28 @@ export class CloudStore implements DataStore {
       navQuery = navQuery.eq("fund_id", fundId);
     }
 
-    const { data: navRows } = await navQuery;
+    const [fundsRes, entriesRes, navRes] = await Promise.all([
+      this.db
+        .from("fund_config")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true }),
+      entriesQuery,
+      navQuery,
+    ]);
+
+    const fundsError = fundsRes.error;
+    const fundsRaw = fundsRes.data;
+    const entriesError = entriesRes.error;
+    const entriesRaw = entriesRes.data;
+    const navRows = navRes.data;
+
+    if (fundsError) return { success: false, error: fundsError.message };
+    const funds = (fundsRaw ?? []) as FundConfig[];
+
+    if (entriesError) return { success: false, error: entriesError.message };
+    const entries = (entriesRaw ?? []) as Entry[];
 
     const navHistory: NavHistoryRow[] = (navRows ?? []).map((r: any) => ({
       id: `${r.fund_id}-${r.nav_date}`,
@@ -488,12 +516,19 @@ export class CloudStore implements DataStore {
 
     const { data: fund } = await this.db
       .from("fund_config")
-      .select("latest_nav, latest_nav_date")
+      .select("start_date, latest_nav, latest_nav_date")
       .eq("id", input.fund_id)
       .eq("user_id", userId)
       .single();
 
     if (!fund) return { success: false, error: "Fund not found" };
+
+    if (input.purchase_date < fund.start_date) {
+      return {
+        success: false,
+        error: `Purchase date cannot be before the fund's start date (${fund.start_date})`,
+      };
+    }
 
     const { data, error } = await this.db
       .from("entries")
@@ -566,7 +601,7 @@ export class CloudStore implements DataStore {
 
     const { data: fund } = await this.db
       .from("fund_config")
-      .select("latest_nav, latest_nav_date")
+      .select("start_date, latest_nav, latest_nav_date")
       .eq("id", fundId)
       .eq("user_id", userId)
       .single();
@@ -584,6 +619,16 @@ export class CloudStore implements DataStore {
       if (!parsed.success) {
         skipped++;
         errors.push({ row: i + 1, message: parsed.error.errors[0].message });
+        continue;
+      }
+
+      const rowDate = toDateKey(new Date(parsed.data.date));
+      if (rowDate < fund.start_date) {
+        skipped++;
+        errors.push({
+          row: i + 1,
+          message: `Date ${rowDate} is before the fund's start date (${fund.start_date})`,
+        });
         continue;
       }
 
@@ -709,7 +754,9 @@ export class CloudStore implements DataStore {
       .maybeSingle();
 
     if (!data) return DEFAULT_NOTIFICATION_PREFERENCES;
-    return data as NotificationPreferences;
+    // Validate at the boundary instead of trusting the row shape.
+    const parsed = notificationPreferencesSchema.safeParse(data);
+    return parsed.success ? parsed.data : DEFAULT_NOTIFICATION_PREFERENCES;
   }
 
   async saveNotificationPreferences(
@@ -718,9 +765,19 @@ export class CloudStore implements DataStore {
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
+    const parsed = notificationPreferencesSchema.safeParse(prefs);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.errors[0]?.message ?? "Invalid notification preferences",
+      };
+    }
+    // Owner id LAST: a hostile or legacy payload can never override the
+    // bound identity (contrast `{ user_id, ...prefs }`, which lets the
+    // spread replace it).
     const { error } = await this.db
       .from("notification_preferences")
-      .upsert({ user_id: userId, ...prefs }, { onConflict: "user_id" });
+      .upsert({ ...parsed.data, user_id: userId }, { onConflict: "user_id" });
 
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -756,13 +813,14 @@ export class CloudStore implements DataStore {
     const userId = await this.dataUid();
     if (!userId) return { success: false, error: "Not authenticated" };
 
-    const { error } = await this.db
+    const { error, count } = await this.db
       .from("notifications_log")
       .update({ is_read: true })
       .eq("id", id)
       .eq("user_id", userId);
 
     if (error) return { success: false, error: error.message };
+    if ((count ?? 0) === 0) return { success: false, error: "Notification not found" };
     return { success: true };
   }
 
@@ -793,29 +851,39 @@ export class CloudStore implements DataStore {
     // own rows; purge every row under either id space. RLS scopes deletes.
     const ids = Array.from(new Set([userId, authId]));
 
-    const { error: e1 } = await this.db
-      .from("entries")
-      .delete()
-      .in("user_id", ids);
-    if (e1) return { success: false, error: e1.message };
+    // VERIFY each purge: RLS admitting the request without matching rows
+    // returns success with a zero count (the fix script's "THE PROBLEM"
+    // section documents exactly this id-mismatch failure mode). Counting
+    // before and after makes a silently no-opped delete impossible.
+    const tables = [
+      "entries",
+      "nav_history",
+      "fund_config",
+      "notifications_log",
+      "notification_preferences",
+    ] as const;
+    for (const table of tables) {
+      const before = await this.db
+        .from(table)
+        .select("*", { count: "exact", head: true })
+        .in("user_id", ids);
+      if (before.error) return { success: false, error: before.error.message };
+      const expected = before.count ?? 0;
 
-    const { error: e2 } = await this.db
-      .from("nav_history")
-      .delete()
-      .in("user_id", ids);
-    if (e2) return { success: false, error: e2.message };
+      const { error, count } = await this.db
+        .from(table)
+        .delete({ count: "exact" })
+        .in("user_id", ids);
+      if (error) return { success: false, error: error.message };
 
-    const { error: e3 } = await this.db
-      .from("fund_config")
-      .delete()
-      .in("user_id", ids);
-    if (e3) return { success: false, error: e3.message };
-
-    const { error: e4 } = await this.db
-      .from("notifications_log")
-      .delete()
-      .in("user_id", ids);
-    if (e4) return { success: false, error: e4.message };
+      const deleted = count ?? 0;
+      if (deleted < expected) {
+        return {
+          success: false,
+          error: `Server refused to delete ${expected - deleted} ${table} row(s). Nothing was removed — please contact support.`,
+        };
+      }
+    }
 
     return { success: true };
   }

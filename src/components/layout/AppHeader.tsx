@@ -7,7 +7,7 @@
 // ============================================================
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Image, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
@@ -26,6 +26,7 @@ import { Text, Badge, Separator } from "../ui/primitives";
 import { DropdownMenu, type DropdownAnchor } from "../ui/overlays";
 import { AppLogo } from "./AppLogo";
 import { useAuth } from "../../lib/auth/AuthContext";
+import { useProfilePhotoUri } from "../../lib/profilePhoto";
 import { formatRelativeDate } from "../../lib/format";
 import type { NotificationItem } from "../../lib/types";
 
@@ -138,8 +139,28 @@ function NotificationBell() {
     }
     setOpen(false);
     if (n.url) {
-      const path = n.url.replace(/^\//, "");
-      router.push(`/(app)/${path}` as never);
+      // Navigation comes from a server-owned row, but stay defensive:
+      // allowlist the first segment against the (app) route tree and
+      // reject traversal so a crafted url can never leave (app)/*.
+      const segments = n.url
+        .replace(/^\/+/, "")
+        .split(/[?#]/)[0]
+        .split("/")
+        .filter(Boolean);
+      const allowedRoots = new Set([
+        "dashboard",
+        "history",
+        "projections",
+        "tax-breakdown",
+        "settings",
+      ]);
+      const safe =
+        segments.length > 0 &&
+        allowedRoots.has(segments[0]) &&
+        segments.every((s) => s !== "." && s !== "..");
+      if (safe) {
+        router.push(`/(app)/${segments.join("/")}` as never);
+      }
     }
   };
 
@@ -333,6 +354,10 @@ function UserAvatarMenu() {
     (email.includes("@") ? email.split("@")[0] : email) ||
     "Portfolio Owner";
   const initial = (displayName.charAt(0) || "S").toUpperCase();
+  const { uri: photoUri, onError: handlePhotoError } = useProfilePhotoUri(
+    user?.id,
+    user?.avatarUrl
+  );
 
   // Captured when the menu opens, like the web's mount-time stamp.
   const sessionSince = sessionStartedAt
@@ -361,11 +386,21 @@ function UserAvatarMenu() {
             alignItems: "center",
             justifyContent: "center",
             opacity: pressed ? 0.75 : 1,
+            overflow: "hidden",
           })}
         >
-          <Text style={{ fontSize: 14, fontWeight: "900" }} color={colors.emerald}>
-            {initial}
-          </Text>
+          {photoUri ? (
+            <Image
+              source={{ uri: photoUri }}
+              onError={handlePhotoError}
+              style={{ width: 32, height: 32, borderRadius: 16 }}
+              accessibilityLabel={`${displayName}'s profile photo`}
+            />
+          ) : (
+            <Text style={{ fontSize: 14, fontWeight: "900" }} color={colors.emerald}>
+              {initial}
+            </Text>
+          )}
         </Pressable>
       </View>
 
@@ -389,11 +424,20 @@ function UserAvatarMenu() {
                 borderColor: colors.emerald,
                 alignItems: "center",
                 justifyContent: "center",
+                overflow: "hidden",
               }}
             >
-              <Text style={{ fontSize: 18, fontWeight: "900" }} color={colors.emerald}>
-                {initial}
-              </Text>
+              {photoUri ? (
+                <Image
+                  source={{ uri: photoUri }}
+                  onError={handlePhotoError}
+                  style={{ width: 42, height: 42, borderRadius: 21 }}
+                />
+              ) : (
+                <Text style={{ fontSize: 18, fontWeight: "900" }} color={colors.emerald}>
+                  {initial}
+                </Text>
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text variant="label" numberOfLines={1}>

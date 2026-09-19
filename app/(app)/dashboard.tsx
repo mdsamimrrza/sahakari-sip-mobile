@@ -3,7 +3,7 @@
 // ============================================================
 // Port of the web app's (app)/dashboard/page.tsx:
 //   • 4 KPI summary cards + personal summary sheet
-//   • Latest NAV inline editor (single-fund scope only)
+//   • Latest NAV inline editor (any fund via picker in "All" scope)
 //   • Portfolio growth chart with time ranges
 //   • NAV history, monthly contributions, invested-vs-gain, fee drag
 // Redirects to /onboarding when no funds are configured yet, exactly
@@ -11,16 +11,18 @@
 // ============================================================
 
 import React, { useState } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import { Redirect } from "expo-router";
+import { Plus } from "lucide-react-native";
 import { useDashboard } from "@/hooks/useData";
-import { useTheme, spacing } from "@/theme";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { useTheme, radius, spacing } from "@/theme";
 import { Screen, PageHeader } from "@/components/ui/layout";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Text, Card } from "@/components/ui/primitives";
 import { Skeleton } from "@/components/ui/primitives";
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
-import { LatestNavEditor } from "@/components/dashboard/LatestNavEditor";
+import { NavEditModal } from "@/components/dashboard/NavEditModal";
 import {
   FeeDragCard,
   InvestedVsGainCard,
@@ -30,15 +32,26 @@ import {
 } from "@/components/dashboard/DashboardCharts";
 import { EntryFormModal } from "@/components/entries/EntryFormModal";
 import type { FundConfig } from "@/lib/types";
+import { formatFundShortName } from "@/lib/utils";
 
 export default function DashboardScreen() {
   const { colors } = useTheme();
+  const { hasUnmergedLocalData } = useAuth();
   const [fundId, setFundId] = useState<string>("all");
   const [entryOpen, setEntryOpen] = useState(false);
+  const [navEditOpen, setNavEditOpen] = useState(false);
 
   const { data, loading, error, reload } = useDashboard(fundId);
 
-  if (!loading && data && data.funds.length === 0) {
+  // An empty cloud account may still be waiting on the "Move phone data to
+  // cloud" merge (Settings → Data) — hold off the onboarding bounce unless
+  // we positively know there's nothing left to bring in.
+  if (
+    !loading &&
+    data &&
+    data.funds.length === 0 &&
+    hasUnmergedLocalData !== true
+  ) {
     return <Redirect href="/onboarding" />;
   }
 
@@ -59,22 +72,37 @@ export default function DashboardScreen() {
         <PageHeader
           title="SIP Dashboard"
           subtitle="Track your mutual fund performance, returns, and fee impact."
+          right={
+            <Pressable
+              onPress={() => setEntryOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Add SIP entry"
+              style={{
+                height: 44,
+                width: 44,
+                borderRadius: radius.lg,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.primary,
+              }}
+            >
+              <Plus size={20} color={colors.primaryForeground} strokeWidth={2.6} />
+            </Pressable>
+          }
         />
 
-        {/* Latest NAV editor — only meaningful for a single fund */}
-        {fundId !== "all" && activeFund ? (
-          <LatestNavEditor
-            fundId={activeFund.id}
-            currentNav={
-              activeFund.latest_nav ? Number(activeFund.latest_nav) : null
-            }
-            currentNavDate={activeFund.latest_nav_date}
-            onUpdated={reload}
-          />
-        ) : null}
-
         {error && !data ? (
-          <Card padded>
+          <Card
+            padded
+            style={{
+              borderWidth: 0,
+              shadowColor: "#000",
+              shadowOpacity: 0.07,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 2,
+            }}
+          >
             <Text variant="label" color={colors.destructive}>
               Could not load your dashboard
             </Text>
@@ -101,7 +129,6 @@ export default function DashboardScreen() {
               onFundChange={setFundId}
               activeFund={activeFund}
               loading={loading && !data}
-              onAddEntry={() => setEntryOpen(true)}
             />
 
             <PortfolioGrowthCard
@@ -109,20 +136,25 @@ export default function DashboardScreen() {
               summary={data.summary}
             />
 
-            <NavHistoryCard data={data.navHistory} />
-
-            <MonthlyContributionsCard data={data.monthlyContributions} />
+            <NavHistoryCard
+              data={data.navHistory}
+              onEditNav={() => setNavEditOpen(true)}
+            />
 
             <InvestedVsGainCard
               totalInvested={data.summary.totalInvested}
               currentValue={data.summary.currentValue}
             />
 
+            <MonthlyContributionsCard data={data.monthlyContributions} />
+
             <FeeDragCard
               data={data.feeDragChart}
               feeRatePct={feeRatePct}
               fundName={
-                fundId !== "all" && activeFund ? activeFund.fund_name : undefined
+                fundId !== "all" && activeFund
+                  ? formatFundShortName(activeFund.fund_name)
+                  : undefined
               }
             />
           </>
@@ -135,6 +167,14 @@ export default function DashboardScreen() {
         funds={funds}
         defaultFundId={activeFund?.id}
         onSaved={reload}
+      />
+
+      <NavEditModal
+        visible={navEditOpen}
+        onClose={() => setNavEditOpen(false)}
+        funds={funds}
+        defaultFundId={fundId !== "all" ? activeFund?.id : undefined}
+        onUpdated={reload}
       />
     </>
   );

@@ -5,7 +5,7 @@
 // (ThemeProvider → SessionProvider) plus a toast host.
 // ============================================================
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -15,11 +15,15 @@ import { View } from "react-native";
 import { ThemeProvider, useTheme } from "@/theme";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import { ToastProvider } from "@/components/ui/overlays";
+import { MergePromptDialog } from "@/components/auth/MergePromptDialog";
+import { BiometricPromptDialog } from "@/components/auth/BiometricPromptDialog";
+import { AnimatedSplash } from "@/components/layout/AnimatedSplash";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function ThemedApp() {
   const { colors, isDark } = useTheme();
+  const [splashDone, setSplashDone] = useState(false);
   const [fontsLoaded] = useFonts({
     "InstrumentSerif-Regular": require("../assets/fonts/InstrumentSerif-Regular.ttf"),
     HankenGrotesk: require("../assets/fonts/HankenGrotesk.ttf"),
@@ -56,6 +60,12 @@ if (!fontsLoaded) {
         <Stack.Screen name="(auth)" options={{ animation: "fade" }} />
         <Stack.Screen name="(app)" options={{ animation: "fade" }} />
       </Stack>
+      {/* One-time local→cloud merge offer (Settings → Go Cloud flow) */}
+      <MergePromptDialog />
+      {/* Post-login "enable fingerprint unlock?" offer */}
+      <BiometricPromptDialog />
+      {/* Animated splash — plays on cold start, fades into the app */}
+      {!splashDone && <AnimatedSplash onDone={() => setSplashDone(true)} />}
     </View>
   );
 }

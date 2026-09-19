@@ -8,6 +8,8 @@ data handling**. What changes is the runtime: the web app's Next.js Server Actio
 NextAuth can't execute inside an APK, so they are replaced by an equivalent data layer
 (see *Architecture* below) that produces **identical numbers**.
 
+> 🌐 **Live web app:** https://expense-calculator-taupe.vercel.app
+
 ---
 
 ## Feature parity

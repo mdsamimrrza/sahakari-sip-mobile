@@ -1,12 +1,11 @@
 // ============================================================
 // SahakariSIP — Theme
 // ============================================================
-// "Terrace" design language — stepped Himalayan fields, where a SIP
-// grows row by row:
 //
-//   Light → "Mist":   cool morning-mist canvas, near-white cards, pine
-//                      ink, Nepal crimson + marigold as the only loud
-//                      notes, Instrument Serif display over Hanken Grotesk
+//   Light → "Parchment": warm parchment paper (#EDEAE0), paper-raised
+//                      cards (#F7F5EC), deep teal ink-accent (#147A64),
+//                      brass (#A8791F) for highlights, rust (#A5442B)
+//                      for destructive notes, ink text (#17241F)
 //   Dark  → "Night":  night-terrace canvas, raised pine cards, shoot-green
 //                      + marigold accents, same quiet geometry
 // ============================================================
@@ -64,81 +63,83 @@ export interface ThemeColors {
 }
 
 export const lightColors: ThemeColors = {
-  background: "#F4F7F5", // crisp alpine mist with subtle emerald tint
-  foreground: "#0F1A15", // deep pine ink
-  card: "#FFFFFF",
-  cardForeground: "#0F1A15",
-  primary: "#059669", // rich energetic emerald green
+  // Warm parchment paper — see the palette table in the design notes.
+  background: "#EDEAE0",
+  foreground: "#17241F", // primary ink (near-black green)
+  card: "#F7F5EC", // paper-raised card surface
+  cardForeground: "#17241F",
+  primary: "#147A64", // deep teal — active states, progress, chart line
   primaryForeground: "#FFFFFF",
-  secondary: "#D97706", // warm golden amber
+  secondary: "#A8791F", // brass — highlights, badge percentages
   secondaryForeground: "#FFFFFF",
-  muted: "#E6ECE8",
-  mutedForeground: "#4B5B53",
-  accent: "#10B981", // vibrant mint accent
+  muted: "#E5E2D6", // elevated parchment (tinted chips, icon wells)
+  mutedForeground: "#4B5C55", // soft ink
+  accent: "#A8791F", // brass accent
   accentForeground: "#FFFFFF",
-  destructive: "#DC2626", // rich crimson
+  destructive: "#A5442B", // rust — alerts, destructive actions
   destructiveForeground: "#FFFFFF",
-  border: "#E2E9E4",
-  input: "#FFFFFF",
-  ring: "#059669",
+  border: "#CFCABA", // rule lines and dividers
+  input: "#F7F5EC", // paper-raised input background
+  ring: "#147A64",
 
-  chartPrimary: "#059669",
-  chartPositive: "#10B981",
-  chartNegative: "#DC2626",
-  chartInvested: "#64748B",
-  chartFeeDrag: "#D97706",
-  chartGrid: "#E2E9E4",
-  chartText: "#4B5B53",
+  chartPrimary: "#147A64",
+  chartPositive: "#047857", // deep emerald — income
+  chartNegative: "#A5442B", // rust — outflow
+  chartInvested: "#8B978F", // faint ink
+  chartFeeDrag: "#A8791F", // brass
+  chartGrid: "#CFCABA",
+  chartText: "#4B5C55",
 
-  success: "#10B981",
-  warning: "#F59E0B",
-  info: "#2563EB",
-  blue: "#2563EB",
-  purple: "#7C3AED",
-  amber: "#D97706",
-  rose: "#E11D48",
-  emerald: "#059669",
-  overlay: "rgba(15, 26, 21, 0.5)",
-  skeleton: "#E2E9E4",
+  success: "#147A64", // teal (same as primary, per palette)
+  warning: "#A8791F", // brass (same as accent)
+  info: "#2A6F86", // deep aqua/slate
+  blue: "#2A6F86",
+  purple: "#7C3AED", // not in the palette — kept for existing chips
+  amber: "#A8791F", // brass
+  rose: "#A5442B", // rust
+  emerald: "#047857", // income green
+  overlay: "rgba(23, 36, 31, 0.5)",
+  skeleton: "#E5E2D6",
 };
 
 export const darkColors: ThemeColors = {
-  background: "#070F0B", // deep midnight obsidian emerald
-  foreground: "#F0FDF4",
-  card: "#101E17", // rich elevated emerald panel
-  cardForeground: "#F0FDF4",
-  primary: "#10B981", // glowing neon emerald
-  primaryForeground: "#042F1E",
-  secondary: "#F59E0B", // bright warm gold
-  secondaryForeground: "#180E02",
-  muted: "#172A20",
-  mutedForeground: "#8DA497",
-  accent: "#34D399",
-  accentForeground: "#042F1E",
-  destructive: "#F87171",
-  destructiveForeground: "#450A0A",
-  border: "#1E3A2B",
-  input: "#101E17",
-  ring: "#10B981",
+  // Deep slate night — indigo primary, emerald income, amber brass-shift.
+  background: "#0B0F19",
+  foreground: "#F8FAFC", // near-white primary text
+  card: "#151D2A", // dark card surface
+  cardForeground: "#F8FAFC",
+  primary: "#818CF8", // indigo — active states, progress, chart line
+  primaryForeground: "#0B0F19", // dark ink on light indigo
+  secondary: "#8B5CF6", // violet accent
+  secondaryForeground: "#FFFFFF",
+  muted: "#1E293B", // elevated dark surface (chips, icon wells)
+  mutedForeground: "#94A3B8", // muted slate
+  accent: "#8B5CF6", // violet
+  accentForeground: "#FFFFFF",
+  destructive: "#EF4444", // red — alerts, destructive actions
+  destructiveForeground: "#FFFFFF",
+  border: "#273549", // rule lines and dividers
+  input: "#151D2A",
+  ring: "#818CF8",
 
-  chartPrimary: "#10B981",
-  chartPositive: "#34D399",
-  chartNegative: "#F87171",
-  chartInvested: "#334155",
-  chartFeeDrag: "#F59E0B",
-  chartGrid: "#172A20",
-  chartText: "#F0FDF4",
+  chartPrimary: "#818CF8",
+  chartPositive: "#10B981", // bright emerald — income
+  chartNegative: "#EF4444",
+  chartInvested: "#64748B", // faint slate
+  chartFeeDrag: "#F59E0B", // amber (brass-shifted)
+  chartGrid: "#273549",
+  chartText: "#94A3B8",
 
-  success: "#34D399",
-  warning: "#FBBF24",
-  info: "#60A5FA",
-  blue: "#60A5FA",
-  purple: "#A78BFA",
+  success: "#10B981",
+  warning: "#F59E0B",
+  info: "#0EA5E9", // sky blue
+  blue: "#0EA5E9",
+  purple: "#8B5CF6", // violet
   amber: "#F59E0B",
-  rose: "#F87171",
+  rose: "#EF4444",
   emerald: "#10B981",
   overlay: "rgba(0, 0, 0, 0.75)",
-  skeleton: "#172A20",
+  skeleton: "#1E293B",
 };
 
 // ---------- Spacing / radius / type scale ----------

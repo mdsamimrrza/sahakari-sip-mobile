@@ -32,7 +32,18 @@ export const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 export const isSupabaseConfigured =
-  SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY.length > 40;
+  SUPABASE_URL.startsWith("https://") && SUPABASE_ANON_KEY.length > 40;
+
+/**
+ * AsyncStorage key supabase-js persists its session under
+ * (`sb-<project-ref>-auth-token`). The biometric lock clears this key
+ * DIRECTLY instead of calling signOut(), because signOut() revokes the
+ * refresh token server-side and would break the stored biometric key.
+ */
+export const SUPABASE_AUTH_STORAGE_KEY = (() => {
+  const ref = SUPABASE_URL.match(/^https?:\/\/([^.]+)/)?.[1];
+  return ref ? `sb-${ref}-auth-token` : "sb-auth-token";
+})();
 
 let client: SupabaseClient | null = null;
 

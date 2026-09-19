@@ -14,40 +14,64 @@
 import React, { useState } from "react";
 import { View, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Eye, EyeOff } from "lucide-react-native";
+import { Eye, EyeOff, Fingerprint } from "lucide-react-native";
 import { useAuth } from "@/lib/auth/AuthContext";
 import type { DataMode } from "@/lib/data/store";
-import { useTheme, spacing, fontSize } from "@/theme";
+import { useTheme, spacing, fontSize, radius } from "@/theme";
 import { Text, Button, Input, Card, Separator } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/overlays";
 import { AuthShell } from "@/components/layout/AuthShell";
-import { DataModeToggle } from "@/components/auth/DataModeToggle";
+import { AuthModeSwitch } from "@/components/auth/AuthModeSwitch";
+import { DataModeDetailsLink } from "@/components/auth/DataModeDetails";
 import { GoogleButton } from "@/components/auth/GoogleButton";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { signIn, signInWithGoogle, cloudAvailable } = useAuth();
+  const {
+    signIn,
+    signInWithGoogle,
+    cloudAvailable,
+    biometricEnabled,
+    biometricSupported,
+    unlockWithBiometric,
+  } = useAuth();
   const { toast } = useToast();
 
-  const envDefault = process.env.EXPO_PUBLIC_DEFAULT_DATA_MODE as
-  | DataMode
-  | undefined;
-const [mode, setMode] = useState<DataMode>(
-  envDefault === "cloud" && cloudAvailable
-    ? "cloud"
-    : envDefault === "local"
-      ? "local"
-      : cloudAvailable
-        ? "cloud"
-        : "local"
-);
+  // Cloud is the first-class path — always start there when Supabase is
+  // configured. The env default only matters with no cloud configured.
+  const [mode, setMode] = useState<DataMode>(cloudAvailable ? "cloud" : "local");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fingerprint unlock from the login screen itself (banking-style) — only
+  // offered when the user has actually armed biometric unlock before.
+  const showBiometric = biometricEnabled && biometricSupported;
+
+  async function handleBiometricLogin() {
+    setBioLoading(true);
+    const res = await unlockWithBiometric();
+    setBioLoading(false);
+    if (res.success) {
+      toast({
+        title: "Welcome back",
+        description: "Unlocked with your fingerprint.",
+        variant: "success",
+      });
+      router.replace("/(app)/dashboard");
+    } else if (res.error && res.error !== "Not verified.") {
+      toast({
+        title: "Unlock failed",
+        description: res.error,
+        variant: "destructive",
+      });
+    }
+  }
 
   async function handleSubmit() {
     setError(null);
@@ -100,47 +124,50 @@ const [mode, setMode] = useState<DataMode>(
   }
 
   return (
-    <AuthShell>
-      <Card padded>
+    <View style={{ flex: 1 }}>
+      {/* Mode switch — shows the mode you can switch TO (Local while on
+          cloud, Cloud while on the on-device form). */}
+      <AuthModeSwitch
+        mode={mode}
+        onSwitch={(next) => {
+          setError(null);
+          setMode(next);
+        }}
+      />
+
+      <AuthShell compact>
+      <Card padded style={{ borderWidth: 0, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
         <Text variant="heading">Welcome back</Text>
         <Text
           variant="caption"
           color={colors.mutedForeground}
-          style={{ marginTop: 2, marginBottom: spacing.lg }}
+          style={{ marginTop: 2, marginBottom: spacing.md }}
         >
-          Sign in to your account to continue
+          {mode === "cloud"
+            ? "Sign in to your account to continue"
+            : "Sign in to the profile saved on this phone"}
         </Text>
 
-        <View style={{ gap: spacing.lg }}>
-          <GoogleButton
-            label="Continue with Google"
-            onPress={handleGoogle}
-            loading={googleLoading}
-          />
+        <DataModeDetailsLink />
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-            <Separator style={{ flex: 1 }} />
-            <Text variant="caption" color={colors.mutedForeground}>
-              Or sign in with email
-            </Text>
-            <Separator style={{ flex: 1 }} />
-          </View>
+        <View style={{ gap: spacing.md }}>
+          {mode === "cloud" && (
+            <GoogleButton
+              label="Continue with Google"
+              onPress={handleGoogle}
+              loading={googleLoading}
+            />
+          )}
 
-          <View style={{ gap: 6 }}>
-            <Text
-              variant="caption"
-              color={colors.mutedForeground}
-              style={{ fontWeight: "600" }}
-            >
-              Where should your data live?
-            </Text>
-            <DataModeToggle mode={mode} onChange={setMode} />
-            <Text variant="caption" color={colors.mutedForeground}>
-              {mode === "cloud"
-                ? "Uses the same Supabase project and tables as the web app."
-                : "Stored only on this phone. Everything works offline."}
-            </Text>
-          </View>
+          {mode === "cloud" && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+              <Separator style={{ flex: 1 }} />
+              <Text variant="caption" color={colors.mutedForeground}>
+                Or sign in with email
+              </Text>
+              <Separator style={{ flex: 1 }} />
+            </View>
+          )}
 
           <Input
             label="Email"
@@ -172,15 +199,54 @@ const [mode, setMode] = useState<DataMode>(
             }
           />
 
-          <Pressable onPress={() => router.push("/(auth)/forgot-password")}>
-            <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
-              Forgot password?
+          {mode === "cloud" ? (
+            <Pressable onPress={() => router.push("/(auth)/forgot-password?mode=cloud")}>
+              <Text variant="caption" color={colors.primary} style={{ fontWeight: "700" }}>
+                Forgot password?
+              </Text>
+            </Pressable>
+          ) : (
+            <Text
+              variant="caption"
+              color={colors.mutedForeground}
+              style={{ textAlign: "center", fontSize: fontSize.xs }}
+            >
+              Forgot your password? On-device profiles can&apos;t be recovered
+              by email.
             </Text>
-          </Pressable>
+          )}
 
-          <Button fullWidth size="lg" loading={loading} onPress={handleSubmit}>
-            Sign In
-          </Button>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Button
+              size="lg"
+              loading={loading}
+              onPress={handleSubmit}
+              style={{ flex: 1 }}
+            >
+              Sign In
+            </Button>
+            {showBiometric && (
+              <Pressable
+                onPress={handleBiometricLogin}
+                disabled={bioLoading}
+                accessibilityRole="button"
+                accessibilityLabel="Unlock with fingerprint"
+                style={({ pressed }) => ({
+                  height: 52,
+                  width: 52,
+                  borderRadius: radius.lg,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: colors.muted,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  opacity: bioLoading || pressed ? 0.55 : 1,
+                })}
+              >
+                <Fingerprint size={26} color={colors.primary} />
+              </Pressable>
+            )}
+          </View>
 
           <View style={{ flexDirection: "row", justifyContent: "center", gap: 4 }}>
             <Text variant="caption" color={colors.mutedForeground}>
@@ -198,6 +264,7 @@ const [mode, setMode] = useState<DataMode>(
           </View>
         </View>
       </Card>
-    </AuthShell>
+      </AuthShell>
+    </View>
   );
 }

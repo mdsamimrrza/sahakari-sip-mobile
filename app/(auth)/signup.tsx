@@ -16,7 +16,8 @@ import { useTheme, spacing, fontSize } from "@/theme";
 import { Text, Button, Input, Card, Separator } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/overlays";
 import { AuthShell } from "@/components/layout/AuthShell";
-import { DataModeToggle } from "@/components/auth/DataModeToggle";
+import { AuthModeSwitch } from "@/components/auth/AuthModeSwitch";
+import { DataModeDetailsLink } from "@/components/auth/DataModeDetails";
 import { GoogleButton } from "@/components/auth/GoogleButton";
 
 export default function SignupScreen() {
@@ -25,18 +26,9 @@ export default function SignupScreen() {
   const { signUp, signInWithGoogle, cloudAvailable } = useAuth();
   const { toast } = useToast();
 
-  const envDefault = process.env.EXPO_PUBLIC_DEFAULT_DATA_MODE as
-  | DataMode
-  | undefined;
-const [mode, setMode] = useState<DataMode>(
-  envDefault === "cloud" && cloudAvailable
-    ? "cloud"
-    : envDefault === "local"
-      ? "local"
-      : cloudAvailable
-        ? "cloud"
-        : "local"
-);
+  // Cloud is the first-class path — always start there when Supabase is
+  // configured. The env default only matters with no cloud configured.
+  const [mode, setMode] = useState<DataMode>(cloudAvailable ? "cloud" : "local");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -110,42 +102,50 @@ const [mode, setMode] = useState<DataMode>(
   }
 
   return (
-    <AuthShell>
-      <Card padded>
+    <View style={{ flex: 1 }}>
+      {/* Mode switch — shows the mode you can switch TO (Local while on
+          cloud, Cloud while on the on-device form). */}
+      <AuthModeSwitch
+        mode={mode}
+        onSwitch={(next) => {
+          setError(null);
+          setMode(next);
+        }}
+      />
+
+      <AuthShell compact>
+      <Card padded style={{ borderWidth: 0, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
         <Text variant="heading">Create your account</Text>
         <Text
           variant="caption"
           color={colors.mutedForeground}
-          style={{ marginTop: 2, marginBottom: spacing.lg }}
+          style={{ marginTop: 2, marginBottom: spacing.md }}
         >
-          Start tracking your SIP portfolio in under a minute
+          {mode === "cloud"
+            ? "Start tracking your SIP portfolio in under a minute"
+            : "Create an on-device profile. Your data never leaves this phone"}
         </Text>
 
-        <View style={{ gap: spacing.lg }}>
-          <GoogleButton
-            label="Sign up with Google"
-            onPress={handleGoogle}
-            loading={googleLoading}
-          />
+        <DataModeDetailsLink />
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-            <Separator style={{ flex: 1 }} />
-            <Text variant="caption" color={colors.mutedForeground}>
-              Or sign up with email
-            </Text>
-            <Separator style={{ flex: 1 }} />
-          </View>
+        <View style={{ gap: spacing.md }}>
+          {mode === "cloud" && (
+            <GoogleButton
+              label="Sign up with Google"
+              onPress={handleGoogle}
+              loading={googleLoading}
+            />
+          )}
 
-          <View style={{ gap: 6 }}>
-            <Text
-              variant="caption"
-              color={colors.mutedForeground}
-              style={{ fontWeight: "600" }}
-            >
-              Where should your data live?
-            </Text>
-            <DataModeToggle mode={mode} onChange={setMode} />
-          </View>
+          {mode === "cloud" && (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+              <Separator style={{ flex: 1 }} />
+              <Text variant="caption" color={colors.mutedForeground}>
+                Or sign up with email
+              </Text>
+              <Separator style={{ flex: 1 }} />
+            </View>
+          )}
 
           <Input
             label="Email"
@@ -186,11 +186,10 @@ const [mode, setMode] = useState<DataMode>(
           />
 
           <Text variant="caption" color={colors.mutedForeground}>
-            Must be 8+ characters with at least one uppercase letter and one
-            number.
+            8+ characters, one uppercase letter and one number.
           </Text>
 
-          <Button fullWidth size="lg" loading={loading} onPress={handleSubmit}>
+          <Button fullWidth loading={loading} onPress={handleSubmit}>
             Create Account
           </Button>
 
@@ -210,6 +209,7 @@ const [mode, setMode] = useState<DataMode>(
           </View>
         </View>
       </Card>
-    </AuthShell>
+      </AuthShell>
+    </View>
   );
 }

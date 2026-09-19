@@ -1,5 +1,5 @@
 // ============================================================
-// SahakariSIP — Constants & Fund Presets
+// SahakariSIP: Constants & Fund Presets
 // ============================================================
 // Ported verbatim from the web app (src/lib/constants.ts).
 // ============================================================
@@ -45,9 +45,17 @@ export const DP_CHARGE = 5; // Flat Depository Participant fee per transaction
 
 export const APP_NAME = "SahakariSIP";
 export const APP_DESCRIPTION =
-  "Track your Nepali mutual fund SIP investments — see your real returns, understand fee drag, and project your growth.";
+  "Track your Nepali mutual fund SIP investments: see your real returns, understand fee drag, and project your growth.";
 export const APP_TAGLINE =
   "Enter what you actually invested. See exactly what it's worth.";
+
+// ---------- Distribution ----------
+
+// GitHub release link for the APK download, opened from Settings → About.
+// TODO: replace with the real release link, e.g.
+// https://github.com/user/repo/releases/latest
+export const APP_DOWNLOAD_URL =
+  "https://github.com/YOUR_USERNAME/sahakarisip/releases/latest";
 
 // ---------- Currency ----------
 
@@ -65,6 +73,7 @@ export const PROJECTION_YEARS = [5, 10, 15, 20] as const;
 export const MIN_PASSWORD_LENGTH = 8;
 export const MAX_NOTES_LENGTH = 500;
 export const XIRR_MIN_ENTRIES = 3; // Show XIRR only when ≥ 3 entries
+export const MIN_SIP_AMOUNT = 1000; // Minimum monthly SIP amount (NPR)
 
 // ---------- Navigation items (mobile bottom tab bar, mirrors web) ----------
 

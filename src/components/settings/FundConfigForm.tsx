@@ -25,7 +25,7 @@ import {
 
 import { useTheme, radius, spacing, fontSize } from "../../theme";
 import { useAuth } from "../../lib/auth/AuthContext";
-import { FUND_PRESETS } from "../../lib/constants";
+import { FUND_PRESETS, MIN_SIP_AMOUNT } from "../../lib/constants";
 import { formatCurrencyWhole, formatDate } from "../../lib/format";
 import { todayKey } from "../../lib/format";
 import type { FundConfig } from "../../lib/types";
@@ -62,7 +62,15 @@ const EMPTY_FORM: FormState = {
   preset: "",
 };
 
-export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
+export function FundConfigForm({
+  funds,
+  onChanged,
+}: {
+  funds: FundConfig[];
+  /** Called after a successful create/update/delete so the host screen
+   * can refetch immediately instead of waiting for the next focus. */
+  onChanged?: () => void;
+}) {
   const { colors } = useTheme();
   const { store } = useAuth();
   const { toast } = useToast();
@@ -145,8 +153,10 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
     if (isNaN(fee) || fee < 0) return setFormError("Fee rate cannot be negative");
     if (fee > 10) return setFormError("Fee rate seems too high — please verify");
     if (!form.startDate) return setFormError("Start date is required");
-    if (isNaN(sip) || sip <= 0)
-      return setFormError("Monthly SIP amount must be greater than 0");
+    if (isNaN(sip) || sip < MIN_SIP_AMOUNT)
+      return setFormError(
+        `Monthly SIP amount must be at least NPR ${MIN_SIP_AMOUNT.toLocaleString("en-IN")}`
+      );
     if (isNaN(nav) || nav <= 0) return setFormError("Current NAV must be greater than 0");
 
     setIsLoading(true);
@@ -169,6 +179,7 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
         variant: "success",
       });
       setOpen(false);
+      onChanged?.();
     } else {
       setFormError(result.error ?? "Action failed");
       toast({
@@ -188,6 +199,7 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
     if (result.success) {
       toast({ title: "Fund removed", description: "Fund configuration deleted." });
       setDeletingId(null);
+      onChanged?.();
     } else {
       toast({
         title: "Deletion blocked",
@@ -455,16 +467,29 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
             autoCapitalize="words"
           />
 
-          <Input
-            label="Annual Fee (%)"
-            value={form.feeRate}
-            onChangeText={(t) => setForm((p) => ({ ...p, feeRate: t }))}
-            keyboardType="decimal-pad"
-            placeholder="1.80"
-          />
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Input
+              label="Annual Fee (%)"
+              value={form.feeRate}
+              onChangeText={(t) => setForm((p) => ({ ...p, feeRate: t }))}
+              keyboardType="decimal-pad"
+              placeholder="1.80"
+              containerStyle={{ flex: 1 }}
+            />
+
+            <Input
+              label="Current NAV (NPR)"
+              value={form.latestNav}
+              onChangeText={(t) => setForm((p) => ({ ...p, latestNav: t }))}
+              keyboardType="decimal-pad"
+              placeholder="e.g. 10.50"
+              error={formError}
+              containerStyle={{ flex: 1 }}
+            />
+          </View>
 
           <Input
-            label="Planned Monthly SIP (NPR)"
+            label={`Planned Monthly SIP (NPR) — minimum ${MIN_SIP_AMOUNT.toLocaleString("en-IN")}`}
             value={form.monthlySip}
             onChangeText={(t) => setForm((p) => ({ ...p, monthlySip: t }))}
             keyboardType="number-pad"
@@ -475,15 +500,6 @@ export function FundConfigForm({ funds }: { funds: FundConfig[] }) {
             label="Start Date"
             value={form.startDate}
             onChange={(d) => setForm((p) => ({ ...p, startDate: d }))}
-          />
-
-          <Input
-            label="Current NAV (NPR)"
-            value={form.latestNav}
-            onChangeText={(t) => setForm((p) => ({ ...p, latestNav: t }))}
-            keyboardType="decimal-pad"
-            placeholder="e.g. 10.50"
-            error={formError}
           />
         </View>
       </Modal>

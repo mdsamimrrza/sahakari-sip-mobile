@@ -24,6 +24,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { ChevronDown } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme, fontSize, radius, spacing } from "../../theme";
 import { Button, Text } from "./primitives";
 
@@ -212,6 +213,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 function ToastViewport({ toasts }: { toasts: ToastEntry[] }) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const anims = useRef(new Map<number, Animated.Value>()).current;
 
   useEffect(() => {
@@ -238,7 +240,7 @@ function ToastViewport({ toasts }: { toasts: ToastEntry[] }) {
         position: "absolute",
         left: spacing.lg,
         right: spacing.lg,
-        bottom: spacing.xxxl + 24,
+        top: insets.top + spacing.md,
         gap: spacing.sm,
       }}
     >
@@ -260,7 +262,7 @@ function ToastViewport({ toasts }: { toasts: ToastEntry[] }) {
                 {
                   translateY: v.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [24, 0],
+                    outputRange: [-24, 0],
                   }),
                 },
               ],

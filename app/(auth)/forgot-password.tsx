@@ -20,7 +20,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { CheckCircle, KeyRound, Lock, Mail } from "lucide-react-native";
 import { useAuth } from "@/lib/auth/AuthContext";
 import type { DataMode } from "@/lib/data/store";
@@ -29,7 +29,7 @@ import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { Text, Button, Input, Card } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/overlays";
 import { AuthShell } from "@/components/layout/AuthShell";
-import { DataModeToggle } from "@/components/auth/DataModeToggle";
+import { AuthModeSwitch } from "@/components/auth/AuthModeSwitch";
 
 type Step = 0 | 1 | 2 | 3; // 3 = done
 
@@ -43,19 +43,20 @@ export default function ForgotPasswordScreen() {
     cloudAvailable,
   } = useAuth();
   const { toast } = useToast();
+  // The login screen passes the mode the user was on, so the flow starts
+  // in the right context instead of asking again. Cloud is the default
+  // whenever Supabase is configured.
+  const params = useLocalSearchParams<{ mode?: string }>();
 
-  const envDefault = process.env.EXPO_PUBLIC_DEFAULT_DATA_MODE as
-  | DataMode
-  | undefined;
-const [mode, setMode] = useState<DataMode>(
-  envDefault === "cloud" && cloudAvailable
-    ? "cloud"
-    : envDefault === "local"
+  const [mode, setMode] = useState<DataMode>(
+    params.mode === "local"
       ? "local"
-      : cloudAvailable
+      : params.mode === "cloud"
         ? "cloud"
-        : "local"
-);
+        : cloudAvailable
+          ? "cloud"
+          : "local"
+  );
   const [step, setStep] = useState<Step>(0);
 
   const [email, setEmail] = useState("");
@@ -280,7 +281,7 @@ const [mode, setMode] = useState<DataMode>(
   if (step === 3) {
     return (
       <AuthShell>
-        <Card padded>
+        <Card padded style={{ borderWidth: 0, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
           <StepPills />
           <View style={{ alignItems: "center", gap: spacing.sm }}>
             <View
@@ -318,8 +319,16 @@ const [mode, setMode] = useState<DataMode>(
   // ---------- Step 1: email ----------
 
   return (
-    <AuthShell>
-      <Card padded>
+    <View style={{ flex: 1 }}>
+      <AuthModeSwitch
+        mode={mode}
+        onSwitch={(next) => {
+          setError(null);
+          setMode(next);
+        }}
+      />
+      <AuthShell>
+      <Card padded style={{ borderWidth: 0, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
         <StepPills />
 
         {step === 0 ? (
@@ -330,41 +339,68 @@ const [mode, setMode] = useState<DataMode>(
               color={colors.mutedForeground}
               style={{ marginTop: 2, marginBottom: spacing.lg }}
             >
-              Enter your email and we'll send a 6-digit reset code.
+              {mode === "cloud"
+                ? "Enter your email and we'll send a 6-digit reset code."
+                : "On-device profiles can't be recovered by email."}
             </Text>
 
             <View style={{ gap: spacing.lg }}>
-              <View style={{ gap: 6 }}>
-                <Text
-                  variant="caption"
-                  color={colors.mutedForeground}
-                  style={{ fontWeight: "600" }}
-                >
-                  Account type
-                </Text>
-                <DataModeToggle mode={mode} onChange={setMode} />
-              </View>
+              {mode === "cloud" ? (
+                <>
+                  <Input
+                    label="Email Address"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoFocus
+                    error={error}
+                  />
 
-              <Input
-                label="Email Address"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus
-                error={error}
-              />
+                  <Button
+                    fullWidth
+                    size="lg"
+                    loading={loading}
+                    onPress={handleSendCode}
+                  >
+                    Send Reset Code
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <View
+                    style={{
+                      gap: spacing.sm,
+                      padding: spacing.md,
+                      borderRadius: radius.lg,
+                      backgroundColor: colors.muted,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Text
+                      variant="caption"
+                      color={colors.mutedForeground}
+                      style={{ fontSize: fontSize.sm }}
+                    >
+                      Profiles saved on this phone have no email recovery.
+                      If you forgot your password, create a new profile with
+                      the same email, or switch to Cloud (top right) to reset
+                      an online account by email.
+                    </Text>
+                  </View>
 
-              <Button
-                fullWidth
-                size="lg"
-                loading={loading}
-                onPress={handleSendCode}
-              >
-                Send Reset Code
-              </Button>
+                  <Button
+                    fullWidth
+                    size="lg"
+                    onPress={() => router.replace("/(auth)/signup")}
+                  >
+                    Create a new profile
+                  </Button>
+                </>
+              )}
 
               <Pressable
                 onPress={() => router.replace("/(auth)/login")}
@@ -542,6 +578,7 @@ const [mode, setMode] = useState<DataMode>(
           </>
         ) : null}
       </Card>
-    </AuthShell>
+      </AuthShell>
+    </View>
   );
 }

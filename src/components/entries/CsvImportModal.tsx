@@ -63,6 +63,10 @@ export function CsvImportModal({
 
   const validCount = rows.filter((r) => r.isValid).length;
 
+  // Upper bound on a single import batch — keeps the parsed preview and the
+  // store's bulk insert bounded no matter how large the picked file is.
+  const MAX_IMPORT_ROWS = 2000;
+
   function parseCsv(text: string) {
     const lines = text
       .split(/\r\n|\n/)
@@ -95,8 +99,10 @@ export function CsvImportModal({
     }
 
     const parsed: ParsedRow[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    const dataLines = lines.slice(1, MAX_IMPORT_ROWS + 1);
+    const truncated = lines.length - 1 > MAX_IMPORT_ROWS;
+    for (let i = 0; i < dataLines.length; i++) {
+      const cols = dataLines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
       const dateStr = cols[dateIdx] || "";
       const amountNum = parseFloat(cols[amountIdx] || "0");
       const navNum = parseFloat(cols[navIdx] || "0");
@@ -133,6 +139,12 @@ export function CsvImportModal({
     }
 
     setRows(parsed);
+    if (truncated) {
+      toast({
+        title: "File truncated",
+        description: `Only the first ${MAX_IMPORT_ROWS} data rows will be imported.`,
+      });
+    }
   }
 
   async function pickFile() {
@@ -213,7 +225,7 @@ export function CsvImportModal({
             disabled={validCount === 0}
             onPress={handleImport}
           >
-            Import {validCount > 0 ? `${validCount} Rows` : ""}
+            {`Import${validCount > 0 ? ` ${validCount} Rows` : ""}`}
           </Button>
           <Button fullWidth variant="outline" onPress={onClose}>
             Cancel
@@ -234,13 +246,32 @@ export function CsvImportModal({
         <Pressable onPress={pickFile}>
           <Card
             style={{
+              backgroundColor: `${colors.primary}0A`,
               padding: spacing.xl,
               alignItems: "center",
               gap: spacing.sm,
               borderStyle: "dashed",
+              borderWidth: 1.5,
+              borderColor: `${colors.primary}66`,
+              shadowColor: "#000",
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 2,
             }}
           >
-            <Upload size={26} color={colors.primary} />
+            <View
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: `${colors.primary}1F`,
+              }}
+            >
+              <Upload size={24} color={colors.primary} />
+            </View>
             <Text variant="label">Select CSV File</Text>
             <Text variant="caption" color={colors.mutedForeground} align="center">
               {fileName ? `Selected: ${fileName}` : "Tap to browse your device"}
@@ -255,9 +286,20 @@ export function CsvImportModal({
         </Pressable>
 
         {showSample && (
-          <Card padded style={{ backgroundColor: colors.muted }}>
+          <Card padded style={{ borderWidth: 0, backgroundColor: colors.muted }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <FileSpreadsheet size={15} color={colors.primary} />
+              <View
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 10,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: `${colors.primary}1F`,
+                }}
+              >
+                <FileSpreadsheet size={15} color={colors.primary} />
+              </View>
               <Text variant="caption" style={{ fontWeight: "700" }}>
                 Expected CSV format
               </Text>
@@ -283,10 +325,9 @@ export function CsvImportModal({
             </Text>
             <View
               style={{
-                borderWidth: 1,
-                borderColor: colors.border,
                 borderRadius: radius.lg,
                 overflow: "hidden",
+                backgroundColor: colors.muted,
               }}
             >
               {rows.slice(0, 30).map((row, idx) => (
@@ -300,16 +341,29 @@ export function CsvImportModal({
                       padding: spacing.md,
                       gap: spacing.sm,
                       backgroundColor: row.isValid
-                        ? colors.card
+                        ? "transparent"
                         : `${colors.destructive}14`,
                     }}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      {row.isValid ? (
-                        <Check size={14} color={colors.success} />
-                      ) : (
-                        <AlertTriangle size={14} color={colors.destructive} />
-                      )}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                      <View
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 8,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: row.isValid
+                            ? `${colors.success}1F`
+                            : `${colors.destructive}1F`,
+                        }}
+                      >
+                        {row.isValid ? (
+                          <Check size={13} color={colors.success} strokeWidth={3} />
+                        ) : (
+                          <AlertTriangle size={13} color={colors.destructive} />
+                        )}
+                      </View>
                       <Text variant="caption">{row.date || "—"}</Text>
                     </View>
                     <Text variant="caption" color={colors.mutedForeground} tabular>

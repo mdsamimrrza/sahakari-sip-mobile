@@ -11,7 +11,7 @@
 
 import React, { useEffect } from "react";
 import { View } from "react-native";
-import { Redirect, Tabs, useRouter } from "expo-router";
+import { Redirect, Tabs, useRouter, useSegments } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   LayoutDashboard,
@@ -27,20 +27,32 @@ export default function AppLayout() {
   const { status, store } = useAuth();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const segments = useSegments();
 
   // Auth guard — the mobile equivalent of the web middleware.ts
   if (status === "loading") {
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
+  if (status === "locked") {
+    return <Redirect href="/(auth)/lock" />;
+  }
   if (status === "unauthenticated" || !store) {
     return <Redirect href="/(auth)/login" />;
   }
 
-  // Floating pill tab bar — the Iris design's signature navigation: a
-  // detached rounded pill above the system nav bar instead of a full-width
-  // edge bar. Screen's bottom padding already clears this height.
+  // Floating pill tab bar — a detached rounded pill above the system
+  // nav bar instead of a full-width edge bar. Screen's bottom padding
+  // already clears this height.
+  // Nested settings detail pages (profile / funds / notifications / …)
+  // and the tax ledger hide the pill so they read as full-screen
+  // iOS-style sub-pages with their own back header.
   const bottomInset = Math.max(8, insets.bottom);
   const tabBarHeight = 62;
+  const segKey = segments.join("/");
+  const isDetailRoute =
+    segKey.includes("tax-breakdown") ||
+    (segments.includes("settings" as never) &&
+      segments.length > 2);
 
   return (
     <Tabs
@@ -48,19 +60,21 @@ export default function AppLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
-        tabBarStyle: {
-          position: "absolute",
-          left: 16,
-          right: 16,
-          bottom: bottomInset + 8,
-          height: tabBarHeight,
-          borderRadius: radius.md,
-          backgroundColor: colors.card,
-          borderWidth: 1,
-          borderColor: colors.border,
-          paddingBottom: 6,
-          paddingTop: 6,
-        },
+        tabBarStyle: isDetailRoute
+          ? { display: "none" }
+          : {
+              position: "absolute",
+              left: 16,
+              right: 16,
+              bottom: bottomInset + 8,
+              height: tabBarHeight,
+              borderRadius: radius.md,
+              backgroundColor: colors.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              paddingBottom: 6,
+              paddingTop: 6,
+            },
         tabBarLabel: ({ color, children }) => (
           <Text
             style={{ fontSize: fontSize.xs, fontWeight: "700" }}

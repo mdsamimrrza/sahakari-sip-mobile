@@ -6,20 +6,18 @@
 // ============================================================
 
 import React from "react";
-import { View, ScrollView } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  ArrowRight,
   TrendingUp,
-  PieChart,
   Calculator,
   ShieldCheck,
-  ArrowRight,
-  CheckCircle2,
 } from "lucide-react-native";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useTheme, spacing, radius, fontSize } from "@/theme";
-import { Text, Button, Card } from "@/components/ui/primitives";
+import { Text, Button } from "@/components/ui/primitives";
 import { AppLogo } from "@/components/layout/AppLogo";
 import { APP_TAGLINE } from "@/lib/constants";
 
@@ -29,56 +27,48 @@ export default function LandingScreen() {
   const { colors } = useTheme();
   const { status } = useAuth();
 
-  // Already signed in → go straight to the dashboard (mirrors the web redirect)
+  // Already signed in → go straight to the dashboard (mirrors the web redirect).
+  // Locked → biometric lock screen instead of the login form.
   React.useEffect(() => {
     if (status === "authenticated") {
       router.replace("/(app)/dashboard");
+    } else if (status === "locked") {
+      router.replace("/(auth)/lock");
     }
   }, [status, router]);
 
-  if (status === "loading" || status === "authenticated") {
+  if (status === "loading" || status === "authenticated" || status === "locked") {
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
-  const features = [
-    {
-      icon: <TrendingUp size={20} color={colors.primary} />,
-      bg: `${colors.primary}1A`,
-      title: "Actual XIRR Returns",
-      body:
-        "Calculates true annualized internal rate of return using exact cash flow dates instead of simple averages.",
-    },
-    {
-      icon: <PieChart size={20} color={colors.amber} />,
-      bg: `${colors.amber}1A`,
-      title: "Fee Drag Visibility",
-      body:
-        "See the cumulative cost of annual management, depository, and supervision fees over your investment horizon.",
-    },
-    {
-      icon: <Calculator size={20} color={colors.success} />,
-      bg: `${colors.success}1A`,
-      title: "Step-Up Projections",
-      body:
-        "Simulate portfolio growth at 5, 10, 15, and 20 years seeded directly with your current corpus value.",
-    },
-    {
-      icon: <ShieldCheck size={20} color={colors.purple} />,
-      bg: `${colors.purple}1A`,
-      title: "Private & Isolated",
-      body:
-        "Your data is protected by Supabase Row Level Security. Only you can view or modify your portfolio entries.",
-    },
-  ];
-
-  const badges = [
-    "Support for NMB, NIBL, SSIS & more",
-    "Exact Newton-Raphson XIRR",
-    "Row-Level Security (RLS) Isolation",
-  ];
-
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background, overflow: "hidden" }}>
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: -80,
+          right: -70,
+          width: 200,
+          height: 200,
+          borderRadius: 100,
+          backgroundColor: colors.primary,
+          opacity: 0.07,
+        }}
+      />
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          bottom: -100,
+          left: -70,
+          width: 220,
+          height: 220,
+          borderRadius: 110,
+          backgroundColor: colors.secondary,
+          opacity: 0.08,
+        }}
+      />
       {/* Top nav */}
       <View
         style={{
@@ -103,64 +93,59 @@ export default function LandingScreen() {
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={{
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
           padding: spacing.lg,
-          paddingBottom: insets.bottom + spacing.xxxl,
-          gap: spacing.xl,
+          paddingBottom: insets.bottom + spacing.lg,
+          gap: spacing.md,
         }}
-        showsVerticalScrollIndicator={false}
       >
         {/* Hero */}
-        <View style={{ alignItems: "center", gap: spacing.md, paddingTop: spacing.xl }}>
+        <View style={{ alignItems: "center", gap: spacing.sm }}>
+          <AppLogo size={44} />
           <View
             style={{
-              paddingHorizontal: spacing.lg,
-              paddingVertical: 6,
+              paddingHorizontal: spacing.md,
+              paddingVertical: 5,
               borderRadius: radius.full,
-              backgroundColor: `${colors.primary}18`,
-              borderWidth: 1,
-              borderColor: `${colors.primary}35`,
+              backgroundColor: `${colors.primary}14`,
             }}
           >
             <Text
               style={{ fontSize: fontSize.xs, fontWeight: "800", letterSpacing: 0.6 }}
               color={colors.primary}
             >
-              BUILT FOR NEPALI MUTUAL FUND INVESTORS
+              NEPALI MUTUAL FUND SIP TRACKER
             </Text>
           </View>
 
-          <Text variant="display" align="center" style={{ lineHeight: 46 }}>
-            Track Your Nepali Mutual Fund SIPs with{" "}
-            <Text variant="display" color={colors.secondary} style={{ lineHeight: 46 }}>
-              Precision &amp; Clarity
-            </Text>
+          <Text variant="title" align="center" style={{ fontSize: fontSize.xxl }}>
+            Track Your SIPs with Precision
           </Text>
 
           <Text
-            variant="body"
+            variant="caption"
             align="center"
             color={colors.mutedForeground}
-            style={{ maxWidth: 520, lineHeight: 22 }}
+            style={{ fontSize: fontSize.sm }}
+            numberOfLines={3}
           >
-            “{APP_TAGLINE}” Real XIRR returns, portfolio growth projections, and
-            true fee drag insights in one clean dashboard.
+            {APP_TAGLINE} Watch all your monthly payments grow in one simple place.
           </Text>
 
           <View style={{ width: "100%", gap: spacing.sm, marginTop: spacing.sm }}>
             <Button
-              size="lg"
               fullWidth
               onPress={() => router.push("/(auth)/signup")}
             >
               <Text variant="label" color={colors.primaryForeground}>
                 Start Tracking Free
               </Text>
-              <ArrowRight size={18} color={colors.primaryForeground} />
+              <ArrowRight size={17} color={colors.primaryForeground} />
             </Button>
             <Button
-              size="lg"
               variant="outline"
               fullWidth
               onPress={() => router.push("/(auth)/login")}
@@ -169,72 +154,103 @@ export default function LandingScreen() {
             </Button>
           </View>
 
-          <View style={{ gap: spacing.sm, marginTop: spacing.md, width: "100%" }}>
-            {badges.map((b) => (
+          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, width: "100%" }}>
+            {[
+              { icon: TrendingUp, tint: colors.primary, label: "Real returns" },
+              { icon: Calculator, tint: colors.amber, label: "Future growth" },
+              { icon: ShieldCheck, tint: colors.success, label: "Private & safe" },
+            ].map((f) => (
               <View
-                key={b}
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                key={f.label}
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  gap: 6,
+                  paddingVertical: spacing.md,
+                  borderRadius: radius.lg,
+                  backgroundColor: colors.card,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.06,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: 2,
+                }}
               >
-                <CheckCircle2 size={18} color={colors.primary} />
-                <Text variant="caption" color={colors.foreground} style={{ fontWeight: "500" }}>
-                  {b}
+                <View
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 11,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: `${f.tint}1F`,
+                  }}
+                >
+                  <f.icon size={17} color={f.tint} />
+                </View>
+                <Text
+                  variant="caption"
+                  color={colors.mutedForeground}
+                  align="center"
+                  style={{ fontWeight: "700", fontSize: fontSize.xs }}
+                >
+                  {f.label}
                 </Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Feature grid */}
-        <View style={{ gap: spacing.md, marginTop: spacing.md }}>
-          <View style={{ gap: 4 }}>
-            <Text variant="heading" align="center">
-              Everything you need to master your SIP portfolio
-            </Text>
-            <Text variant="caption" align="center" color={colors.mutedForeground}>
-              Replace messy Excel sheets with a dedicated personal mutual fund
-              dashboard.
-            </Text>
-          </View>
-
-{features.map((f) => (
-            <Card key={f.title} padded>
+        {/* Footer */}
+        <View style={{ gap: spacing.sm }}>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            {[
+              { n: "1", label: "Add your fund" },
+              { n: "2", label: "Add payments" },
+              { n: "3", label: "Watch growth" },
+            ].map((s) => (
               <View
+                key={s.n}
                 style={{
-                  width: 44,
-                  height: 44,
-                  backgroundColor: f.bg.replace("1A", ""),
-                  borderRadius: radius.md,
+                  flex: 1,
+                  flexDirection: "row",
                   alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: spacing.sm,
+                  gap: 6,
                 }}
               >
-                {f.icon}
+                <View
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: `${colors.primary}1F`,
+                  }}
+                >
+                  <Text
+                    style={{ fontSize: fontSize.xs, fontWeight: "900" }}
+                    color={colors.primary}
+                  >
+                    {s.n}
+                  </Text>
+                </View>
+                <Text
+                  variant="caption"
+                  color={colors.mutedForeground}
+                  style={{ fontWeight: "600", flexShrink: 1 }}
+                  numberOfLines={2}
+                >
+                  {s.label}
+                </Text>
               </View>
-              <Text variant="subheading" style={{ fontSize: fontSize.lg }}>
-                {f.title}
-              </Text>
-              <Text
-                variant="caption"
-                color={colors.mutedForeground}
-                style={{ marginTop: 4, lineHeight: 20 }}
-              >
-                {f.body}
-              </Text>
-            </Card>
-          ))}
-        </View>
-
-        {/* Footer */}
-        <View style={{ alignItems: "center", gap: 4, marginTop: spacing.md }}>
+            ))}
+          </View>
           <Text variant="caption" color={colors.mutedForeground} align="center">
-            © {new Date().getFullYear()} SahakariSIP. Personal Mutual Fund Tracker.
-          </Text>
-          <Text variant="caption" color={colors.mutedForeground} align="center">
-            Designed for Nepali open-ended mutual fund investors.
+            © {new Date().getFullYear()} SahakariSIP
           </Text>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
