@@ -26,6 +26,7 @@ import React, {
   useState,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState } from "react-native";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
@@ -178,6 +179,10 @@ function avatarFromMetadata(metadata: unknown): string | undefined {
   return typeof url === "string" && url.startsWith("http") ? url : undefined;
 }
 
+/** Returning from a shorter-than-grace background stay (app switch, share
+ *  sheet, notification shade) does not re-lock; anything longer does. */
+const BACKGROUND_LOCK_GRACE_MS = 30_000;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthContextValue["status"]>("loading");
   const [user, setUser] = useState<AppUser | null>(null);
@@ -196,7 +201,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Ref mirror so lock-aware signOut / the post-login offer never read a
   // stale closure value.
   const biometricEnabledRef = useRef(false);
+  // Ref mirrors for the background-lock listener (a plain effect closure
+  // would go stale between renders).
+  const userRef = useRef<AppUser | null>(null);
+  const backgroundedAtRef = useRef(0);
+  const appStateRef = useRef(AppState.currentState);
   const mounted = useRef(true);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   const cloudAvailable = isSupabaseConfigured;
 
@@ -218,6 +232,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     biometricEnabledRef.current = biometricEnabled;
   }, [biometricEnabled]);
+
+  // ---------- Background → foreground lock ----------
+  // Banking-style: with biometrics armed and a session in memory, coming
+  // back after a longer-than-grace background stay drops the app on the
+  // lock screen. The session itself stays live — the fingerprint reveals
+  // it, no re-authentication needed.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      const prev = appStateRef.current;
+      appStateRef.current = nextState;
+      if (nextState === "active") {
+        if (
+          prev !== "active" &&
+          biometricEnabledRef.current &&
+          userRef.current &&
+          Date.now() - backgroundedAtRef.current > BACKGROUND_LOCK_GRACE_MS
+        ) {
+          setLockInfo({
+            email: userRef.current.email,
+            name: userRef.current.name,
+          });
+          setStatus("locked");
+        }
+      } else {
+        backgroundedAtRef.current = Date.now();
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   const persistSession = useCallback(async (next: AppUser | null) => {
     if (next) {
@@ -446,6 +489,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const verified = await promptBiometric("Unlock SahakariSIP");
       if (!verified) return { success: false, error: "Not verified." };
+      // A live session is already in memory (cold-start or background lock
+      // with the session intact): the fingerprint only needs to reveal it.
+      if (userRef.current) {
+        setLockInfo(null);
+        setStatus("authenticated");
+        return { success: true };
+      }
       try {
         if (entry.mode === "cloud" && entry.session) {
           // Mint a fresh session from the stored refresh token. If it was
@@ -488,6 +538,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw new Error("No stored session for this entry.");
         }
         setLockInfo(null);
+        setStatus("authenticated");
         return { success: true };
       } catch {
         await clearBiometricEntry();
@@ -530,7 +581,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             if (mounted.current) {
               setUser(next);
-              setStatus("authenticated");
+              // Biometric armed for THIS account? The app opens on the lock
+              // screen even though the session is live — the fingerprint
+              // just reveals it (no token minting needed).
+              const entry = await readBiometricEntry();
+              if (
+                (await isBiometricEnabled()) &&
+                entry &&
+                entry.email?.toLowerCase() === next.email.toLowerCase()
+              ) {
+                setLockInfo({ email: next.email, name: next.name });
+                setStatus("locked");
+              } else {
+                setStatus("authenticated");
+              }
             }
             void refreshDbProfile();
             return;
@@ -546,7 +610,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (mounted.current) {
               setUser(saved);
               setSessionStartedAt(startedAt);
-              setStatus("authenticated");
+              const entry = await readBiometricEntry();
+              if (
+                (await isBiometricEnabled()) &&
+                entry &&
+                entry.email?.toLowerCase() === saved.email.toLowerCase()
+              ) {
+                setLockInfo({ email: saved.email, name: saved.name });
+                setStatus("locked");
+              } else {
+                setStatus("authenticated");
+              }
             }
             return;
           }
