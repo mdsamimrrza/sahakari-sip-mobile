@@ -9,6 +9,8 @@ NextAuth can't execute inside an APK, so they are replaced by an equivalent data
 (see *Architecture* below) that produces **identical numbers**.
 
 > 🌐 **Live web app:** [https://sahakari-sip.vercel.app](https://sahakari-sip.vercel.app)
+>
+> 📥 **Download the app (Android):** [SahakariSIP.apk](https://github.com/mdsamimrrza/sahakari-sip-mobile/releases/latest/download/SahakariSIP.apk) — this link always points to the latest build and never breaks on renames.
 
 ---
 
