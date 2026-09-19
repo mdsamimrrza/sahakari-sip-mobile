@@ -32,7 +32,6 @@ import { Screen, PageHeader } from "@/components/ui/layout";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Text, Card, Button, Badge, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { DateField } from "@/components/ui/DateField";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConfirmDialog, Modal, useToast } from "@/components/ui/overlays";
 import { FundScopeSelector } from "@/components/dashboard/FundScopeSelector";
 import { EntryFormModal } from "@/components/entries/EntryFormModal";
@@ -1020,18 +1019,17 @@ function AnchorDropdown({
 }) {
   const { colors } = useTheme();
   const { width: screenW } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
 
   if (!anchor) return null;
   const left = Math.min(
     Math.max(8, anchor.x + anchor.w - width),
     Math.max(8, screenW - 8 - width)
   );
-  // Android quirk: measureInWindow's y excludes the status bar, but a
-  // statusBarTranslucent Modal's space includes it — without this offset
-  // the card renders ~status-bar-height above the icon.
-  const top =
-    anchor.y + anchor.h + 6 + (Platform.OS === "android" ? insets.top : 0);
+  // Edge-to-edge builds: measureInWindow and a statusBarTranslucent Modal
+  // share the same window space (status bar included), so the raw rect is
+  // used as-is — adding insets.top double-counts and drops the card ~50px
+  // below its anchor icon.
+  const top = anchor.y + anchor.h + 6;
 
   return (
     <RNModal
