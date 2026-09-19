@@ -72,14 +72,13 @@ jobs:
       - name: Resolve tag name
         id: tag
         run: |
-          # works for both push/tag and release events
           TAG="${GITHUB_REF_NAME:-}"
           if [ -z "$TAG" ]; then
             TAG="${{ github.event.release.tag_name }}"
           fi
           echo "name=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Attach APK to release
+      - name: Create or update GitHub release and attach APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -87,6 +86,17 @@ jobs:
           SRC="android/app/build/outputs/apk/release/app-release.apk"
           cp "$SRC" "SahakariSIP-${TAG}.apk"
           cp "$SRC" "SahakariSIP.apk"
+
+          # Create the release if it does not already exist (handles tag-only pushes)
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "SahakariSIP Mobile ${TAG}" \
+              --notes "Automated release for ${TAG}. Download the APK below and sideload it on any Android device." \
+              --latest
+          fi
+
+          # Upload (or overwrite) both APK assets
           gh release upload "$TAG" \
             "SahakariSIP-${TAG}.apk" \
             "SahakariSIP.apk" \
