@@ -1,12 +1,11 @@
 ﻿name: Build & attach release APK
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag to attach the APK to (e.g. v1.0.0)'
-        required: true
-        default: 'v1.0.0'
+  push:
+    tags:
+      - 'v*'          # fires on every tag like v1.0.0, v2.3.1, etc.
+  release:
+    types: [published] # also fires when a release is published via the GitHub UI
 
 permissions:
   contents: write
@@ -44,7 +43,7 @@ jobs:
               "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" \
               > android/keystore.properties
           else
-            echo "No KEYSTORE_BASE64 secret found — generating a self-signed debug keystore"
+            echo "No KEYSTORE_BASE64 secret — generating a self-signed keystore"
             keytool -genkeypair -v \
               -keystore android/app/release.keystore \
               -alias sahakarisip \
@@ -70,11 +69,21 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon
 
+      - name: Resolve tag name
+        id: tag
+        run: |
+          # works for both push/tag and release events
+          TAG="${GITHUB_REF_NAME:-}"
+          if [ -z "$TAG" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Attach APK to release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ inputs.tag }}"
+          TAG="${{ steps.tag.outputs.name }}"
           SRC="android/app/build/outputs/apk/release/app-release.apk"
           cp "$SRC" "SahakariSIP-${TAG}.apk"
           cp "$SRC" "SahakariSIP.apk"
