@@ -1,4 +1,4 @@
-name: Build & attach release APK
+﻿name: Build & attach release APK
 
 on:
   workflow_dispatch:
@@ -30,22 +30,39 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Restore signing keystore
+      - name: Restore signing keystore (or auto-generate one if secrets are absent)
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64:    ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD:  ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS:          ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD:       ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
-          printf 'storeFile=release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
-            "${{ secrets.KEYSTORE_PASSWORD }}" "${{ secrets.KEY_ALIAS }}" "${{ secrets.KEY_PASSWORD }}" \
-            > android/keystore.properties
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Using repository keystore secret"
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+            printf 'storeFile=release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" \
+              > android/keystore.properties
+          else
+            echo "No KEYSTORE_BASE64 secret found — generating a self-signed debug keystore"
+            keytool -genkeypair -v \
+              -keystore android/app/release.keystore \
+              -alias sahakarisip \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android123 \
+              -keypass  android123 \
+              -dname "CN=SahakariSIP, OU=Mobile, O=SahakariSIP, L=Kathmandu, S=Bagmati, C=NP"
+            printf 'storeFile=release.keystore\nstorePassword=android123\nkeyAlias=sahakarisip\nkeyPassword=android123\n' \
+              > android/keystore.properties
+          fi
 
-      - name: Write app .env (Supabase)
+      - name: Write app .env (Supabase — optional, app works without it)
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\n' \
-            "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > .env
+          printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\nEXPO_PUBLIC_DEFAULT_DATA_MODE=local\n' \
+            "${SUPABASE_URL:-}" "${SUPABASE_ANON_KEY:-}" > .env
 
       - name: Build release APK
         run: |
@@ -57,5 +74,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk SahakariSIP.apk
-          gh release upload "${{ inputs.tag }}" "SahakariSIP.apk" --clobber --repo "$GITHUB_REPOSITORY"
+          TAG="${{ inputs.tag }}"
+          SRC="android/app/build/outputs/apk/release/app-release.apk"
+          cp "$SRC" "SahakariSIP-${TAG}.apk"
+          cp "$SRC" "SahakariSIP.apk"
+          gh release upload "$TAG" \
+            "SahakariSIP-${TAG}.apk" \
+            "SahakariSIP.apk" \
+            --clobber --repo "$GITHUB_REPOSITORY"
