@@ -136,6 +136,9 @@ jobs:
           [**SahakariSIP.apk**](https://github.com/mdsamimrrza/sahakari-sip-mobile/releases/latest/download/SahakariSIP.apk) — permanent link, always the latest build.
 
           ## What changed
+          - ✨ **Privacy Mode UI Upgrade**: The eye button is now inline with the portfolio amount on the dashboard, making it easier to hide/show balances without layout shifts.
+          - 🛡️ **Screenshot Protection**: Added native `FLAG_SECURE` to block screenshots, screen recordings, and screen sharing, keeping your financial data secure.
+          - 🐛 **Release Pipeline Fix**: Fixed an issue where the APK version and GitHub release tag could fall out of sync.
           NOTES
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
