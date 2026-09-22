@@ -147,9 +147,8 @@ jobs:
             # the auto changelog (commits + contributors) under "What changed".
             gh release create "$TAG" "SahakariSIP.apk" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "SahakariSIP Mobile" \
+              --title "SahakariSIP Mobile ${TAG}" \
               --latest \
-              --verify-tag \
               --notes-file release_notes.md \
               --generate-notes
           fi

@@ -11,7 +11,7 @@
 // ============================================================
 
 import React, { useState } from "react";
-import { View, Pressable, ScrollView } from "react-native";
+import { View, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import {
   Wallet,
   TrendingUp,
@@ -21,6 +21,8 @@ import {
   ArrowDownRight,
   ChevronDown,
   Check,
+  Eye,
+  EyeOff,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import type { DashboardSummary, FundConfig } from "@/lib/types";
@@ -61,10 +63,14 @@ export function SummaryCards({
   loading?: boolean;
 }) {
   const { colors, isDark } = useTheme();
-  const { formatPrivate } = usePrivacy();
+  const { formatPrivate, isPrivate, togglePrivacy } = usePrivacy();
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [fundMenuOpen, setFundMenuOpen] = useState(false);
+
+  // Eye button size scales slightly with screen width
+  const eyeBtnSize = screenWidth < 360 ? 28 : 32;
 
   if (loading) {
     return (
@@ -157,20 +163,60 @@ export function SummaryCards({
           </Text>
         </View>
 
-        <Text
+        {/* Amount row: value + fixed-width eye button so layout never shifts */}
+        <View
           style={{
-            fontSize: getHeroFontSize(currentValueDisplay),
-            fontWeight: "900",
-            color: "#FFFFFF",
-            fontVariant: ["tabular-nums"],
+            flexDirection: "row",
+            alignItems: "center",
             marginTop: spacing.xs,
           }}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.55}
         >
-          {currentValueDisplay}
-        </Text>
+          <Text
+            style={{
+              fontSize: getHeroFontSize(currentValueDisplay),
+              fontWeight: "900",
+              color: "#FFFFFF",
+              fontVariant: ["tabular-nums"],
+              flex: 1,
+            }}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.55}
+          >
+            {currentValueDisplay}
+          </Text>
+          {/* Fixed-width container: button is always here, icon just swaps */}
+          <View
+            style={{
+              width: eyeBtnSize + 8,
+              height: eyeBtnSize + 8,
+              alignItems: "center",
+              justifyContent: "center",
+              marginLeft: spacing.sm,
+            }}
+          >
+            <Pressable
+              onPress={togglePrivacy}
+              accessibilityRole="button"
+              accessibilityLabel={isPrivate ? "Show amounts" : "Hide amounts"}
+              style={({ pressed }) => ({
+                width: eyeBtnSize,
+                height: eyeBtnSize,
+                borderRadius: eyeBtnSize / 2,
+                backgroundColor: "#FFFFFF26",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.6 : 1,
+              })}
+            >
+              {isPrivate ? (
+                <EyeOff size={eyeBtnSize * 0.55} color="#FFFFFF" strokeWidth={2.2} />
+              ) : (
+                <Eye size={eyeBtnSize * 0.55} color="#FFFFFF" strokeWidth={2.2} />
+              )}
+            </Pressable>
+          </View>
+        </View>
         <Text style={{ fontSize: fontSize.sm, color: "#FFFFFF", opacity: 0.85, marginTop: 2 }}>
           Invested {formatPrivate(formatCurrencyWhole(summary.totalInvested))}
         </Text>

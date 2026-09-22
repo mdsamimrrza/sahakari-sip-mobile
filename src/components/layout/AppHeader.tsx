@@ -596,7 +596,6 @@ export function AppHeader({ title }: { title?: string }) {
         )}
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
           <NotificationBell />
-          <PrivacyToggle />
           <ThemeToggle />
           <UserAvatarMenu />
         </View>
