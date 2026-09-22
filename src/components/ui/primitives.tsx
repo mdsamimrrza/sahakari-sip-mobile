@@ -43,6 +43,8 @@ interface TextProps {
   weight?: TextStyle["fontWeight"];
   align?: TextStyle["textAlign"];
   numberOfLines?: number;
+  adjustsFontSizeToFit?: boolean;
+  minimumFontScale?: number;
   style?: StyleProp<TextStyle>;
   tabular?: boolean;
 }
@@ -54,6 +56,8 @@ export function Text({
   weight,
   align,
   numberOfLines,
+  adjustsFontSizeToFit,
+  minimumFontScale,
   style,
   tabular,
 }: TextProps) {
@@ -94,6 +98,8 @@ export function Text({
   return (
     <RNText
       numberOfLines={numberOfLines}
+      adjustsFontSizeToFit={adjustsFontSizeToFit}
+      minimumFontScale={minimumFontScale}
       style={[
         { fontFamily: fontFamily.body },
         variantStyle,

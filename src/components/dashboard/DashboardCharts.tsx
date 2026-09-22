@@ -143,7 +143,15 @@ export function PortfolioGrowthCard({
       </View>
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, flexWrap: "wrap" }}>
-        <Text variant="display" style={{ fontSize: fontSize.xxxl }}>
+        <Text
+          variant="display"
+          style={{
+            fontSize: currVal >= 100000000 ? fontSize.lg : currVal >= 10000000 ? fontSize.xl : currVal >= 1000000 ? fontSize.xxl : fontSize.xxxl,
+          }}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+        >
           {formatCurrencyWhole(currVal)}
         </Text>
         <View

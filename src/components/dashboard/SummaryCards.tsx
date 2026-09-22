@@ -36,6 +36,14 @@ import { Text, Card, Button, Skeleton } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/overlays";
 import { FundScopeSelector } from "./FundScopeSelector";
 
+function getHeroFontSize(text: string): number {
+  const len = text.length;
+  if (len <= 12) return 32;
+  if (len <= 16) return 26;
+  if (len <= 20) return 22;
+  return 18;
+}
+
 export function SummaryCards({
   summary,
   funds,
@@ -148,13 +156,15 @@ export function SummaryCards({
 
         <Text
           style={{
-            fontSize: 30,
+            fontSize: getHeroFontSize(currentValueDisplay),
             fontWeight: "900",
             color: "#FFFFFF",
             fontVariant: ["tabular-nums"],
             marginTop: spacing.xs,
           }}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.55}
         >
           {currentValueDisplay}
         </Text>
