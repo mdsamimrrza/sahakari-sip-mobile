@@ -436,8 +436,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!mobileSession) {
             return { success: false, error: "No mobile session to save." };
           }
-          // Pull fresh profile from web (NextAuth) and store the mobile session.
-          const webProfile = await fetchProfile(mobileSession.accessToken);
           await saveBiometricEntry({
             mode: "cloud",
             email: user.email,
@@ -680,13 +678,16 @@ const next: AppUser = {
         try {
           const session = await passwordLogin(normalized, password);
           await saveMobileSession(session);
-          void refreshDbProfile();
-          void maybeOfferBiometric({
+          const nextUser: AppUser = {
             id: session.user.id,
-            email: session.user.email,
-            name: session.user.name,
+            email: session.user.email ?? normalized,
+            name: session.user.name ?? undefined,
+            avatarUrl: session.user.image ?? undefined,
             mode: "cloud",
-          } as AppUser);
+          };
+          await persistSession(nextUser);
+          void refreshDbProfile();
+          void maybeOfferBiometric(nextUser);
           return { success: true };
         } catch (err) {
           if (err instanceof MobileApiError) {
