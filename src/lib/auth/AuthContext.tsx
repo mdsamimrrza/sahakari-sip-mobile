@@ -417,39 +417,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const dismissBiometricOffer = useCallback(
     async (declined: boolean) => {
       setOfferBiometric(false);
-      if (declined && user) await markBiometricDeclined(user.id);
+      const currentUser = userRef.current;
+      if (declined && currentUser) await markBiometricDeclined(currentUser.id);
     },
-    [user]
+    []
   );
 
   const enableBiometric = useCallback(
     async (): Promise<{ success: boolean; error?: string }> => {
-      if (!user) return { success: false, error: "Not signed in." };
+      const currentUser = userRef.current;
+      if (!currentUser) return { success: false, error: "Not signed in." };
       if (!(await isBiometricSupported())) {
         return { success: false, error: "Biometrics are not set up on this device." };
       }
       const verified = await promptBiometric("Enable biometric unlock");
       if (!verified) return { success: false, error: "Not verified." };
       try {
-        if (user.mode === "cloud" && cloudAvailable) {
+        if (currentUser.mode === "cloud" && cloudAvailable) {
           const mobileSession = await loadMobileSession();
           if (!mobileSession) {
             return { success: false, error: "No mobile session to save." };
           }
           await saveBiometricEntry({
             mode: "cloud",
-            email: user.email,
-            name: user.name,
+            email: currentUser.email,
+            name: currentUser.name,
             savedAt: new Date().toISOString(),
             mobileSession,
           });
         } else {
           await saveBiometricEntry({
             mode: "local",
-            email: user.email,
-            name: user.name,
+            email: currentUser.email,
+            name: currentUser.name,
             savedAt: new Date().toISOString(),
-            localProfileId: user.id,
+            localProfileId: currentUser.id,
           });
         }
         biometricEnabledRef.current = true;
@@ -461,7 +463,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     [cloudAvailable]
   );
-
   const disableBiometric = useCallback(async () => {
     await clearBiometricEntry();
     biometricEnabledRef.current = false;
@@ -906,7 +907,10 @@ const next: AppUser = {
         // locally). The browser completes NextAuth's Google flow and the
         // web's relay page bounces back to our scheme URL with the token.
         const { url } = await googleStart();
-        const redirectTo = Linking.createURL("/auth/callback");
+        // Must exactly match the scheme URL emitted by the web handoff relay.
+        // Using Linking.createURL here can produce a triple-slash URI on
+        // Android, which makes the Custom Tab miss the callback result.
+        const redirectTo = "sahakarisip://auth/callback";
 
         // Path A: the Custom Tab's openAuthSessionAsync result.
         // Path B: expo-router / LaunchEvents delivering /auth/callback?token=…

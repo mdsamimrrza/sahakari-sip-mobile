@@ -41,8 +41,6 @@ export default function AuthCallbackScreen() {
   useEffect(() => {
     if (status === "authenticated") {
       router.replace("/(app)/dashboard");
-    } else if (status === "unauthenticated") {
-      router.replace("/(auth)/login");
     }
   }, [status, router]);
 

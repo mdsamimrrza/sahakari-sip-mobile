@@ -40,3 +40,5 @@ android/keystore.properties
 
 # Agent tooling
 .zcode/
+
+.vercel
