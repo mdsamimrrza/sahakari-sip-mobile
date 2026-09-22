@@ -20,6 +20,8 @@ import { BiometricPromptDialog } from "@/components/auth/BiometricPromptDialog";
 import { AnimatedSplash } from "@/components/layout/AnimatedSplash";
 
 import { PrivacyProvider } from "@/lib/privacy/PrivacyContext";
+import * as ScreenCapture from "expo-screen-capture";
+
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -34,6 +36,14 @@ function ThemedApp() {
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
   }, [fontsLoaded]);
+
+  // Block screenshots, screen recording and screen sharing (Android FLAG_SECURE + iOS)
+  useEffect(() => {
+    ScreenCapture.preventScreenCaptureAsync().catch(() => {});
+    return () => {
+      ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+    };
+  }, []);
 
 if (!fontsLoaded) {
       return (
