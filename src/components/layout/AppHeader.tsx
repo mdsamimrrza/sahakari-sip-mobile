@@ -15,6 +15,8 @@ import {
   Check,
   CheckCheck,
   Clock,
+  Eye,
+  EyeOff,
   Inbox,
   LogOut,
   Moon,
@@ -28,6 +30,7 @@ import { AppLogo } from "./AppLogo";
 import { useAuth } from "../../lib/auth/AuthContext";
 import { useProfilePhotoUri } from "../../lib/profilePhoto";
 import { formatRelativeDate } from "../../lib/format";
+import { usePrivacy } from "../../lib/privacy/PrivacyContext";
 import type { NotificationItem } from "../../lib/types";
 
 // ------------------------------------------------------------
@@ -80,6 +83,29 @@ export function ThemeToggle() {
         <Sun size={20} color={colors.amber} />
       ) : (
         <Moon size={20} color={colors.foreground} />
+      )}
+    </HeaderIconButton>
+  );
+}
+
+// ------------------------------------------------------------
+// Privacy toggle — Eye / EyeOff toggle for amount privacy
+// ------------------------------------------------------------
+
+export function PrivacyToggle() {
+  const { colors } = useTheme();
+  const { isPrivate, togglePrivacy } = usePrivacy();
+
+  return (
+    <HeaderIconButton
+      onPress={togglePrivacy}
+      accessibilityLabel={isPrivate ? "Show amounts" : "Hide amounts"}
+      style={{ width: 38, height: 38 }}
+    >
+      {isPrivate ? (
+        <EyeOff size={20} color={colors.rose} />
+      ) : (
+        <Eye size={20} color={colors.foreground} />
       )}
     </HeaderIconButton>
   );
@@ -570,6 +596,7 @@ export function AppHeader({ title }: { title?: string }) {
         )}
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
           <NotificationBell />
+          <PrivacyToggle />
           <ThemeToggle />
           <UserAvatarMenu />
         </View>

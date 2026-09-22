@@ -2,7 +2,7 @@
   "expo": {
     "name": "SahakariSIP",
     "slug": "sahakarisip",
-    "version": "1.1.3",
+    "version": "1.1.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sahakarisip",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.samimrrza.sahakarisip",
-      "versionCode": 4,
+      "versionCode": 5,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#EDEAE0",

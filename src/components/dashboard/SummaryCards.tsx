@@ -35,6 +35,7 @@ import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { Text, Card, Button, Skeleton } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/overlays";
 import { FundScopeSelector } from "./FundScopeSelector";
+import { usePrivacy } from "@/lib/privacy/PrivacyContext";
 
 function getHeroFontSize(text: string): number {
   const len = text.length;
@@ -60,6 +61,7 @@ export function SummaryCards({
   loading?: boolean;
 }) {
   const { colors, isDark } = useTheme();
+  const { formatPrivate } = usePrivacy();
   const router = useRouter();
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [fundMenuOpen, setFundMenuOpen] = useState(false);
@@ -80,10 +82,11 @@ export function SummaryCards({
   const isPositive = (summary.gainLoss ?? 0) >= 0;
   const gainColor = isPositive ? colors.success : colors.rose;
 
-  const currentValueDisplay =
+  const rawValueDisplay =
     summary.currentValue !== null
       ? formatCurrencyWhole(summary.currentValue)
       : formatCurrencyWhole(summary.totalInvested);
+  const currentValueDisplay = formatPrivate(rawValueDisplay);
 
   const effectiveDeployed = Math.max(
     0,
@@ -169,7 +172,7 @@ export function SummaryCards({
           {currentValueDisplay}
         </Text>
         <Text style={{ fontSize: fontSize.sm, color: "#FFFFFF", opacity: 0.85, marginTop: 2 }}>
-          Invested {formatCurrencyWhole(summary.totalInvested)}
+          Invested {formatPrivate(formatCurrencyWhole(summary.totalInvested))}
         </Text>
 
         <View
@@ -206,7 +209,7 @@ export function SummaryCards({
                 tabular
               >
                 {isPositive ? "+" : ""}
-                {formatCurrencyWhole(summary.gainLoss, true)} (
+                {formatPrivate(formatCurrencyWhole(summary.gainLoss, true))} (
                 {formatPercentage(summary.gainLossPct ?? 0)})
               </Text>
             </View>
@@ -361,8 +364,8 @@ export function SummaryCards({
           label="Net Gain"
           value={
             summary.gainLoss !== null
-              ? formatCurrencyWhole(summary.gainLoss, true)
-              : "NPR 0"
+              ? formatPrivate(formatCurrencyWhole(summary.gainLoss, true))
+              : formatPrivate("NPR 0")
           }
         />
         <KpiChip
@@ -381,7 +384,7 @@ export function SummaryCards({
           tint={colors.purple}
           icon={<Coins size={15} color={colors.purple} />}
           label="Rollover Cash"
-          value={formatCurrencyWhole(summary.unallottedCash)}
+          value={formatPrivate(formatCurrencyWhole(summary.unallottedCash))}
         />
       </ScrollView>
 
@@ -435,8 +438,8 @@ export function SummaryCards({
               </View>
               <Text variant="heading" color={gainColor} tabular style={{ fontSize: fontSize.xl }}>
                 {summary.gainLoss !== null
-                  ? formatCurrencyWhole(summary.gainLoss, true)
-                  : "NPR 0"}
+                  ? formatPrivate(formatCurrencyWhole(summary.gainLoss, true))
+                  : formatPrivate("NPR 0")}
               </Text>
             </View>
           </View>

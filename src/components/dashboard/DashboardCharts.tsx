@@ -31,7 +31,8 @@ import {
   formatPercentage,
 } from "@/lib/format";
 import { useTheme, radius, spacing, fontSize } from "@/theme";
-import { Text, Card, EmptyState } from "@/components/ui/primitives";
+import { Text, Card, EmptyState, Button } from "@/components/ui/primitives";
+import { usePrivacy } from "@/lib/privacy/PrivacyContext";
 import { SectionHeader } from "@/components/ui/layout";
 import { Modal } from "@/components/ui/overlays";
 import { BarChart, DonutChart, ChartLegend, LineChart } from "@/components/charts";
@@ -92,6 +93,7 @@ export function PortfolioGrowthCard({
   summary: DashboardSummary;
 }) {
   const { colors } = useTheme();
+  const { formatPrivate } = usePrivacy();
   const [range, setRange] = useState<TimeRange>("ALL");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
@@ -152,7 +154,7 @@ export function PortfolioGrowthCard({
           adjustsFontSizeToFit
           minimumFontScale={0.6}
         >
-          {formatCurrencyWhole(currVal)}
+          {formatPrivate(formatCurrencyWhole(currVal))}
         </Text>
         <View
           style={{
@@ -172,7 +174,7 @@ export function PortfolioGrowthCard({
           )}
           <Text variant="caption" color={gainColor} style={{ fontWeight: "800" }} tabular>
             {isPositive ? "+" : ""}
-            {formatCurrencyWhole(gainVal)} ({formatPercentage(gainPct)})
+            {formatPrivate(formatCurrencyWhole(gainVal))} ({formatPercentage(gainPct)})
           </Text>
         </View>
       </View>
@@ -422,6 +424,7 @@ export function MonthlyContributionsCard({
   data: MonthlyContribution[];
 }) {
   const { colors } = useTheme();
+  const { formatPrivate } = usePrivacy();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const sorted = useMemo(
@@ -439,8 +442,8 @@ export function MonthlyContributionsCard({
         title="Monthly Contributions"
         subtitle={
           activeItem
-            ? `Selected: ${formatMonth(activeItem.month)} · ${formatCurrencyWhole(activeItem.amount)}`
-            : `${sorted.length} month${sorted.length === 1 ? "" : "s"} · ${formatCurrencyWhole(total)} deposited`
+            ? `Selected: ${formatMonth(activeItem.month)} · ${formatPrivate(formatCurrencyWhole(activeItem.amount))}`
+            : `${sorted.length} month${sorted.length === 1 ? "" : "s"} · ${formatPrivate(formatCurrencyWhole(total))} deposited`
         }
         right={
           activeItem ? (
@@ -488,6 +491,7 @@ export function InvestedVsGainCard({
   compact?: boolean;
 }) {
   const { colors } = useTheme();
+  const { formatPrivate } = usePrivacy();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const value = currentValue ?? totalInvested;
@@ -521,7 +525,7 @@ export function InvestedVsGainCard({
         title="Invested vs Gain"
         subtitle={
           activeSlice
-            ? `${activeSlice.name}: ${formatCurrencyWhole(activeSlice.value)} (${((activeSlice.value / (value || 1)) * 100).toFixed(1)}%)`
+            ? `${activeSlice.name}: ${formatPrivate(formatCurrencyWhole(activeSlice.value))} (${((activeSlice.value / (value || 1)) * 100).toFixed(1)}%)`
             : "How your portfolio value splits between capital and return"
         }
         right={
@@ -544,7 +548,7 @@ export function InvestedVsGainCard({
         />
         <ChartLegend
           items={slices}
-          formatValue={(v) => formatCurrencyWhole(v)}
+          formatValue={(v) => formatPrivate(formatCurrencyWhole(v))}
           selectedIndex={selectedIndex}
           onSelectSlice={(idx) => setSelectedIndex(idx)}
         />
@@ -572,6 +576,7 @@ function FeeDragBreakdownDialog({
   totalDrag: number;
 }) {
   const { colors } = useTheme();
+  const { formatPrivate } = usePrivacy();
 
   // Split logic from the web app: a matching preset uses its feeBreakdown;
   // otherwise the default 1.5/0.2/0.1-of-1.8 ratio is scaled to the rate.
@@ -662,8 +667,8 @@ function FeeDragBreakdownDialog({
                 {r.detail}
               </Text>
             </View>
-            <Text variant="mono" color={r.color} tabular>
-              {formatCurrencyWhole(r.amount)}
+            <Text variant="mono" color={r.color} tabular adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1}>
+              {formatPrivate(formatCurrencyWhole(r.amount))}
             </Text>
           </View>
         ))}
@@ -680,8 +685,8 @@ function FeeDragBreakdownDialog({
           }}
         >
           <Text variant="label">Total Fee Drag</Text>
-          <Text variant="mono" color={colors.rose} tabular style={{ fontWeight: "800" }}>
-            {formatCurrencyWhole(totalDrag)}
+          <Text variant="mono" color={colors.rose} tabular style={{ fontWeight: "800" }} adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1}>
+            {formatPrivate(formatCurrencyWhole(totalDrag))}
           </Text>
         </View>
 
@@ -705,6 +710,7 @@ export function FeeDragCard({
   fundName?: string;
 }) {
   const { colors } = useTheme();
+  const { formatPrivate } = usePrivacy();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const latest = data.length > 0 ? data[data.length - 1].cumulativeDrag : 0;
 
@@ -753,8 +759,8 @@ export function FeeDragCard({
             <Text variant="caption" color={colors.mutedForeground}>
               Cumulative drag to date
             </Text>
-            <Text variant="label" color={colors.rose} tabular>
-              {formatCurrencyWhole(latest)}
+            <Text variant="label" color={colors.rose} tabular adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1}>
+              {formatPrivate(formatCurrencyWhole(latest))}
             </Text>
           </View>
 

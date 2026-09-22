@@ -19,6 +19,8 @@ import { MergePromptDialog } from "@/components/auth/MergePromptDialog";
 import { BiometricPromptDialog } from "@/components/auth/BiometricPromptDialog";
 import { AnimatedSplash } from "@/components/layout/AnimatedSplash";
 
+import { PrivacyProvider } from "@/lib/privacy/PrivacyContext";
+
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function ThemedApp() {
@@ -75,9 +77,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <ToastProvider>
-            <ThemedApp />
-          </ToastProvider>
+          <PrivacyProvider>
+            <ToastProvider>
+              <ThemedApp />
+            </ToastProvider>
+          </PrivacyProvider>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
