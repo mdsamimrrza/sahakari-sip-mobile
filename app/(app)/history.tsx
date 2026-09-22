@@ -25,12 +25,14 @@ import { Pencil, Trash2, Search, ChevronDown, Plus, Upload, Calendar, ArrowUpDow
 import { useEntries, useFunds } from "@/hooks/useData";
 import { computeEntryBreakdowns } from "@/lib/data/analytics";
 import { formatCurrency, formatDate, formatNav, formatUnits } from "@/lib/format";
+import { usePrivacy } from "@/lib/privacy/PrivacyContext";
 import { useAuth } from "@/lib/auth/AuthContext";
 import type { Entry } from "@/lib/types";
 import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { Screen, PageHeader } from "@/components/ui/layout";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Text, Card, Button, Badge, EmptyState, Skeleton } from "@/components/ui/primitives";
+import { PrivacyEyeButton } from "@/components/ui/PrivacyEyeButton";
 import { DateField } from "@/components/ui/DateField";
 import { ConfirmDialog, Modal, useToast } from "@/components/ui/overlays";
 import { FundScopeSelector } from "@/components/dashboard/FundScopeSelector";
@@ -57,6 +59,7 @@ function animateLayout() {
 
 export default function HistoryScreen() {
   const { colors, isDark } = useTheme();
+  const { formatPrivate } = usePrivacy();
   const { store } = useAuth();
   const { toast } = useToast();
 
@@ -337,6 +340,7 @@ export default function HistoryScreen() {
                 {totals.count} {totals.count === 1 ? "payment" : "payments"}
               </Text>
             </View>
+            <PrivacyEyeButton variant="hero" />
           </View>
           {loading && entries.length === 0 ? (
             <View style={{ marginTop: spacing.sm }}>
@@ -354,7 +358,7 @@ export default function HistoryScreen() {
                 }}
                 numberOfLines={1}
               >
-                {formatCurrency(totals.invested)}
+                {formatPrivate(formatCurrency(totals.invested))}
               </Text>
               <View
                 style={{
@@ -785,12 +789,12 @@ export default function HistoryScreen() {
                         paddingTop: spacing.md,
                       }}
                     >
-                      <MiniMetric label="Deposit" value={formatCurrency(Number(entry.amount))} />
+                      <MiniMetric label="Deposit" value={formatPrivate(formatCurrency(Number(entry.amount)))} />
                       <MiniMetric label="NAV" value={formatNav(Number(entry.nav))} />
                       <MiniMetric label="Units" value={formatUnits(Number(entry.units))} />
                       <MiniMetric
                         label="Rollover"
-                        value={b ? formatCurrency(b.remainingRollover) : "—"}
+                        value={b ? formatPrivate(formatCurrency(b.remainingRollover)) : "—"}
                         color={colors.success}
                       />
                     </View>
@@ -807,24 +811,24 @@ export default function HistoryScreen() {
                       >
                         <BreakdownRow
                           label="Carried Rollover"
-                          value={`+ ${formatCurrency(b.carriedRollover)}`}
+                          value={`+ ${formatPrivate(formatCurrency(b.carriedRollover))}`}
                           color={colors.blue}
                         />
                         <BreakdownRow
                           label="Total Available"
-                          value={formatCurrency(b.totalAvailable)}
+                          value={formatPrivate(formatCurrency(b.totalAvailable))}
                         />
                         <BreakdownRow
                           label="Net Cash for Units"
-                          value={formatCurrency(b.netCash)}
+                          value={formatPrivate(formatCurrency(b.netCash))}
                         />
                         <BreakdownRow
                           label="Unit Cost"
-                          value={formatCurrency(b.unitCost)}
+                          value={formatPrivate(formatCurrency(b.unitCost))}
                         />
                         <BreakdownRow
                           label="Ending Rollover"
-                          value={formatCurrency(b.remainingRollover)}
+                          value={formatPrivate(formatCurrency(b.remainingRollover))}
                           color={colors.success}
                           emphasis
                         />

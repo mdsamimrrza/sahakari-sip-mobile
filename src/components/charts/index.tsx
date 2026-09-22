@@ -64,14 +64,27 @@ const PAD_RIGHT = 12;
 const PAD_TOP = 12;
 const PAD_BOTTOM = 26;
 
-/** Round a max value up to a "nice" axis top with 3 divisions. */
+/** Dynamic axis top — hugs the data at ~1.35x the max with fine steps,
+    so a 9L portfolio tops out near 12.5L instead of jumping to 20L. */
 function niceTop(max: number, minTop = 0): number {
   if (max <= 0) return Math.max(minTop, 10);
-  const raw = Math.max(max * 1.15, minTop);
+  const raw = Math.max(max * 1.35, minTop);
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
   const normalized = raw / magnitude;
   const stepped =
-    normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+    normalized <= 1
+      ? 1
+      : normalized <= 1.25
+        ? 1.25
+        : normalized <= 1.5
+          ? 1.5
+          : normalized <= 2
+            ? 2
+            : normalized <= 2.5
+              ? 2.5
+              : normalized <= 5
+                ? 5
+                : 10;
   return stepped * magnitude;
 }
 
@@ -112,6 +125,9 @@ export const LineChart = React.memo(function LineChart({
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
   const [internalActiveIndex, setInternalActiveIndex] = useState<number | null>(null);
+  // Tap detection — tooltip shows only on a deliberate tap (quick touch
+  // without dragging), never on scroll or an accidental brush.
+  const tapStart = useRef<{ x: number; y: number; t: number } | null>(null);
 
   const activeIndex = selectedIndex !== undefined ? selectedIndex : internalActiveIndex;
 
@@ -172,8 +188,25 @@ export const LineChart = React.memo(function LineChart({
     const relative = locationX - padLeft;
     const idx = stepX > 0 ? Math.round(relative / stepX) : 0;
     const clamped = Math.max(0, Math.min(labels.length - 1, idx));
+    // Tapping the already-open point closes the tooltip (toggle).
+    if (clamped === activeIndex) {
+      setInternalActiveIndex(null);
+      onSelectPoint?.(null);
+      return;
+    }
     setInternalActiveIndex(clamped);
     onSelectPoint?.(clamped);
+  };
+
+  /** Release handler — only a real tap (fast, almost no movement) counts. */
+  const handleRelease = (locationX: number, locationY: number) => {
+    const start = tapStart.current;
+    tapStart.current = null;
+    if (!start) return;
+    const moved = Math.hypot(locationX - start.x, locationY - start.y);
+    if (moved < 14 && Date.now() - start.t < 600) {
+      handleTouch(locationX);
+    }
   };
 
   const tooltipLeft = activeIndex !== null ? padLeft + stepX * activeIndex : 0;
@@ -195,12 +228,23 @@ export const LineChart = React.memo(function LineChart({
         <View
           onStartShouldSetResponder={() => true}
           onResponderTerminationRequest={() => true}
-          onResponderGrant={(e) => handleTouch(e.nativeEvent.locationX)}
-          onResponderMove={(e) => handleTouch(e.nativeEvent.locationX)}
-          onResponderRelease={() => {
-            // Touch release keeps the active index until auto-dismiss after 5s!
+          onResponderGrant={(e) =>
+            (tapStart.current = {
+              x: e.nativeEvent.locationX,
+              y: e.nativeEvent.locationY,
+              t: Date.now(),
+            })
+          }
+          onResponderMove={() => {
+            // Intentionally empty — dragging (scroll or scrub) never
+            // opens the tooltip. Only a tap on release does.
           }}
-          onResponderTerminate={() => {}}
+          onResponderRelease={(e) =>
+            handleRelease(e.nativeEvent.locationX, e.nativeEvent.locationY)
+          }
+          onResponderTerminate={() => {
+            tapStart.current = null;
+          }}
         >
           <Svg width={width} height={height}>
             <Defs>
@@ -331,27 +375,18 @@ export const LineChart = React.memo(function LineChart({
         </View>
       )}
 
-      {/* Tooltip card */}
+      {/* Tooltip card — rendered BELOW the graph in normal flow so it
+          never covers the lines, and always fully visible. */}
       {activeIndex !== null && showTooltip && (
         <View
-          pointerEvents="none"
           style={{
-            position: "absolute",
-            top: 6,
-            left: Math.max(
-              8,
-              Math.min(
-                width - 225,
-                tooltipLeft - 105
-              )
-            ),
+            marginTop: spacing.sm,
             backgroundColor: tooltipVariant === "dark" ? colors.foreground : colors.card,
             borderWidth: tooltipVariant === "dark" ? 0 : 1,
             borderColor: colors.border,
             borderRadius: radius.xl,
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,
-            minWidth: series.length > 1 ? 215 : 165,
             shadowColor: "transparent",
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0,
@@ -504,6 +539,8 @@ export const BarChart = React.memo(function BarChart({
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  // Tap detection — same tap-only rule as LineChart.
+  const tapStart = useRef<{ x: number; y: number; t: number } | null>(null);
 
   useEffect(() => {
     if (activeIndex !== null) {
@@ -536,15 +573,31 @@ export const BarChart = React.memo(function BarChart({
   const slot = n > 0 ? plotW / n : 0;
   const barWidth = Math.max(4, Math.min(slot * 0.6, 26));
   const labelStride = Math.max(1, Math.ceil(n / 5));
-  const activeBarX = activeIndex !== null ? PAD_LEFT + slot * activeIndex + slot / 2 : 0;
 
   const handleBarTouch = (locationX: number) => {
     if (n === 0) return;
     const relative = locationX - PAD_LEFT;
     const idx = slot > 0 ? Math.floor(relative / slot) : 0;
     const clamped = Math.max(0, Math.min(n - 1, idx));
+    // Tapping the already-open bar closes the tooltip (toggle).
+    if (clamped === activeIndex) {
+      setActiveIndex(null);
+      onSelectPoint?.(null);
+      return;
+    }
     setActiveIndex(clamped);
     onSelectPoint?.(clamped);
+  };
+
+  /** Release handler — only a real tap (fast, almost no movement) counts. */
+  const handleBarRelease = (locationX: number, locationY: number) => {
+    const start = tapStart.current;
+    tapStart.current = null;
+    if (!start) return;
+    const moved = Math.hypot(locationX - start.x, locationY - start.y);
+    if (moved < 14 && Date.now() - start.t < 600) {
+      handleBarTouch(locationX);
+    }
   };
 
   return (
@@ -553,10 +606,20 @@ export const BarChart = React.memo(function BarChart({
         <View
           onStartShouldSetResponder={() => true}
           onResponderTerminationRequest={() => true}
-          onResponderGrant={(e) => handleBarTouch(e.nativeEvent.locationX)}
-          onResponderMove={(e) => handleBarTouch(e.nativeEvent.locationX)}
-          onResponderRelease={() => {}}
-          onResponderTerminate={() => {}}
+          onResponderGrant={(e) =>
+            (tapStart.current = {
+              x: e.nativeEvent.locationX,
+              y: e.nativeEvent.locationY,
+              t: Date.now(),
+            })
+          }
+          onResponderMove={() => {}}
+          onResponderRelease={(e) =>
+            handleBarRelease(e.nativeEvent.locationX, e.nativeEvent.locationY)
+          }
+          onResponderTerminate={() => {
+            tapStart.current = null;
+          }}
         >
           <Svg width={width} height={height}>
             {ticks.map((t, i) => {
@@ -629,18 +692,14 @@ export const BarChart = React.memo(function BarChart({
 
       {activeIndex !== null && series[0]?.values[activeIndex] != null && (
         <View
-          pointerEvents="none"
           style={{
-            position: "absolute",
-            top: 6,
-            left: Math.max(8, Math.min(width - 185, activeBarX - 80)),
+            marginTop: spacing.sm,
             backgroundColor: colors.card,
             borderWidth: 1,
             borderColor: colors.border,
             borderRadius: radius.xl,
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,
-            minWidth: 175,
             shadowColor: "transparent",
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0,

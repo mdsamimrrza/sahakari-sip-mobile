@@ -18,8 +18,11 @@ export function AnimatedSplash({ onDone }: { onDone: () => void }) {
   const [hidden, setHidden] = useState(false);
 
   const overlayOpacity = useRef(new Animated.Value(1)).current;
-  const logoScale = useRef(new Animated.Value(0.55)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
+  // Opens at ~the native splash icon size (~200dp) on the same #EDEAE0
+  // background, then settles down to the 84dp mark — so the handoff from
+  // the OS / Expo static splash looks like one continuous splash.
+  const logoScale = useRef(new Animated.Value(2.4)).current;
+  const logoOpacity = useRef(new Animated.Value(1)).current;
   const wordOpacity = useRef(new Animated.Value(0)).current;
   const wordY = useRef(new Animated.Value(10)).current;
   const tagOpacity = useRef(new Animated.Value(0)).current;
@@ -27,20 +30,13 @@ export function AnimatedSplash({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     const sequence = Animated.sequence([
-      // Logo springs in
-      Animated.parallel([
-        Animated.spring(logoScale, {
-          toValue: 1,
-          friction: 6,
-          tension: 90,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 260,
-          useNativeDriver: true,
-        }),
-      ]),
+      // Logo settles from the static-splash size down to the mark size
+      Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 7,
+        tension: 70,
+        useNativeDriver: true,
+      }),
       // Wordmark fades up
       Animated.parallel([
         Animated.timing(wordOpacity, {
@@ -64,7 +60,7 @@ export function AnimatedSplash({ onDone }: { onDone: () => void }) {
         }),
         Animated.timing(barProgress, {
           toValue: 1,
-          duration: 850,
+          duration: 600,
           easing: Easing.out(Easing.quad),
           useNativeDriver: false,
         }),
@@ -76,8 +72,8 @@ export function AnimatedSplash({ onDone }: { onDone: () => void }) {
       // Hold a beat, then fade the whole overlay away
       Animated.timing(overlayOpacity, {
         toValue: 0,
-        duration: 320,
-        delay: 200,
+        duration: 300,
+        delay: 100,
         useNativeDriver: true,
       }).start(({ finished: fadeFinished }) => {
         if (fadeFinished) {
@@ -104,7 +100,9 @@ export function AnimatedSplash({ onDone }: { onDone: () => void }) {
         bottom: 0,
         zIndex: 100,
         elevation: 100,
-        backgroundColor: colors.background,
+        // Hardcoded to match the native splash background (#EDEAE0 in
+        // app.json) so the static → animated handoff is invisible.
+        backgroundColor: "#EDEAE0",
         alignItems: "center",
         justifyContent: "center",
         opacity: overlayOpacity,

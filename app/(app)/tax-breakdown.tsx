@@ -38,6 +38,7 @@ import {
 
 import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { useDashboard } from "@/hooks/useData";
+import { usePrivacy } from "@/lib/privacy/PrivacyContext";
 import {
   formatCurrencyWhole,
   formatUnits,
@@ -52,6 +53,7 @@ import {
   EmptyState,
 } from "@/components/ui/primitives";
 import { Screen } from "@/components/ui/layout";
+import { PrivacyEyeButton } from "@/components/ui/PrivacyEyeButton";
 import { SettingsDetailHeader } from "@/components/settings/menu";
 import { Modal } from "@/components/ui/overlays";
 import { DropdownMenu, type DropdownAnchor } from "@/components/ui/overlays";
@@ -236,6 +238,7 @@ function LedgerRow({
 
 export default function TaxBreakdownScreen() {
   const { colors, isDark } = useTheme();
+  const { formatPrivate } = usePrivacy();
   const params = useLocalSearchParams<{ fund?: string }>();
   const router = useRouter();
 
@@ -301,22 +304,25 @@ export default function TaxBreakdownScreen() {
           title="Tax & Settlement"
           subtitle="Fees, tax, and what you take home"
           right={
-            <Pressable
-              onPress={() => setGlossaryOpen(true)}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Glossary of terms"
-              style={{
-                height: 34,
-                width: 34,
-                borderRadius: 17,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: `${colors.info}1F`,
-              }}
-            >
-              <Info size={17} color={colors.info} />
-            </Pressable>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <PrivacyEyeButton />
+              <Pressable
+                onPress={() => setGlossaryOpen(true)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Glossary of terms"
+                style={{
+                  height: 34,
+                  width: 34,
+                  borderRadius: 17,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: `${colors.info}1F`,
+                }}
+              >
+                <Info size={17} color={colors.info} />
+              </Pressable>
+            </View>
           }
         />
       }
@@ -399,7 +405,7 @@ export default function TaxBreakdownScreen() {
                   }}
                   numberOfLines={1}
                 >
-                  {formatCurrencyWhole(netInHandSettlement)}
+                  {formatPrivate(formatCurrencyWhole(netInHandSettlement))}
                 </Text>
                 <View
                   style={{
@@ -418,7 +424,7 @@ export default function TaxBreakdownScreen() {
                       color: "#FFFFFF",
                     }}
                   >
-                    After tax · +{formatCurrencyWhole(unallottedCash)} spare cash in
+                    After tax · +{formatPrivate(formatCurrencyWhole(unallottedCash))} spare cash in
                   </Text>
                 </View>
               </View>
@@ -494,7 +500,7 @@ export default function TaxBreakdownScreen() {
                   style={{ fontSize: fontSize.lg, fontWeight: "900", fontVariant: ["tabular-nums"] }}
                   numberOfLines={1}
                 >
-                  {formatCurrencyWhole(totalInvested)}
+                  {formatPrivate(formatCurrencyWhole(totalInvested))}
                 </Text>
               </View>
               <View
@@ -526,7 +532,7 @@ export default function TaxBreakdownScreen() {
                   style={{ fontSize: fontSize.lg, fontWeight: "900", fontVariant: ["tabular-nums"] }}
                   numberOfLines={1}
                 >
-                  {formatCurrencyWhole(totalEstimatedCgt)}
+                  {formatPrivate(formatCurrencyWhole(totalEstimatedCgt))}
                 </Text>
               </View>
             </View>
@@ -591,19 +597,19 @@ export default function TaxBreakdownScreen() {
                   <LedgerRow
                     label="Total money you added"
                     sub="Every deposit you have made so far"
-                    value={formatCurrencyWhole(totalInvested)}
+                    value={formatPrivate(formatCurrencyWhole(totalInvested))}
                     bordered={false}
                   />
                   <LedgerRow
                     label={`Entry fee (NPR 5 × ${entriesCount})`}
                     sub="NPR 5 depository charge per deposit"
-                    value={`-${formatCurrencyWhole(totalDpFeesPaid)}`}
+                    value={`-${formatPrivate(formatCurrencyWhole(totalDpFeesPaid))}`}
                     color={colors.warning}
                   />
                   <LedgerRow
                     label="Money that bought units"
                     sub="Deposits minus the entry fees"
-                    value={formatCurrencyWhole(netCashForUnits)}
+                    value={formatPrivate(formatCurrencyWhole(netCashForUnits))}
                     color={colors.success}
                     fill={`${colors.success}14`}
                     emphasis
@@ -634,24 +640,24 @@ export default function TaxBreakdownScreen() {
                   <LedgerRow
                     label="Average buying price"
                     sub="Total spent divided by units owned"
-                    value={avgPurchaseNav !== null ? `NPR ${avgPurchaseNav.toFixed(2)}` : "-"}
+                    value={avgPurchaseNav !== null ? formatPrivate(`NPR ${avgPurchaseNav.toFixed(2)}`) : "-"}
                   />
                   <LedgerRow
                     label={`Yearly fund fee, in price (${activeFund?.fee_rate_pct || 1.5}%)`}
                     sub="Already included in the published price"
-                    value={`About ${formatCurrencyWhole(latestFeeDrag)} *`}
+                    value={`About ${formatPrivate(formatCurrencyWhole(latestFeeDrag))} *`}
                     color={colors.purple}
                     fill={`${colors.purple}12`}
                   />
                   <LedgerRow
                     label="Money turned into units"
                     sub="What is actually working in the fund"
-                    value={formatCurrencyWhole(effectiveDeployedCapital)}
+                    value={formatPrivate(formatCurrencyWhole(effectiveDeployedCapital))}
                   />
                   <LedgerRow
                     label="(+) Spare cash back to you"
                     sub="Leftover that could not buy a whole unit"
-                    value={`+${formatCurrencyWhole(unallottedCash)}`}
+                    value={`+${formatPrivate(formatCurrencyWhole(unallottedCash))}`}
                     color={colors.info}
                     fill={`${colors.info}12`}
                   />
@@ -693,18 +699,18 @@ export default function TaxBreakdownScreen() {
                   <LedgerRow
                     label="Long-term tax 7.5% (over 1 year)"
                     sub="Units held for more than a year"
-                    value={formatCurrencyWhole(estimatedCgtLongTerm)}
+                    value={formatPrivate(formatCurrencyWhole(estimatedCgtLongTerm))}
                     bordered={false}
                   />
                   <LedgerRow
                     label="Short-term tax 10% (under 1 year)"
                     sub="Units sold within a year"
-                    value={formatCurrencyWhole(estimatedCgtShortTerm)}
+                    value={formatPrivate(formatCurrencyWhole(estimatedCgtShortTerm))}
                   />
                   <LedgerRow
                     label="Total tax to pay"
                     sub="Owed when you sell, paid to IRD Nepal"
-                    value={formatCurrencyWhole(totalEstimatedCgt)}
+                    value={formatPrivate(formatCurrencyWhole(totalEstimatedCgt))}
                     color={colors.rose}
                     fill={`${colors.rose}12`}
                     emphasis
@@ -729,25 +735,25 @@ export default function TaxBreakdownScreen() {
                   <LedgerRow
                     label="1. Value of your units"
                     sub="Units times the latest NAV"
-                    value={formatCurrencyWhole(grossPortfolioValue)}
+                    value={formatPrivate(formatCurrencyWhole(grossPortfolioValue))}
                     bordered={false}
                   />
                   <LedgerRow
                     label="2. (+) Spare cash"
                     sub="Your rollover wallet, fully refundable"
-                    value={`+${formatCurrencyWhole(unallottedCash)}`}
+                    value={`+${formatPrivate(formatCurrencyWhole(unallottedCash))}`}
                     color={colors.info}
                   />
                   <LedgerRow
                     label="3. (-) Total tax"
                     sub="From section 03 above"
-                    value={`-${formatCurrencyWhole(totalEstimatedCgt)}`}
+                    value={`-${formatPrivate(formatCurrencyWhole(totalEstimatedCgt))}`}
                     color={colors.rose}
                   />
                   <LedgerRow
                     label="CASH YOU RECEIVE"
                     sub="What actually reaches your bank"
-                    value={formatCurrencyWhole(netInHandSettlement)}
+                    value={formatPrivate(formatCurrencyWhole(netInHandSettlement))}
                     color={colors.success}
                     fill={`${colors.success}1F`}
                     emphasis

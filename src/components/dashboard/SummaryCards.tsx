@@ -70,7 +70,7 @@ export function SummaryCards({
   const [fundMenuOpen, setFundMenuOpen] = useState(false);
 
   // Eye button size scales slightly with screen width
-  const eyeBtnSize = screenWidth < 360 ? 28 : 32;
+  const eyeBtnSize = screenWidth < 360 ? 32 : 38;
 
   if (loading) {
     return (
@@ -542,7 +542,7 @@ export function SummaryCards({
                 </Text>
                 <Text variant="label" color="#FFFFFF" tabular>
                   {summary.gainLoss !== null
-                    ? formatCurrencyWhole(summary.gainLoss, true)
+                    ? formatPrivate(formatCurrencyWhole(summary.gainLoss, true))
                     : "NPR 0"}
                 </Text>
               </View>
@@ -557,7 +557,7 @@ export function SummaryCards({
               }}
             >
               <Text variant="caption" color="rgba(255,255,255,0.72)">
-                Invested: {formatCurrencyWhole(summary.totalInvested)}
+                Invested: {formatPrivate(formatCurrencyWhole(summary.totalInvested))}
               </Text>
               <Text variant="caption" color="rgba(255,255,255,0.72)">
                 Return:{" "}
@@ -577,15 +577,15 @@ export function SummaryCards({
                 // never a bare "—" when we know the last updated NAV.
                 value:
                   activeFund?.latest_nav
-                    ? `NPR ${Number(activeFund.latest_nav).toFixed(2)}`
+                    ? formatPrivate(`NPR ${Number(activeFund.latest_nav).toFixed(2)}`)
                     : summary.latestNav
-                      ? `NPR ${Number(summary.latestNav).toFixed(2)}`
+                      ? formatPrivate(`NPR ${Number(summary.latestNav).toFixed(2)}`)
                       : "—",
               },
               { label: "Total Units", value: formatUnits(summary.totalUnits) },
               {
                 label: "Avg Unit Cost",
-                value: avgUnitCost > 0 ? `NPR ${avgUnitCost.toFixed(2)}` : "—",
+                value: avgUnitCost > 0 ? formatPrivate(`NPR ${avgUnitCost.toFixed(2)}`) : "—",
               },
               { label: "SIP Streak", value: formatStreak(summary.sipStreak) },
             ].map((m) => (
@@ -620,28 +620,28 @@ export function SummaryCards({
             }}
           >
             <Text variant="label">Capital Reconciliation</Text>
-            <ReconRow label="Total Cash Deposited" value={formatCurrencyWhole(summary.totalInvested)} />
+            <ReconRow label="Total Cash Deposited" value={formatPrivate(formatCurrencyWhole(summary.totalInvested))} />
             <ReconRow
               label="(−) Rollover Wallet Cash"
-              value={`-${formatCurrencyWhole(summary.unallottedCash)}`}
+              value={`-${formatPrivate(formatCurrencyWhole(summary.unallottedCash))}`}
               color={colors.primary}
             />
             <ReconRow
               label="Effective Deployed Capital"
-              value={formatCurrencyWhole(effectiveDeployed)}
+              value={formatPrivate(formatCurrencyWhole(effectiveDeployed))}
               color={colors.success}
               emphasis
             />
             <ReconRow
               label="Current Units Value (@ NAV)"
-              value={formatCurrencyWhole(summary.currentValue ?? 0)}
+              value={formatPrivate(formatCurrencyWhole(summary.currentValue ?? 0))}
             />
             <ReconRow
               label="Net Investment Return"
               value={`${
-                summary.gainLoss !== null
+                formatPrivate(summary.gainLoss !== null
                   ? formatCurrencyWhole(summary.gainLoss, true)
-                  : "NPR 0"
+                  : "NPR 0")
               } (${formatPercentage(summary.gainLossPct ?? 0)})`}
               color={gainColor}
               emphasis
@@ -660,11 +660,11 @@ export function SummaryCards({
             <Text variant="label">Capital Gains Tax (CGT)</Text>
             <ReconRow
               label="Long-Term (> 1 yr @ 7.5%)"
-              value={formatCurrencyWhole(summary.estimatedCgtLongTerm ?? 0)}
+              value={formatPrivate(formatCurrencyWhole(summary.estimatedCgtLongTerm ?? 0))}
             />
             <ReconRow
               label="Short-Term (< 1 yr @ 10.0%)"
-              value={formatCurrencyWhole(summary.estimatedCgtShortTerm ?? 0)}
+              value={formatPrivate(formatCurrencyWhole(summary.estimatedCgtShortTerm ?? 0))}
             />
           </View>
 

@@ -36,7 +36,7 @@ import { formatFundShortName } from "@/lib/utils";
 
 export default function DashboardScreen() {
   const { colors } = useTheme();
-  const { hasUnmergedLocalData } = useAuth();
+  const { user, hasUnmergedLocalData } = useAuth();
   const [fundId, setFundId] = useState<string>("all");
   const [entryOpen, setEntryOpen] = useState(false);
   const [navEditOpen, setNavEditOpen] = useState(false);
@@ -66,12 +66,24 @@ export default function DashboardScreen() {
         ? funds.reduce((s, f) => s + Number(f.fee_rate_pct || 0), 0) / funds.length
         : 0;
 
+  // Personal greeting — full name when short, first name when long.
+  const email = user?.email ?? "";
+  const displayName =
+    user?.name ||
+    (email.includes("@") ? email.split("@")[0] : email) ||
+    "Investor";
+  const greetName =
+    displayName.length > 14 ? displayName.split(" ")[0] : displayName;
+  const hour = new Date().getHours();
+  const daypart =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
   return (
     <>
       <Screen refreshing={loading} onRefresh={reload} header={<AppHeader />}>
         <PageHeader
-          title="SIP Dashboard"
-          subtitle="Track your mutual fund performance, returns, and fee impact."
+          title={`Hi ${greetName} 🇳🇵`}
+          subtitle={`${daypart} — here's your portfolio at a glance.`}
           right={
             <Pressable
               onPress={() => setEntryOpen(true)}
