@@ -209,6 +209,20 @@ function avatarFromMetadata(metadata: unknown): string | undefined {
  *  sheet, notification shade) does not re-lock; anything longer does. */
 const BACKGROUND_LOCK_GRACE_MS = 30_000;
 
+// Google handoff waiters. On Android the sahakarisip:// redirect can be
+// delivered by the Custom Tab's openAuthSessionAsync result OR by
+// expo-router launching /auth/callback with the token — whichever wins
+// resolves these waiters, and completeGoogleHandoff dedupes the exchange
+// (the token is single-use server-side too).
+let googleHandoffResolvers: Array<(token: string | null) => void> = [];
+
+/** Called by the /auth/callback screen or the browser-session result. */
+export function resolveGoogleHandoff(token: string | null) {
+  const resolvers = googleHandoffResolvers;
+  googleHandoffResolvers = [];
+  for (const resolve of resolvers) resolve(token);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthContextValue["status"]>("loading");
   const [user, setUser] = useState<AppUser | null>(null);
@@ -813,6 +827,64 @@ const next: AppUser = {
 
   // ---------- Google sign-in ----------
 
+  /** Turn a captured handoff token into a live session (single-use). */
+  const completeGoogleHandoff = useCallback(
+    async (token: string): Promise<AuthResult> => {
+      try {
+        const session = await googleExchange(token);
+        await saveMobileSession(session);
+        const nextUser: AppUser = {
+          id: session.user.id,
+          email: session.user.email ?? "",
+          name: session.user.name ?? undefined,
+          avatarUrl: session.user.image ?? undefined,
+          mode: "cloud",
+        };
+        await persistSession(nextUser);
+        void refreshDbProfile();
+        void maybeOfferBiometric(nextUser);
+        return { success: true };
+      } catch (e) {
+        return {
+          success: false,
+          error:
+            e instanceof MobileApiError
+              ? e.message
+              : "Google sign-in failed. Please try again.",
+        };
+      }
+    },
+    [persistSession, refreshDbProfile, maybeOfferBiometric]
+  );
+  const googleHandoffRef = useRef(completeGoogleHandoff);
+  useEffect(() => {
+    googleHandoffRef.current = completeGoogleHandoff;
+  }, [completeGoogleHandoff]);
+
+  // Path B capture: expo-router delivering /auth/callback?token=... while
+  // the app is running. The screen itself resolves in-flight sign-ins (it
+  // has access to the same resolver pool via resolveGoogleHandoff); this
+  // listener covers the cold-start case where the browser launched the
+  // app fresh with the token.
+  useEffect(() => {
+    const exchangeFromUrl = (url: string | null) => {
+      if (!url) return;
+      const match = url.match(/[?&]token=([0-9a-f]{32})/i);
+      if (!match) return;
+      // Hand off to the waiting sign-in if there is one; the callback
+      // screen resolves that path with the resolver. Cold start (no
+      // waiter): run the exchange directly here.
+      if (googleHandoffResolvers.length > 0) return;
+      void googleHandoffRef.current(match[1]);
+    };
+    const sub = Linking.addEventListener("url", (event) =>
+      exchangeFromUrl(event.url)
+    );
+    // Cold start: the launch URL may carry the token.
+    Linking.getInitialURL().then(exchangeFromUrl).catch(() => {});
+    return () => sub.remove();
+  }, []);
+
   const signInWithGoogle = useCallback(
     async (mode: DataMode): Promise<AuthResult> => {
       if (!cloudAvailable) {
@@ -834,38 +906,38 @@ const next: AppUser = {
         // web's relay page bounces back to our scheme URL with the token.
         const { url } = await googleStart();
         const redirectTo = Linking.createURL("/auth/callback");
-        const result = await WebBrowser.openAuthSessionAsync(url, redirectTo);
-        if (result.type !== "success") {
+
+        // Path A: the Custom Tab's openAuthSessionAsync result.
+        // Path B: expo-router / LaunchEvents delivering /auth/callback?token=…
+        // Whichever the OS picked resolves first; on Android the tab may
+        // close as "cancel" right as the scheme launches — give Path B a
+        // grace period before declaring a real cancellation.
+        const tokenFromSession = WebBrowser.openAuthSessionAsync(
+          url,
+          redirectTo
+        ).then(async (result) => {
+          const redirectBase = redirectTo.split("?")[0];
+          const candidate =
+            result.type === "success" && "url" in result && result.url?.startsWith(redirectBase)
+              ? result.url
+              : undefined;
+          const t = candidate?.match(/[?&]token=([0-9a-f]{32})/i)?.[1] ?? null;
+          if (!t) await new Promise((r) => setTimeout(r, 2500));
+          return t;
+        });
+        const tokenFromResolver = new Promise<string | null>((resolve) => {
+          googleHandoffResolvers.push(resolve);
+        });
+        const token = await Promise.race([tokenFromSession, tokenFromResolver]);
+        // Best-effort cleanup of the other path.
+        WebBrowser.dismissBrowser();
+        if (!token) {
           return {
             success: false,
             error: "Google sign-in was cancelled or failed. Please try again.",
           };
         }
-        // Exchange the handoff token captured from the redirect for a
-        // session — only when it's OUR callback. The token equals the
-        // nonce we minted, but we take it from the URL so a stale or
-        // mismatched redirect can never feed the exchange.
-        const redirectBase = redirectTo.split("?")[0];
-        const token =
-          "url" in result && result.url?.startsWith(redirectBase)
-            ? result.url.match(/[?&]token=([0-9a-f]{32})/i)?.[1]
-            : undefined;
-        if (!token) {
-          return {
-            success: false,
-            error: "Google sign-in failed. Please try again.",
-          };
-        }
-        const session = await googleExchange(token);
-        await saveMobileSession(session);
-        void refreshDbProfile();
-        void maybeOfferBiometric({
-          id: session.user.id,
-          email: session.user.email,
-          name: session.user.name,
-          mode: "cloud",
-        } as AppUser);
-        return { success: true };
+        return await googleHandoffRef.current(token);
       } catch (e) {
         return {
           success: false,
@@ -876,7 +948,7 @@ const next: AppUser = {
         };
       }
     },
-    [cloudAvailable, persistSession, refreshDbProfile, maybeOfferBiometric]
+    [cloudAvailable]
   );
 
   // ---------- Sign out ----------
