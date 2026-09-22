@@ -2,15 +2,16 @@
 // SahakariSIP — Biometric unlock (banking-style)
 // ============================================================
 // The fingerprint never reaches a server. When the app is locked, the
-// reusable session (Supabase tokens / local profile id) is stored in the
-// phone's encrypted Keystore-backed storage (SecureStore); the OS
-// biometric prompt is only the lock on that box. Unlocking reads the
-// entry back and silently restores the session.
+// reusable session (NextAuth-minted Supabase RLS JWT / local profile id)
+// is stored in the phone's encrypted Keystore-backed storage
+// (SecureStore); the OS biometric prompt is only the lock on that box.
+// Unlocking reads the entry back and silently restores the session.
 // ============================================================
 
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { MobileSession } from "./mobileSession";
 
 const BIOMETRIC_KEY = "sahakarisip.biometric";
 const ENABLED_FLAG = "sahakarisip.biometric.enabled";
@@ -21,11 +22,8 @@ export interface BiometricEntry {
   email: string;
   name?: string;
   savedAt: string;
-  /** Cloud accounts: the Supabase session to restore on unlock. */
-  session?: {
-    access_token: string;
-    refresh_token: string;
-  };
+  /** Cloud accounts: the mobile session to restore on unlock. */
+  mobileSession?: MobileSession;
   /** Device-local profiles: the on-device profile id to restore. */
   localProfileId?: string;
 }

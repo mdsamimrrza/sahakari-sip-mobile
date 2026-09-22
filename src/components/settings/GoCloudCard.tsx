@@ -185,6 +185,7 @@ export function GoCloudCard() {
             placeholder={createMode ? "At least 8 characters" : "Enter your password"}
             secureTextEntry
             autoCapitalize="none"
+            textContentType={createMode ? "newPassword" : "password"}
           />
           {createMode ? (
             <Input
@@ -194,6 +195,7 @@ export function GoCloudCard() {
               placeholder="Repeat your password"
               secureTextEntry
               autoCapitalize="none"
+              textContentType="newPassword"
             />
           ) : null}
 

@@ -3,9 +3,15 @@ name: Build & attach release APK
 on:
   push:
     tags:
-      - 'v*'          # fires on every tag like v1.0.0, v2.3.1, etc.
+      - 'v*'             # fires on every tag like v1.0.1, v1.0.2, ...
   release:
-    types: [published] # also fires when a release is published via the GitHub UI
+    types: [published]   # also fires when a release is published via the GitHub UI
+  workflow_dispatch:     # manual re-run; set the tag input
+    inputs:
+      tag:
+        description: 'Tag to build and attach (e.g. v1.0.1). Leave empty when running on a tag ref.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -14,20 +20,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install JS dependencies
         run: npm ci
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          TAG="${GITHUB_REF_NAME:-}"
+          if [ -z "$TAG" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          if [ -z "$TAG" ]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Restore signing keystore (or auto-generate one if secrets are absent)
         env:
@@ -59,9 +77,12 @@ jobs:
         env:
           SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          WEB_URL:           ${{ secrets.WEB_URL }}
         run: |
-          printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\nEXPO_PUBLIC_DEFAULT_DATA_MODE=local\n' \
-            "${SUPABASE_URL:-}" "${SUPABASE_ANON_KEY:-}" > .env
+          printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\nEXPO_PUBLIC_DEFAULT_DATA_MODE=cloud\nEXPO_PUBLIC_WEB_URL=%s\n' \
+            "${SUPABASE_URL:-https://entbhjpnhdjfhcctcvmt.supabase.co}" \
+            "${SUPABASE_ANON_KEY:-sb_publishable_Qox-u2IFEpaoUHus51Ofhw_4XyVPI3D}" \
+            "${WEB_URL:-https://sahakari-sip.vercel.app}" > .env
 
       - name: Build release APK
         run: |
@@ -69,33 +90,38 @@ jobs:
           cd android
           ./gradlew assembleRelease --no-daemon
 
-      - name: Resolve tag name
-        id: tag
-        run: |
-          TAG="${GITHUB_REF_NAME:-}"
-          if [ -z "$TAG" ]; then
-            TAG="${{ github.event.release.tag_name }}"
-          fi
-          echo "name=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Create or update GitHub release and attach APK
+      - name: Attach APK to release (create the release if it doesn't exist yet)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.tag.outputs.name }}"
           SRC="android/app/build/outputs/apk/release/app-release.apk"
-          cp "$SRC" "SahakariSIP-${TAG}.apk"
           cp "$SRC" "SahakariSIP.apk"
 
-          # Delete existing release object (e.g. draft releases) without deleting git tag
-          gh release delete "$TAG" --yes --repo "$GITHUB_REPOSITORY" || true
+          cat > release_notes.md <<'NOTES'
+          React Native / Expo build of **SahakariSIP** — Nepali mutual-fund & open-ended SIP tracker following SEBON accounting rules.
 
-          # Create published GitHub Release and attach APKs
-          gh release create "$TAG" \
-            "SahakariSIP-${TAG}.apk" \
-            "SahakariSIP.apk" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "SahakariSIP Mobile ${TAG}" \
-            --notes "Automated release for ${TAG}. Download the APK below and sideload it on any Android device." \
-            --latest
+          🌐 **Web app:** https://sahakari-sip.vercel.app
 
+          ## Download
+
+          [**SahakariSIP.apk**](https://github.com/mdsamimrrza/sahakari-sip-mobile/releases/latest/download/SahakariSIP.apk) — permanent link, always the latest build.
+
+          ## What changed
+          NOTES
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            # Release already exists (e.g. published from the UI): keep its
+            # description, just replace the APK.
+            gh release upload "$TAG" "SahakariSIP.apk" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            # Fresh version tag: create the release. --generate-notes appends
+            # the auto changelog (commits + contributors) under "What changed".
+            gh release create "$TAG" "SahakariSIP.apk" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "SahakariSIP Mobile" \
+              --latest \
+              --verify-tag \
+              --notes-file release_notes.md \
+              --generate-notes
+          fi

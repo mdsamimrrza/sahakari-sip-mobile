@@ -188,6 +188,7 @@ export default function LoginScreen() {
             placeholder="Enter your password"
             secureTextEntry={!showPassword}
             autoCapitalize="none"
+            textContentType="password"
             rightSlot={
               <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={10}>
                 {showPassword ? (

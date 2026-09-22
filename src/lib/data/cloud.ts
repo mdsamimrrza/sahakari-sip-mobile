@@ -26,6 +26,7 @@ import { DP_CHARGE } from "../constants";
 import { csvRowSchema, entrySchema } from "../schemas/entry";
 import { fundConfigSchema, updateLatestNavSchema } from "../schemas/fund-config";
 import { getSupabase } from "../supabase";
+import { loadMobileSession } from "../auth/mobileSession";
 import { computeDashboardData, computeFundRolloverCash } from "./analytics";
 import { cacheGet, cacheSet, cacheInvalidate } from "./cache";
 import {
@@ -50,68 +51,33 @@ const notificationPreferencesSchema = z.object({
 export class CloudStore implements DataStore {
   readonly mode = "cloud" as const;
 
+  /**
+   * Identity for queries: the next_auth.users id from the mobile session.
+   * Since the NextAuth migration this is the same id the web app writes
+   * its rows with (one account, one id space) — no email mapping needed.
+   * Supabase-native auth is gone; the id lives in mobileSession storage
+   * and the RLS JWT rides as the Bearer token (src/lib/supabase.ts).
+   */
   async getUserId(): Promise<string | null> {
-    const { data } = await getSupabase().auth.getUser();
-    return data.user?.id ?? null;
+    const session = await loadMobileSession();
+    return session?.user.id ?? null;
   }
 
   /**
-   * Public accessor for the effective data id (web NextAuth id mapped from
-   * the Supabase Auth uid, falling back to the auth id). Exposed for the
-   * one-time local→cloud merge (src/lib/data/merge.ts), which reads raw
-   * cloud rows for backup/dedup while writes go through the store methods.
+   * Kept for merge.ts compatibility: reads of legacy Supabase-auth ids
+   * (rows the migration may not have reached) still go through the
+   * id SET — the effective id equals the auth id now.
    */
   async getEffectiveUserId(): Promise<string | null> {
-    return this.dataUid();
+    return this.getUserId();
   }
 
   private get db() {
     return getSupabase();
   }
 
-  private async uid(): Promise<string | null> {
-    return this.getUserId();
-  }
-
-  /**
-   * Effective user id for data queries. The web app's NextAuth stores its
-   * users in next_auth.users and writes fund_config/entries/nav_history
-   * with user_id = next_auth.users.id, while this app signs in via Supabase
-   * Auth (auth.users) — a different id space. The `app_effective_user_id`
-   * RPC (see supabase-fix-user-mapping.sql) maps the signed-in Supabase
-   * Auth user to the web's NextAuth id BY EMAIL, so an existing user's
-   * portfolio shows up instead of a fresh onboarding. Falls back to the
-   * Supabase Auth id when the RPC is missing or the email has no web
-   * account. Cached per store instance.
-   */
-  private effectiveId: string | null = null;
-
   private async dataUid(): Promise<string | null> {
-    if (this.effectiveId) return this.effectiveId;
-
-    const authId = await this.getUserId();
-    if (!authId) return null;
-
-    try {
-      // Ensure a next_auth.users row exists for this account (idempotent) —
-      // fund_config.user_id has a FK to next_auth.users(id), so a mobile-only
-      // account could otherwise never create funds. See
-      // supabase-fix-user-mapping.sql.
-      await this.db.rpc("app_ensure_user_row");
-
-      // Resolve the effective id: the web's NextAuth id for this email
-      // (sees web-created data), falling back to the Supabase Auth id.
-      const { data } = await this.db.rpc("app_effective_user_id");
-      if (typeof data === "string" && data) {
-        this.effectiveId = data;
-        return this.effectiveId;
-      }
-    } catch {
-      // RPCs not deployed yet — fall back to the Supabase Auth id.
-    }
-
-    this.effectiveId = authId;
-    return this.effectiveId;
+    return this.getUserId();
   }
 
   // ------------------------------------------------------------

@@ -185,7 +185,7 @@ export default function ForgotPasswordScreen() {
     }
 
     setLoading(true);
-    const result = await completePasswordReset(newPassword, mode);
+    const result = await completePasswordReset(email, newPassword, mode);
     setLoading(false);
 
     if (!result.success) {
@@ -355,6 +355,7 @@ export default function ForgotPasswordScreen() {
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    textContentType="emailAddress"
                     autoFocus
                     error={error}
                   />
@@ -531,6 +532,7 @@ export default function ForgotPasswordScreen() {
                 placeholder="Min. 8 characters"
                 secureTextEntry={!showNew}
                 autoCapitalize="none"
+                textContentType="newPassword"
                 autoFocus
                 rightSlot={
                   <Pressable onPress={() => setShowNew((v) => !v)} hitSlop={10}>
@@ -553,6 +555,7 @@ export default function ForgotPasswordScreen() {
                 placeholder="Re-enter your password"
                 secureTextEntry={!showConfirm}
                 autoCapitalize="none"
+                textContentType="newPassword"
                 rightSlot={
                   <Pressable onPress={() => setShowConfirm((v) => !v)} hitSlop={10}>
                     <Text

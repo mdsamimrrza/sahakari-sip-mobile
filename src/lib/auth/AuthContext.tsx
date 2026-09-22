@@ -1,16 +1,19 @@
 // ============================================================
 // SahakariSIP — Auth Provider
 // ============================================================
-// The web app authenticates with NextAuth v5 (credentials + Google)
-// backed by bcrypt hashes stored server-side. A mobile bundle can't run
-// that server code, so the mobile app offers the two equivalent routes:
+// The web app (NextAuth v5: Google + bcrypt credentials, OTP emails)
+// owns ALL cloud authentication. The APK delegates to it through the
+// /api/mobile/* routes (src/lib/auth/mobileApi.ts): Google runs as a
+// browser handoff, passwords against the shared credential store, and
+// a finished sign-in yields a long-lived Supabase RLS JWT that rides
+// as the Bearer token on every data request (src/lib/supabase.ts).
+// Same account, same user id, same portfolio on phone and browser.
 //
-//   1. CLOUD  — Supabase Auth email + password. Same Supabase project and
-//               the same fund_config/entries/nav_history tables as the web
-//               app, with Row Level Security isolating each account.
-//   2. DEVICE — an on-device profile (salted SHA-256 hash, never leaves the
-//               phone). Everything works offline; the portfolio lives in
-//               local storage only.
+//   1. CLOUD  — via the web's NextAuth backend (requires the web URL
+//               configured: EXPO_PUBLIC_WEB_URL).
+//   2. DEVICE — an on-device profile (salted SHA-256 hash, never leaves
+//               the phone). Everything works offline; the portfolio
+//               lives in local storage only.
 //
 // Both routes expose an identical `DataStore`, so every screen behaves
 // the same way regardless of which one the user picked.
@@ -30,11 +33,32 @@ import { AppState } from "react-native";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
-import { getSupabase, isSupabaseConfigured, SUPABASE_AUTH_STORAGE_KEY } from "../supabase";
+import { getSupabase, isSupabaseConfigured } from "../supabase";
 import { createStore } from "../data";
 import { CloudStore } from "../data/cloud";
 import { cacheInvalidate } from "../data/cache";
 import { removeProfilePhoto } from "../profilePhoto";
+import {
+  clearMobileSession,
+  loadMobileSession,
+  saveMobileSession,
+  type MobileSession,
+  type MobileUser,
+} from "./mobileSession";
+import {
+  MobileApiError,
+  completeReset,
+  deleteAccount as apiDeleteAccount,
+  fetchProfile,
+  googleExchange,
+  googleStart,
+  isWebConfigured,
+  passwordLogin,
+  requestPasswordReset as apiRequestReset,
+  signup as apiSignup,
+  signupVerify,
+  verifyResetOtp,
+} from "./mobileApi";
 import {
   backupCloudToLocal,
   inspectMergeCandidate,
@@ -89,6 +113,8 @@ interface AuthContextValue {
     confirmPassword: string,
     mode: DataMode
   ) => Promise<AuthResult>;
+  /** Cloud signup step 2: confirm the emailed 6-digit code, then sign in. */
+  confirmSignup: (email: string, code: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<AuthResult>;
   /**
@@ -132,7 +158,7 @@ interface AuthContextValue {
     code: string,
     mode: DataMode
   ) => Promise<AuthResult>;
-  completePasswordReset: (newPassword: string, mode: DataMode) => Promise<AuthResult>;
+  completePasswordReset: (email: string, newPassword: string, mode: DataMode) => Promise<AuthResult>;
 }
 
 const SESSION_KEY = "sahakarisip.v1.session";
@@ -207,12 +233,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const backgroundedAtRef = useRef(0);
   const appStateRef = useRef(AppState.currentState);
   const mounted = useRef(true);
+  // Holds the reset token and email between verify OTP and set password steps.
+  const resetTokenRef = useRef<{ token: string | null; email: string | null }>({ token: null, email: null });
 
   useEffect(() => {
     userRef.current = user;
   }, [user]);
 
-  const cloudAvailable = isSupabaseConfigured;
+  const cloudAvailable = isSupabaseConfigured && isWebConfigured;
 
   // Detect device capability + whether biometric unlock is armed.
   useEffect(() => {
@@ -284,7 +312,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // "Go Cloud" / "Move phone data to cloud" (GoCloudCard), which calls
   // offerMerge() to raise the confirm dialog; the merge runs only when
   // the user confirms there.
-
+  //
   // Re-scan device storage whenever the session changes or Settings asks.
   useEffect(() => {
     if (!user || user.mode !== "cloud" || !cloudAvailable) {
@@ -390,18 +418,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!verified) return { success: false, error: "Not verified." };
       try {
         if (user.mode === "cloud" && cloudAvailable) {
-          const { data } = await getSupabase().auth.getSession();
-          const s = data.session;
-          if (!s) return { success: false, error: "No active session." };
+          const mobileSession = await loadMobileSession();
+          if (!mobileSession) {
+            return { success: false, error: "No mobile session to save." };
+          }
+          // Pull fresh profile from web (NextAuth) and store the mobile session.
+          const webProfile = await fetchProfile(mobileSession.accessToken);
           await saveBiometricEntry({
             mode: "cloud",
             email: user.email,
             name: user.name,
             savedAt: new Date().toISOString(),
-            session: {
-              access_token: s.access_token,
-              refresh_token: s.refresh_token,
-            },
+            mobileSession,
           });
         } else {
           await saveBiometricEntry({
@@ -419,7 +447,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: "Could not save securely on this device." };
       }
     },
-    [cloudAvailable, user]
+    [cloudAvailable]
   );
 
   const disableBiometric = useCallback(async () => {
@@ -428,28 +456,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setBiometricEnabled(false);
   }, []);
 
-  // ---------- Web profile (NextAuth `users.image`) ----------
+  // ---------- Web profile (next_auth.users name/image) ----------
   //
-  // Google logins on the WEB app store the photo in next_auth.users.image,
-  // which Supabase Auth metadata doesn't have. This pulls it via the
-  // app_get_profile() RPC (see supabase-profile-image.sql) and patches the
-  // session WITHOUT resetting the session clock. Missing RPC / offline /
-  // signed-out → silently keeps whatever avatar we already have.
+  // Google logins on the WEB app store the photo in next_auth.users.image.
+  // This pulls name/image from the web's /api/mobile/account endpoint
+  // (authorized by the stored RLS JWT) and patches the session WITHOUT
+  // resetting the session clock. Offline / expired token / no row →
+  // silently keeps whatever avatar we already have.
   const refreshDbProfile = useCallback(async () => {
     if (!cloudAvailable) return;
     try {
-      const { data, error } = await getSupabase().rpc("app_get_profile");
-      if (error) {
-        if (__DEV__) console.warn("[profile] app_get_profile RPC failed:", error.message);
-        return;
-      }
-      if (!data) {
-        if (__DEV__) console.warn("[profile] app_get_profile returned no rows — photo stays as-is.");
-        return;
-      }
-      const row = (Array.isArray(data) ? data[0] : data) as
-        | { name?: unknown; image?: unknown }
-        | undefined;
+      const mobileSession = await loadMobileSession();
+      if (!mobileSession) return;
+      const row = await fetchProfile(mobileSession.accessToken);
       if (!row) return;
       const raw = await AsyncStorage.getItem(SESSION_KEY);
       if (!raw) return;
@@ -467,12 +486,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (changed) {
         await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(saved));
         if (mounted.current) setUser(saved);
-      } else if (__DEV__) {
-        console.warn("[profile] app_get_profile returned nothing usable — photo stays as-is.");
       }
     } catch {
-      // RPC missing, RLS denial, or offline — avatar stays as-is.
-      if (__DEV__) console.warn("[profile] app_get_profile threw — photo stays as-is.");
+      // Offline or token rejected — avatar stays as-is.
+      if (__DEV__) console.warn("[profile] refreshDbProfile threw — photo stays as-is.");
     }
   }, [cloudAvailable]);
 
@@ -497,35 +514,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: true };
       }
       try {
-        if (entry.mode === "cloud" && entry.session) {
-          // Mint a fresh session from the stored refresh token. If it was
-          // revoked (password change, token expiry) this throws and we fall
-          // back to the login screen below — the honest path.
-          const { data, error } = await getSupabase().auth.refreshSession({
-            refresh_token: entry.session.refresh_token,
-          });
-          if (error || !data.session) {
-            throw new Error(error?.message ?? "Session expired");
+        if (entry.mode === "cloud" && entry.mobileSession) {
+          // Validate the stored session hasn't expired; if it has, fall back to login.
+          const now = Date.now();
+          if (entry.mobileSession.expiresAt <= now) {
+            await clearMobileSession();
+            throw new Error("Stored session expired");
           }
-          const supaUser = data.session.user;
-          // Defense in depth: the stored entry must never release a session
-          // for a different account than the one that armed the lock.
-          if (
-            supaUser.email &&
-            entry.email &&
-            supaUser.email.toLowerCase() !== entry.email.toLowerCase()
-          ) {
-            throw new Error("Locked session belongs to a different account.");
-          }
-          const next: AppUser = {
-            id: supaUser.id,
-            email: supaUser.email ?? entry.email,
-            name:
-              (supaUser.user_metadata?.name as string) || entry.name || undefined,
-            avatarUrl: avatarFromMetadata(supaUser.user_metadata),
-            mode: "cloud",
-          };
-          await persistSession(next);
+          // Restore the mobile session (bearer token) into Supabase client.
+          await saveMobileSession(entry.mobileSession);
           void refreshDbProfile();
         } else if (entry.mode === "local" && entry.localProfileId) {
           await persistSession({
@@ -560,16 +557,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // 1. Restore a cloud session if Supabase has one persisted
         if (cloudAvailable) {
-          const { data } = await getSupabase().auth.getSession();
-          const supaUser = data.session?.user;
-          if (supaUser?.email) {
-            const next: AppUser = {
-              id: supaUser.id,
-              email: supaUser.email,
-              name: (supaUser.user_metadata?.name as string) || undefined,
-              avatarUrl: avatarFromMetadata(supaUser.user_metadata),
-              mode: "cloud",
-            };
+          const mobileSession = await loadMobileSession();
+          if (mobileSession && mobileSession.expiresAt > Date.now()) {
+            await saveMobileSession(mobileSession); // ensure token in Supabase client
+const next: AppUser = {
+                id: mobileSession.user.id,
+                email: mobileSession.user.email ?? '',
+                name: mobileSession.user.name ?? undefined,
+                avatarUrl: mobileSession.user.image ?? undefined,
+                mode: "cloud",
+              };
             const startedAt = await AsyncStorage.getItem(SESSION_STARTED_KEY);
             await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(next));
             if (!startedAt) {
@@ -588,6 +585,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (
                 (await isBiometricEnabled()) &&
                 entry &&
+                entry.mode === "cloud" &&
+                entry.mobileSession &&
                 entry.email?.toLowerCase() === next.email.toLowerCase()
               ) {
                 setLockInfo({ email: next.email, name: next.name });
@@ -614,7 +613,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (
                 (await isBiometricEnabled()) &&
                 entry &&
-                entry.email?.toLowerCase() === saved.email.toLowerCase()
+                entry.mode === "local" &&
+                entry.localProfileId === saved.id
               ) {
                 setLockInfo({ email: saved.email, name: saved.name });
                 setStatus("locked");
@@ -662,30 +662,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!cloudAvailable) {
           return { success: false, error: "Cloud mode is not configured." };
         }
-        const { data, error } = await getSupabase().auth.signInWithPassword({
-          email: normalized,
-          password,
-        });
-        if (error) {
-          const msg = /confirm/i.test(error.message)
-            ? "Please confirm your email address before signing in."
-            : "Invalid email or password. Please try again.";
-          return { success: false, error: msg };
-        }
-        if (!data.user?.email) {
+        // Delegate to web's shared credential store (bcrypt + OTP rate limit)
+        try {
+          const session = await passwordLogin(normalized, password);
+          await saveMobileSession(session);
+          void refreshDbProfile();
+          void maybeOfferBiometric({
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.name,
+            mode: "cloud",
+          } as AppUser);
+          return { success: true };
+        } catch (err) {
+          if (err instanceof MobileApiError) {
+            if (err.status === 401) {
+              return {
+                success: false,
+                error:
+                  err.message.includes("confirm")
+                    ? "Please confirm your email address before signing in."
+                    : "Invalid email or password. Please try again.",
+              };
+            }
+            return { success: false, error: err.message };
+          }
           return { success: false, error: "Sign in failed. Please try again." };
         }
-        const nextUser: AppUser = {
-          id: data.user.id,
-          email: data.user.email,
-          name: (data.user.user_metadata?.name as string) || undefined,
-          avatarUrl: avatarFromMetadata(data.user.user_metadata),
-          mode: "cloud",
-        };
-        await persistSession(nextUser);
-        void refreshDbProfile();
-        void maybeOfferBiometric(nextUser);
-        return { success: true };
       }
 
       // ---- Device-local mode ----
@@ -733,29 +736,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!cloudAvailable) {
           return { success: false, error: "Cloud mode is not configured." };
         }
-        const { data, error } = await getSupabase().auth.signUp({
-          email: normalized,
-          password,
-        });
-        if (error) return { success: false, error: error.message };
-
-        // When email confirmation is enabled Supabase returns a user but no
-        // session — surface that instead of pretending we're signed in.
-        if (!data.session) {
+        try {
+          await apiSignup(normalized, password, confirmPassword);
+          // Signup succeeded but email confirmation required.
           return { success: true, needsEmailConfirmation: true };
+        } catch (err) {
+          if (err instanceof MobileApiError) {
+            return { success: false, error: err.message };
+          }
+          return { success: false, error: "Sign up failed. Please try again." };
         }
-        if (data.user?.email) {
-          const nextUser: AppUser = {
-            id: data.user.id,
-            email: data.user.email,
-            avatarUrl: avatarFromMetadata(data.user.user_metadata),
-            mode: "cloud",
-          };
-          await persistSession(nextUser);
-          void refreshDbProfile();
-          // No biometric offer on registration — only after a sign-in.
-        }
-        return { success: true };
       }
 
       // ---- Device-local mode ----
@@ -786,7 +776,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [cloudAvailable, persistSession, refreshDbProfile]
   );
 
-    // ---------- Google sign-in ----------
+  /**
+   * Cloud signup step 2: the emailed 6-digit code confirms the account
+   * (web OTP) and mints the mobile session. After this the user is signed
+   * in — mirrors the web's (auth)/signup + verify flow.
+   */
+  const confirmSignup = useCallback(
+    async (email: string, code: string): Promise<AuthResult> => {
+      if (!cloudAvailable) {
+        return { success: false, error: "Cloud mode is not configured." };
+      }
+      try {
+        const session = await signupVerify(email, code);
+        if (session) {
+          await saveMobileSession(session);
+          const nextUser: AppUser = {
+            id: session.user.id,
+            email: session.user.email ?? email.toLowerCase().trim(),
+            name: session.user.name ?? undefined,
+            avatarUrl: session.user.image ?? undefined,
+            mode: "cloud",
+          };
+          await persistSession(nextUser);
+          void refreshDbProfile();
+        }
+        return { success: true };
+      } catch (err) {
+        if (err instanceof MobileApiError) {
+          return { success: false, error: err.message };
+        }
+        return { success: false, error: "Verification failed. Please try again." };
+      }
+    },
+    [cloudAvailable, persistSession, refreshDbProfile]
+  );
+
+  // ---------- Google sign-in ----------
 
   const signInWithGoogle = useCallback(
     async (mode: DataMode): Promise<AuthResult> => {
@@ -804,69 +829,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        // PKCE browser flow: Supabase hands us the consent URL, the OS
-        // browser session opens it, and the redirect lands back in the app.
+        // Kickoff: ask the web where to start Google auth (nonce minted
+        // locally). The browser completes NextAuth's Google flow and the
+        // web's relay page bounces back to our scheme URL with the token.
+        const { url } = await googleStart();
         const redirectTo = Linking.createURL("/auth/callback");
-        const { data, error } = await getSupabase().auth.signInWithOAuth({
-          provider: "google",
-          options: { skipBrowserRedirect: true, redirectTo },
-        });
-        if (error) return { success: false, error: error.message };
-        if (!data?.url) {
-          return { success: false, error: "Could not start Google sign-in. Please try again." };
-        }
-
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        if (result.type !== "success" || !("url" in result) || !result.url) {
+        const result = await WebBrowser.openAuthSessionAsync(url, redirectTo);
+        if (result.type !== "success") {
           return {
             success: false,
             error: "Google sign-in was cancelled or failed. Please try again.",
           };
         }
-
-        // Exchange the PKCE code from the redirect for a session — but only
-        // from OUR OWN callback redirect. A foreign URL that happens to
-        // carry a code parameter must never feed the exchange, and a
-        // redirect without a code (provider error/decline) must fail rather
-        // than silently succeed with whatever ambient session exists.
+        // Exchange the handoff token captured from the redirect for a
+        // session — only when it's OUR callback. The token equals the
+        // nonce we minted, but we take it from the URL so a stale or
+        // mismatched redirect can never feed the exchange.
         const redirectBase = redirectTo.split("?")[0];
-        const fromOwnRedirect = result.url.startsWith(redirectBase);
-        const code = fromOwnRedirect
-          ? result.url.match(/[?&]code=([^&]+)/)?.[1]
-          : undefined;
-        if (!code) {
+        const token =
+          "url" in result && result.url?.startsWith(redirectBase)
+            ? result.url.match(/[?&]token=([0-9a-f]{32})/i)?.[1]
+            : undefined;
+        if (!token) {
           return {
             success: false,
             error: "Google sign-in failed. Please try again.",
           };
         }
-        {
-          const { error: exchangeError } =
-            await getSupabase().auth.exchangeCodeForSession(code);
-          if (exchangeError) {
-            return { success: false, error: exchangeError.message };
-          }
-        }
-
-        const { data: sess } = await getSupabase().auth.getSession();
-        const supaUser = sess.session?.user;
-        if (!supaUser?.email) {
-          return {
-            success: false,
-            error: "Google sign-in was cancelled or failed. Please try again.",
-          };
-        }
-
-        const nextUser: AppUser = {
-          id: supaUser.id,
-          email: supaUser.email,
-          name: (supaUser.user_metadata?.name as string) || undefined,
-          avatarUrl: avatarFromMetadata(supaUser.user_metadata),
-          mode: "cloud",
-        };
-        await persistSession(nextUser);
+        const session = await googleExchange(token);
+        await saveMobileSession(session);
         void refreshDbProfile();
-        void maybeOfferBiometric(nextUser);
+        void maybeOfferBiometric({
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.name,
+          mode: "cloud",
+        } as AppUser);
         return { success: true };
       } catch (e) {
         return {
@@ -898,21 +896,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           !!armed && armed.email === user.email && armed.mode === user.mode;
         if (isArmingAccount && !(await hasDeclinedBiometric(user.id))) {
           if (user.mode === "cloud" && cloudAvailable) {
-            const { data } = await getSupabase().auth.getSession();
-            const s = data.session;
-            if (s) {
+            // Save the current mobile session for biometric unlock.
+            const session = await loadMobileSession();
+            if (session) {
               await saveBiometricEntry({
                 mode: "cloud",
                 email: user.email,
                 name: user.name,
                 savedAt: new Date().toISOString(),
-                session: {
-                  access_token: s.access_token,
-                  refresh_token: s.refresh_token,
-                },
+                mobileSession: session,
               });
             }
-            await AsyncStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
           } else {
             await saveBiometricEntry({
               mode: "local",
@@ -922,6 +916,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               localProfileId: user.id,
             });
           }
+          await clearMobileSession();
           await AsyncStorage.removeItem(SESSION_KEY);
           await AsyncStorage.removeItem(SESSION_STARTED_KEY);
           setSessionStartedAt(null);
@@ -944,13 +939,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       if (cloudAvailable) {
-        await getSupabase().auth.signOut();
+        // The NextAuth JWT is stateless — nothing to revoke server-side
+        // beyond deleting it locally below.
       }
     } catch {
-      // ignore — clearing the local session below is what matters
+      // ignore
     }
     await clearBiometricEntry();
     setBiometricEnabled(false);
+    await clearMobileSession();
     await persistSession(null);
   }, [cloudAvailable, persistSession, user]);
 
@@ -971,16 +968,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearBiometricEntry();
     setBiometricEnabled(false);
 
-    // Terminal action: revoke the Supabase session server-side and purge its
-    // persisted credential, so a cold start cannot silently re-authenticate
-    // as the "deleted" account (matching what full signOut does).
+    // Terminal action: delete the identity row server-side (web's
+    // /api/mobile/account — removes next_auth.users + password/OTP rows)
+    // and purge the local session so a cold start cannot silently
+    // re-authenticate as the "deleted" account.
     if (user.mode === "cloud" && cloudAvailable) {
       try {
-        await getSupabase().auth.signOut();
+        const mobileSession = await loadMobileSession();
+        if (mobileSession) {
+          await apiDeleteAccount(mobileSession.accessToken);
+        }
       } catch {
-        // The local key removal below still prevents silent re-auth.
+        // The local session removal below still prevents silent re-auth;
+        // the user can retry from Settings while signed in.
       }
-      await AsyncStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
+      await clearMobileSession();
     }
 
     // Sweep derived copies the stores' purge lists don't cover: the merge
@@ -1005,11 +1007,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!cloudAvailable) {
           return { success: false, error: "Cloud mode is not configured." };
         }
-        const { error } = await getSupabase().auth.resetPasswordForEmail(
-          normalized
-        );
-        if (error) return { success: false, error: error.message };
-        return { success: true };
+        try {
+          await apiRequestReset(normalized);
+          return { success: true };
+        } catch (err) {
+          if (err instanceof MobileApiError) {
+            return { success: false, error: err.message };
+          }
+          return { success: false, error: "Password reset request failed. Please try again." };
+        }
       }
 
       // Device-local profiles have no email channel — the honest answer is
@@ -1029,28 +1035,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   /** Step 2 of the web's 3-step reset flow: verify the 6-digit code. */
   const verifyPasswordResetOtp = useCallback(
     async (email: string, code: string, mode: DataMode): Promise<AuthResult> => {
+      const normalized = email.toLowerCase().trim();
       if (mode === "cloud") {
         if (!cloudAvailable) {
           return { success: false, error: "Cloud mode is not configured." };
         }
-        const { data, error } = await getSupabase().auth.verifyOtp({
-          email: email.toLowerCase().trim(),
-          token: code,
-          type: "recovery",
-        });
-        if (error) {
-          const msg = /expire/i.test(error.message)
-            ? "OTP code expired or invalid. Please request a new one."
-            : "Incorrect OTP code. Please try again.";
-          return { success: false, error: msg };
+        try {
+          const result = await verifyResetOtp(normalized, code);
+          if (result.resetToken && result.email) {
+            resetTokenRef.current = { token: result.resetToken, email: result.email };
+            return { success: true };
+          }
+          return { success: false, error: "Invalid or expired OTP code. Please try again." };
+        } catch (err) {
+          if (err instanceof MobileApiError) {
+            return { success: false, error: err.message };
+          }
+          return { success: false, error: "Invalid or expired OTP code. Please try again." };
         }
-        if (!data.session) {
-          return {
-            success: false,
-            error: "Invalid or expired reset session. Please start over.",
-          };
-        }
-        return { success: true };
       }
 
       return {
@@ -1063,7 +1065,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   /** Step 3 of the web's 3-step reset flow: set the new password. */
   const completePasswordReset = useCallback(
-    async (newPassword: string, mode: DataMode): Promise<AuthResult> => {
+    async (email: string, newPassword: string, mode: DataMode): Promise<AuthResult> => {
       if (mode === "cloud") {
         if (!cloudAvailable) {
           return { success: false, error: "Cloud mode is not configured." };
@@ -1071,30 +1073,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (newPassword.length < 8) {
           return { success: false, error: "Password must be at least 8 characters." };
         }
-        const { data, error } = await getSupabase().auth.updateUser({
-          password: newPassword,
-        });
-        if (error) {
-          return {
-            success: false,
-            error: /session/i.test(error.message)
-              ? "Invalid or expired reset session. Please start over."
-              : error.message,
-          };
+        const { token, email: storedEmail } = resetTokenRef.current;
+        if (!token) {
+          return { success: false, error: "No active reset session. Please start over." };
         }
-        if (data.user?.email) {
-          const nextUser: AppUser = {
-            id: data.user.id,
-            email: data.user.email,
-            name: (data.user.user_metadata?.name as string) || undefined,
-            avatarUrl: avatarFromMetadata(data.user.user_metadata),
-            mode: "cloud",
-          };
-          await persistSession(nextUser);
-          void refreshDbProfile();
-          void maybeOfferBiometric(nextUser);
+        // Use the email from the reset token for security
+        const normalized = (storedEmail ?? email).toLowerCase().trim();
+        try {
+          await completeReset(normalized, token, newPassword, newPassword);
+          resetTokenRef.current = { token: null, email: null };
+          // After password reset, all existing sessions are invalidated.
+          await clearMobileSession();
+          return { success: true };
+        } catch (err) {
+          if (err instanceof MobileApiError) {
+            return { success: false, error: err.message };
+          }
+          return { success: false, error: "Password reset failed. Please try again." };
         }
-        return { success: true };
       }
 
       return {
@@ -1102,7 +1098,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: "On-device profiles can't be recovered by email. Create a new profile instead.",
       };
     },
-    [cloudAvailable, persistSession, refreshDbProfile, maybeOfferBiometric]
+    [cloudAvailable]
   );
 
   const store = useMemo(
@@ -1121,6 +1117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signInWithGoogle,
       signUp,
+      confirmSignup,
       signOut,
       deleteAccount,
       pendingMerge,
@@ -1165,6 +1162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signInWithGoogle,
       signUp,
+      confirmSignup,
       signOut,
       deleteAccount,
       refreshDbProfile,

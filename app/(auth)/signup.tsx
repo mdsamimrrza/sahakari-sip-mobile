@@ -23,7 +23,7 @@ import { GoogleButton } from "@/components/auth/GoogleButton";
 export default function SignupScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { signUp, signInWithGoogle, cloudAvailable } = useAuth();
+  const { signUp, confirmSignup, signInWithGoogle, cloudAvailable } = useAuth();
   const { toast } = useToast();
 
   // Cloud is the first-class path — always start there when Supabase is
@@ -36,6 +36,9 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cloud signup step 2: the 6-digit OTP emailed by the web backend.
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   async function handleGoogle() {
     setError(null);
@@ -81,12 +84,13 @@ export default function SignupScreen() {
     }
 
     if (result.needsEmailConfirmation) {
+      // Same as the web flow: ask for the 6-digit code we just emailed.
+      setPendingEmail(email.toLowerCase().trim());
+      setError(null);
       toast({
         title: "Check your inbox",
-        description:
-          "Your account was created. Confirm your email address, then sign in.",
+        description: "We sent a 6-digit confirmation code to your email.",
       });
-      router.replace("/(auth)/login");
       return;
     }
 
@@ -96,6 +100,31 @@ export default function SignupScreen() {
         mode === "cloud"
           ? "You're signed in. Let's set up your first fund."
           : "On-device profile ready. Let's set up your first fund.",
+      variant: "success",
+    });
+    router.replace("/onboarding");
+  }
+
+  async function handleConfirmCode() {
+    setError(null);
+    if (!pendingEmail) return;
+    if (code.length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+
+    setLoading(true);
+    const result = await confirmSignup(pendingEmail, code);
+    setLoading(false);
+
+    if (!result.success) {
+      setError(result.error ?? "Verification failed. Please try again.");
+      return;
+    }
+
+    toast({
+      title: "Account created! 🎉",
+      description: "Email confirmed. Let's set up your first fund.",
       variant: "success",
     });
     router.replace("/onboarding");
@@ -115,6 +144,53 @@ export default function SignupScreen() {
 
       <AuthShell compact>
       <Card padded style={{ borderWidth: 0, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}>
+        {pendingEmail ? (
+          <>
+            <Text variant="heading">Confirm your email</Text>
+            <Text
+              variant="caption"
+              color={colors.mutedForeground}
+              style={{ marginTop: 2, marginBottom: spacing.md }}
+            >
+              We sent a 6-digit code to {pendingEmail}. Enter it to activate
+              your account.
+            </Text>
+
+            <View style={{ gap: spacing.md }}>
+              <Input
+                label="Confirmation code"
+                value={code}
+                onChangeText={(v) => setCode(v.replace(/\D/g, "").slice(0, 6))}
+                placeholder="123456"
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus
+                error={error}
+              />
+
+              <Button fullWidth loading={loading} onPress={handleConfirmCode}>
+                Confirm &amp; Continue
+              </Button>
+
+              <Pressable
+                onPress={() => {
+                  setPendingEmail(null);
+                  setCode("");
+                  setError(null);
+                }}
+              >
+                <Text
+                  variant="caption"
+                  color={colors.mutedForeground}
+                  style={{ textAlign: "center" }}
+                >
+                  Wrong email? Go back and sign up again
+                </Text>
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <>
         <Text variant="heading">Create your account</Text>
         <Text
           variant="caption"
@@ -155,6 +231,7 @@ export default function SignupScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            textContentType="emailAddress"
             error={error}
           />
 
@@ -165,6 +242,7 @@ export default function SignupScreen() {
             placeholder="At least 8 characters"
             secureTextEntry={!showPassword}
             autoCapitalize="none"
+            textContentType="newPassword"
             rightSlot={
               <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={10}>
                 {showPassword ? (
@@ -183,6 +261,7 @@ export default function SignupScreen() {
             placeholder="Re-enter your password"
             secureTextEntry={!showPassword}
             autoCapitalize="none"
+            textContentType="newPassword"
           />
 
           <Text variant="caption" color={colors.mutedForeground}>
@@ -208,6 +287,8 @@ export default function SignupScreen() {
             </Pressable>
           </View>
         </View>
+          </>
+        )}
       </Card>
       </AuthShell>
     </View>
