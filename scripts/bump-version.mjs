@@ -41,13 +41,13 @@ if (dirty) {
   process.exit(1);
 }
 
-// 1. app.json
+// 1. app.json (Expo layout: version lives under "expo")
 const appJsonPath = new URL("../app.json", import.meta.url);
 const appJson = JSON.parse(readFileSync(appJsonPath, "utf8"));
-const current = appJson.version;
+const current = appJson.expo.version;
 const next = bump(current);
 
-appJson.version = next;
+appJson.expo.version = next;
 writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + "\n");
 
 // 2. android/app/build.gradle — versionName "x.y.z", versionCode n
