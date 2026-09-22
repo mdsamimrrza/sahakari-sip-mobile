@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0          # needed to push auto-created version tags
 
       - uses: actions/setup-node@v7
         with:
@@ -40,6 +42,7 @@ jobs:
       - name: Resolve tag name
         id: tag
         run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
           TAG="${GITHUB_REF_NAME:-}"
           if [ "$TAG" = "main" ] || [ -z "$TAG" ]; then
             TAG="${{ github.event.release.tag_name }}"
@@ -48,7 +51,18 @@ jobs:
             TAG="${{ inputs.tag }}"
           fi
           if [ "$TAG" = "main" ] || [ -z "$TAG" ]; then
-            TAG="v$(node -p "require('./package.json').version")"
+            TAG="v$VERSION"
+          fi
+          if [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ github.event_name }}" = "push" ]; then
+            FULL_TAG="v$VERSION"
+            if ! git rev-parse "$FULL_TAG" >/dev/null 2>&1; then
+              echo "Creating git tag $FULL_TAG from app.json"
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git tag "$FULL_TAG"
+              git push origin "$FULL_TAG"
+            fi
+            TAG="$FULL_TAG"
           fi
           echo "name=$TAG" >> "$GITHUB_OUTPUT"
 
@@ -88,6 +102,15 @@ jobs:
             "${SUPABASE_URL:-https://entbhjpnhdjfhcctcvmt.supabase.co}" \
             "${SUPABASE_ANON_KEY:-sb_publishable_Qox-u2IFEpaoUHus51Ofhw_4XyVPI3D}" \
             "${WEB_URL:-https://sahakari-sip.vercel.app}" > .env
+
+      - name: Stamp versionName & versionCode into build.gradle
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode")
+          echo "Stamping build.gradle → versionName=\"${VERSION}\" versionCode=${VERSION_CODE}"
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/g" android/app/build.gradle
+          sed -i "s/versionCode [0-9]*/versionCode ${VERSION_CODE}/g"       android/app/build.gradle
+          grep -E 'versionName|versionCode' android/app/build.gradle
 
       - name: Build release APK
         run: |
