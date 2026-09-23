@@ -136,11 +136,7 @@ jobs:
           [**SahakariSIP.apk**](https://github.com/mdsamimrrza/sahakari-sip-mobile/releases/latest/download/SahakariSIP.apk) — permanent link, always the latest build.
 
           ## What changed
-          - Personal greeting: the dashboard now says hi with your name plus flag and a time-aware Good morning / afternoon / evening line (long names auto-shorten to first name).
-          - One global privacy eye: the same eye toggle now lives on Dashboard, History and Tax & Settlement — a single tap hides amounts on every page at once, including the Personal Summary sheet. Tap again to reveal; the choice is remembered.
-          - Tap-only chart details: graph popups no longer fire while scrolling — tap a point to see details below the graph (never covering it), tap again to dismiss.
-          - Dynamic chart axis: the Y-axis now hugs your data at ~1.35x the max, so a NPR 9L portfolio tops out near 12.5L instead of 20L.
-          - Seamless startup: the static splash hands off invisibly into a shorter (~1.5s) animated splash — one continuous launch.
+          - Dark-mode splash: the native launch screen is now dark (#0B0F19) when your phone is in dark mode, and the animated splash matches in both modes — no more light flash.
           NOTES
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then

@@ -14,7 +14,7 @@ import { LogoMark } from "./AppLogo";
 import { Text } from "../ui/primitives";
 
 export function AnimatedSplash({ onDone }: { onDone: () => void }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [hidden, setHidden] = useState(false);
 
   const overlayOpacity = useRef(new Animated.Value(1)).current;
@@ -100,9 +100,10 @@ export function AnimatedSplash({ onDone }: { onDone: () => void }) {
         bottom: 0,
         zIndex: 100,
         elevation: 100,
-        // Hardcoded to match the native splash background (#EDEAE0 in
-        // app.json) so the static → animated handoff is invisible.
-        backgroundColor: "#EDEAE0",
+        // Hardcoded pair matching the native splash backgrounds in app.json
+        // (light #EDEAE0 / dark #0B0F19) so the static → animated handoff
+        // is invisible in both modes.
+        backgroundColor: isDark ? "#0B0F19" : "#EDEAE0",
         alignItems: "center",
         justifyContent: "center",
         opacity: overlayOpacity,

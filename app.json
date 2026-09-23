@@ -2,7 +2,7 @@
   "expo": {
     "name": "SahakariSIP",
     "slug": "sahakarisip",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sahakarisip",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.samimrrza.sahakarisip",
-      "versionCode": 7,
+      "versionCode": 8,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#EDEAE0",
@@ -37,7 +37,11 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 220,
           "resizeMode": "contain",
-          "backgroundColor": "#EDEAE0"
+          "backgroundColor": "#EDEAE0",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0B0F19"
+          }
         }
       ],
       "expo-secure-store",
