@@ -5,7 +5,7 @@
 // ============================================================
 
 import { z } from "zod";
-import { MAX_NOTES_LENGTH } from "../constants";
+import { MAX_NOTES_LENGTH, DP_CHARGE } from "../constants";
 
 export const entrySchema = z.object({
   fund_id: z.string().uuid("Please select a fund"),
@@ -58,6 +58,17 @@ export const csvRowSchema = z.object({
   nav: z.coerce.number().finite("NAV must be a finite number").positive("NAV must be greater than 0"),
   units: z.coerce.number().finite("Units must be a finite number").positive("Units must be greater than 0").optional(),
   notes: z.string().max(MAX_NOTES_LENGTH).optional(),
-});
+}).refine(
+  (data) => {
+    if (data.units === undefined) return true;
+    const effectiveCash = Math.max(0, data.amount - DP_CHARGE);
+    const expectedUnits = Math.floor(effectiveCash / data.nav);
+    return data.units === expectedUnits;
+  },
+  {
+    message: `Units must equal floor((amount - ${DP_CHARGE}) / nav) per SEBON whole-unit rule`,
+    path: ["units"],
+  }
+);
 
 export type CsvRowData = z.infer<typeof csvRowSchema>;

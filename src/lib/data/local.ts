@@ -24,6 +24,7 @@ import type {
   NotificationItem,
   NotificationPreferences,
 } from "../types";
+import type { ProfileImageResult } from "./store";
 import { DP_CHARGE } from "../constants";
 import { csvRowSchema, entrySchema } from "../schemas/entry";
 import { fundConfigSchema, updateLatestNavSchema } from "../schemas/fund-config";
@@ -49,6 +50,7 @@ const key = {
   nav: (uid: string) => `${NS}.${uid}.nav_history`,
   prefs: (uid: string) => `${NS}.${uid}.prefs`,
   notifications: (uid: string) => `${NS}.${uid}.notifications`,
+  profile: (uid: string) => `${NS}.${uid}.profile`,
 };
 
 async function readJson<T>(k: string, fallback: T): Promise<T> {
@@ -199,6 +201,12 @@ export class LocalStore implements DataStore {
       latest_nav: parsed.data.latest_nav,
       latest_nav_date: input.start_date,
       is_active: true,
+      // SIP schedule fields (defaults for backward compatibility)
+      sip_type: "UNLIMITED",
+      frequency: null,
+      calendar_system: null,
+      anchor_date: null,
+      schedule_verified: false,
       created_at: now,
       updated_at: now,
     };
@@ -642,7 +650,41 @@ export class LocalStore implements DataStore {
       key.nav(this.userId),
       key.prefs(this.userId),
       key.notifications(this.userId),
+      key.profile(this.userId),
     ]);
     return { success: true };
+  }
+
+  // ------------------------------------------------------------
+  // Profile
+  // ------------------------------------------------------------
+
+  private async getProfileData(): Promise<{ name: string | null; image: string | null; email: string | null }> {
+    return readJson(key.profile(this.userId), { name: null, image: null, email: null });
+  }
+
+  private async setProfileData(data: { name: string | null; image: string | null; email: string | null }): Promise<void> {
+    await writeJson(key.profile(this.userId), data);
+  }
+
+  async getProfile(): Promise<ActionResult<{ name: string | null; image: string | null; email: string | null }>> {
+    const profile = await this.getProfileData();
+    return { success: true, data: profile };
+  }
+
+  async updateProfileImage(uri: string, mimeType: string): Promise<ActionResult<ProfileImageResult>> {
+    // For local store, we store the file URI directly (or base64 for small images)
+    // In a real app, you'd use expo-file-system to copy to a permanent location
+    const profile = await this.getProfileData();
+    profile.image = uri;
+    await this.setProfileData(profile);
+    return { success: true, data: { image: uri } };
+  }
+
+  async removeProfileImage(): Promise<ActionResult<ProfileImageResult>> {
+    const profile = await this.getProfileData();
+    profile.image = null;
+    await this.setProfileData(profile);
+    return { success: true, data: { image: null } };
   }
 }

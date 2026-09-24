@@ -218,19 +218,24 @@ const TEST_PASSWORD = "TestE2E!2026";
 // C10-style dashboard math check on live-shaped data (same numbers the
 // CSV import path produces: units = floor((amount-5)/nav))
 {
-  const fund: FundConfig = {
-    id: uuid,
-    user_id: "u1",
-    fund_name: "E2E Test Fund",
-    fee_rate_pct: 1.8,
-    start_date: "2024-01-15",
-    monthly_sip: 5000,
-    latest_nav: 11,
-    latest_nav_date: format(new Date(), "yyyy-MM-dd"),
-    is_active: true,
-    created_at: "2024-01-15T00:00:00Z",
-    updated_at: "2024-01-15T00:00:00Z",
-  };
+    const fund: FundConfig = {
+      id: uuid,
+      user_id: "u1",
+      fund_name: "E2E Test Fund",
+      fee_rate_pct: 1.8,
+      start_date: "2024-01-15",
+      monthly_sip: 5000,
+      latest_nav: 11,
+      latest_nav_date: format(new Date(), "yyyy-MM-dd"),
+      is_active: true,
+      sip_type: "UNLIMITED",
+      frequency: null,
+      calendar_system: null,
+      anchor_date: null,
+      schedule_verified: false,
+      created_at: "2024-01-15T00:00:00Z",
+      updated_at: "2024-01-15T00:00:00Z",
+    };
   const mk = (id: string, purchase_date: string, nav: number, units: number): Entry => ({
     id,
     user_id: "u1",

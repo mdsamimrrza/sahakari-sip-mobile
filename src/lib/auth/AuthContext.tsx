@@ -171,6 +171,7 @@ interface LocalProfile {
   name?: string;
   salt: string;
   hash: string;
+  iterations: number;
   created_at: string;
 }
 
@@ -178,11 +179,38 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // ---------- Local profile helpers ----------
 
-async function hashPassword(password: string, salt: string): Promise<string> {
-  return Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    `${salt}::${password}`
+const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_KEY_LENGTH = 32; // 256 bits
+const PBKDF2_ALGORITHM = "PBKDF2";
+const PBKDF2_HASH = "SHA-256";
+
+async function hashPassword(password: string, salt: string, iterations = PBKDF2_ITERATIONS): Promise<string> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password),
+    { name: PBKDF2_ALGORITHM },
+    false,
+    ["deriveBits"]
   );
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: PBKDF2_ALGORITHM,
+      salt: encoder.encode(salt),
+      iterations,
+      hash: PBKDF2_HASH,
+    },
+    keyMaterial,
+    PBKDF2_KEY_LENGTH * 8
+  );
+  return Array.from(new Uint8Array(derivedBits))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function verifyPassword(password: string, salt: string, hash: string, iterations: number): Promise<boolean> {
+  const computed = await hashPassword(password, salt, iterations);
+  return computed === hash;
 }
 
 async function readProfiles(): Promise<LocalProfile[]> {
@@ -215,6 +243,38 @@ const BACKGROUND_LOCK_GRACE_MS = 30_000;
 // resolves these waiters, and completeGoogleHandoff dedupes the exchange
 // (the token is single-use server-side too).
 let googleHandoffResolvers: Array<(token: string | null) => void> = [];
+
+// Client-side replay protection: store used handoff tokens with timestamp.
+// Tokens are 32-char hex; we keep them for 24h to prevent accidental replays.
+const USED_HANDOFF_TOKENS_KEY = "sahakarisip.v1.used_handoff_tokens";
+const HANDOFF_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function markHandoffTokenUsed(token: string): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(USED_HANDOFF_TOKENS_KEY);
+    const tokens: Record<string, number> = raw ? JSON.parse(raw) : {};
+    tokens[token] = Date.now();
+    // Prune expired
+    const now = Date.now();
+    for (const [t, ts] of Object.entries(tokens)) {
+      if (now - ts > HANDOFF_TOKEN_TTL_MS) delete tokens[t];
+    }
+    await AsyncStorage.setItem(USED_HANDOFF_TOKENS_KEY, JSON.stringify(tokens));
+  } catch {
+    // Best-effort; server enforces single-use.
+  }
+}
+
+async function isHandoffTokenUsed(token: string): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(USED_HANDOFF_TOKENS_KEY);
+    if (!raw) return false;
+    const tokens: Record<string, number> = JSON.parse(raw);
+    return token in tokens;
+  } catch {
+    return false;
+  }
+}
 
 /** Called by the /auth/callback screen or the browser-session result. */
 export function resolveGoogleHandoff(token: string | null) {
@@ -713,8 +773,9 @@ const next: AppUser = {
       if (!profile) {
         return { success: false, error: "No on-device profile found for this email. Create one first." };
       }
-      const hash = await hashPassword(password, profile.salt);
-      if (hash !== profile.hash) {
+      const iterations = profile.iterations ?? PBKDF2_ITERATIONS;
+      const valid = await verifyPassword(password, profile.salt, profile.hash, iterations);
+      if (!valid) {
         return { success: false, error: "Invalid email or password. Please try again." };
       }
       const localUser: AppUser = {
@@ -779,6 +840,7 @@ const next: AppUser = {
         email: normalized,
         salt,
         hash,
+        iterations: PBKDF2_ITERATIONS,
         created_at: new Date().toISOString(),
       };
       await writeProfiles([...profiles, profile]);
@@ -832,8 +894,13 @@ const next: AppUser = {
   /** Turn a captured handoff token into a live session (single-use). */
   const completeGoogleHandoff = useCallback(
     async (token: string): Promise<AuthResult> => {
+      // Client-side replay protection: reject if we've already used this token.
+      if (await isHandoffTokenUsed(token)) {
+        return { success: false, error: "This sign-in link has already been used. Please start over." };
+      }
       try {
         const session = await googleExchange(token);
+        await markHandoffTokenUsed(token);
         await saveMobileSession(session);
         const nextUser: AppUser = {
           id: session.user.id,

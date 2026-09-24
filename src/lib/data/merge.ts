@@ -250,7 +250,7 @@ export async function hasUnmergedLocalData(cloud: CloudStore): Promise<boolean> 
 
 // ---------- The merge itself ----------
 
-const fundKey = (name: string) => name.trim().toLowerCase();
+const fundKey = (userId: string, name: string) => `${userId}|${name.trim().toLowerCase()}`;
 
 /**
  * ISO-timestamp "is a newer than b". Local timestamps come from the device
@@ -284,9 +284,11 @@ export async function mergeLocalIntoCloud(
 
   // Cloud funds by name — grows as we create, so two device profiles with
   // the same fund name share one cloud fund.
+  // Key includes cloud user ID to prevent cross-user collisions.
+  const effectiveUserId = cloudIds[0];
   const cloudFunds = await readCloudRows<FundConfig>("fund_config", cloudIds);
   const fundsByName = new Map<string, FundConfig>();
-  for (const f of cloudFunds) fundsByName.set(fundKey(f.fund_name), f);
+  for (const f of cloudFunds) fundsByName.set(fundKey(effectiveUserId, f.fund_name), f);
 
   const uids = await listLocalDataUids();
 
@@ -299,7 +301,7 @@ export async function mergeLocalIntoCloud(
     const newestEntryDate = new Map<string, string>();
 
     for (const localFund of ds.funds) {
-      const name = fundKey(localFund.fund_name);
+      const name = fundKey(effectiveUserId, localFund.fund_name);
       const existing = fundsByName.get(name);
 
       if (existing) {
@@ -391,7 +393,7 @@ export async function mergeLocalIntoCloud(
       const rows = ds.nav.filter((r) => r.fund_id === localFund.id);
       if (rows.length === 0) continue;
       const newest = rows.reduce((a, b) => (b.nav_date > a.nav_date ? b : a));
-      const cloudFund = fundsByName.get(fundKey(localFund.fund_name));
+      const cloudFund = fundsByName.get(fundKey(effectiveUserId, localFund.fund_name));
       const floor =
         newestEntryDate.get(cloudFundId) ?? cloudFund?.latest_nav_date ?? "";
       if (newest.nav_date > floor) {

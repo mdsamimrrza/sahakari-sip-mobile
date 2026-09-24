@@ -21,6 +21,7 @@ import type {
   NotificationItem,
   NotificationPreferences,
 } from "../types";
+import type { ProfileImageResult } from "./store";
 import { z } from "zod";
 import { DP_CHARGE } from "../constants";
 import { csvRowSchema, entrySchema } from "../schemas/entry";
@@ -852,5 +853,122 @@ export class CloudStore implements DataStore {
     }
 
     return { success: true };
+  }
+
+  // ------------------------------------------------------------
+  // Profile
+  // ------------------------------------------------------------
+
+  async getProfile(): Promise<ActionResult<{ name: string | null; image: string | null; email: string | null }>> {
+    const userId = await this.dataUid();
+    if (!userId) return { success: false, error: "Not authenticated" };
+
+    const { data, error } = await this.db
+      .from("users")
+      .select("name, image, email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) return { success: false, error: error.message };
+    return {
+      success: true,
+      data: {
+        name: data?.name ?? null,
+        image: data?.image ?? null,
+        email: data?.email ?? null,
+      },
+    };
+  }
+
+  async updateProfileImage(uri: string, mimeType: string): Promise<ActionResult<ProfileImageResult>> {
+    const userId = await this.dataUid();
+    if (!userId) return { success: false, error: "Not authenticated" };
+
+    try {
+      // Convert file URI to blob for upload
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      if (blob.size > 2 * 1024 * 1024) {
+        return { success: false, error: "Image must be under 2MB" };
+      }
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(mimeType)) {
+        return { success: false, error: "Only JPG, PNG or WebP images are allowed" };
+      }
+
+      const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
+      const path = `${userId}/avatar.${ext}`;
+
+      // Remove any previously uploaded avatar files for this user
+      try {
+        const { data: existing } = await this.db.storage.from("avatars").list(userId);
+        const stale = (existing ?? [])
+          .filter((f) => f.name !== `avatar.${ext}`)
+          .map((f) => `${userId}/${f.name}`);
+        if (stale.length > 0) {
+          await this.db.storage.from("avatars").remove(stale);
+        }
+      } catch {
+        // best-effort cleanup only
+      }
+
+      const { error: uploadError } = await this.db.storage
+        .from("avatars")
+        .upload(path, blob, {
+          contentType: mimeType,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        return { success: false, error: uploadError.message };
+      }
+
+      const { data: pub } = this.db.storage.from("avatars").getPublicUrl(path);
+      const imageUrl = `${pub.publicUrl}?v=${Date.now()}`;
+
+      const { error: dbError } = await this.db
+        .from("users")
+        .update({ image: imageUrl })
+        .eq("id", userId);
+
+      if (dbError) {
+        return { success: false, error: dbError.message };
+      }
+
+      return { success: true, data: { image: imageUrl } };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : "Upload failed" };
+    }
+  }
+
+  async removeProfileImage(): Promise<ActionResult<ProfileImageResult>> {
+    const userId = await this.dataUid();
+    if (!userId) return { success: false, error: "Not authenticated" };
+
+    try {
+      // Remove all avatar files for this user
+      try {
+        const { data: existing } = await this.db.storage.from("avatars").list(userId);
+        const paths = (existing ?? []).map((f) => `${userId}/${f.name}`);
+        if (paths.length > 0) {
+          await this.db.storage.from("avatars").remove(paths);
+        }
+      } catch {
+        // best-effort cleanup only
+      }
+
+      const { error } = await this.db
+        .from("users")
+        .update({ image: null })
+        .eq("id", userId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true, data: { image: null } };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : "Remove failed" };
+    }
   }
 }

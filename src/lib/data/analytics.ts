@@ -19,8 +19,11 @@ import type {
   PortfolioChartPoint,
 } from "../types";
 import {
-  CGT_LONG_TERM_RATE,
-  CGT_SHORT_TERM_RATE,
+  CGT_NP_REDEMPTION,
+  getCapitalGainsStatus,
+  estimateBucketedCgt,
+} from "../tax";
+import {
   DP_CHARGE,
   LONG_TERM_HOLDING_DAYS,
   XIRR_MIN_ENTRIES,
@@ -130,7 +133,7 @@ export function computeDashboardData({
 
   // ---- Capital Gains Tax ----
   // Nepal IRD taxes each LOT of units separately based on THAT lot's own
-  // holding period (> 365 days = long-term @ 7.5%, else short-term @ 10%).
+  // holding period (> 365 days = long-term @ 3.75%, else short-term @ 5%).
   const todayMs = Date.now();
   let longTermGainSum = 0;
   let shortTermGainSum = 0;
@@ -154,10 +157,21 @@ export function computeDashboardData({
   }
 
   // Tax applies only to NET positive gain within each bucket.
+  // Use verified rates from tax.ts (CGT_NP_REDEMPTION: 3.75% long-term, 5% short-term)
+  const cgtLongRate = CGT_NP_REDEMPTION.longTermRatePct / 100;
+  const cgtShortRate = CGT_NP_REDEMPTION.shortTermRatePct / 100;
+
   const estimatedCgtLongTerm =
-    longTermGainSum > 0 ? longTermGainSum * CGT_LONG_TERM_RATE : 0;
+    longTermGainSum > 0 ? longTermGainSum * cgtLongRate : 0;
   const estimatedCgtShortTerm =
-    shortTermGainSum > 0 ? shortTermGainSum * CGT_SHORT_TERM_RATE : 0;
+    shortTermGainSum > 0 ? shortTermGainSum * cgtShortRate : 0;
+
+  // Taxable bases (loss lots excluded)
+  const cgtTaxableLongTerm = Math.max(0, longTermGainSum);
+  const cgtTaxableShortTerm = Math.max(0, shortTermGainSum);
+
+  // CGT status from verified source
+  const { status: cgtStatus, message: cgtMessage } = getCapitalGainsStatus();
 
   // ---- XIRR ----
   let xirr: number | null = null;
@@ -176,8 +190,12 @@ export function computeDashboardData({
     unallottedCash,
     gainLoss,
     gainLossPct,
+    cgtStatus,
+    cgtMessage,
     estimatedCgtLongTerm,
     estimatedCgtShortTerm,
+    cgtTaxableLongTerm,
+    cgtTaxableShortTerm,
     xirr,
     sipStreak,
     latestNav,

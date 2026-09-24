@@ -9,6 +9,7 @@
 import React from "react";
 import {
   ActivityIndicator,
+  Image as ReactNativeImage,
   Pressable,
   StyleSheet,
   Text as RNText,
@@ -652,6 +653,57 @@ export function Avatar({
       >
         {initial}
       </Text>
+    </View>
+  );
+}
+
+// ------------------------------------------------------------
+// Image (remote or local URI with fallback to initials)
+// ------------------------------------------------------------
+
+export function Image({
+  uri,
+  initial,
+  size = 40,
+  bg,
+  color,
+}: {
+  uri?: string | null;
+  initial: string;
+  size?: number;
+  bg?: string;
+  color?: string;
+}) {
+  const { colors } = useTheme();
+  const hasUri = Boolean(uri);
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius.lg,
+        backgroundColor: bg ?? colors.muted,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+        borderColor: colors.border,
+        overflow: "hidden",
+      }}
+    >
+      {hasUri ? (
+        <ReactNativeImage
+          source={{ uri: uri! }}
+          style={{ width: size, height: size, borderRadius: radius.lg }}
+          resizeMode="cover"
+        />
+      ) : (
+        <Text
+          style={{ fontSize: size * 0.42, fontWeight: "900" }}
+          color={color ?? colors.foreground}
+        >
+          {initial}
+        </Text>
+      )}
     </View>
   );
 }

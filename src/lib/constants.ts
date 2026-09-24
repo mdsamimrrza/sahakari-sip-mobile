@@ -97,7 +97,7 @@ export const CHART_COLORS = {
 } as const;
 
 // ---------- CGT rates (Nepal IRD) ----------
-
-export const CGT_LONG_TERM_RATE = 0.075; // > 365 days
-export const CGT_SHORT_TERM_RATE = 0.1; // ≤ 365 days
+// NOTE: Actual rates are now defined in src/lib/tax.ts (CGT_NP_REDEMPTION)
+// which has verified rates: 3.75% long-term (>365 days), 5% short-term (≤365 days).
+// This constant remains for holding-period logic only.
 export const LONG_TERM_HOLDING_DAYS = 365;

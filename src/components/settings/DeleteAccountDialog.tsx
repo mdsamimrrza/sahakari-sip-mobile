@@ -27,7 +27,15 @@ import {
 } from "../ui/primitives";
 import { Modal, useToast } from "../ui/overlays";
 
-export function DeleteAccountDialog() {
+interface DeleteAccountDialogProps {
+  fundCount?: number;
+  entryCount?: number;
+}
+
+export function DeleteAccountDialog({
+  fundCount,
+  entryCount,
+}: DeleteAccountDialogProps) {
   const { colors } = useTheme();
   const { deleteAccount } = useAuth();
   const { toast } = useToast();
@@ -35,6 +43,8 @@ export function DeleteAccountDialog() {
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const hasCounts = fundCount !== undefined || entryCount !== undefined;
 
   async function handleDeleteAccount() {
     if (confirmText !== "DELETE") return;
@@ -110,6 +120,19 @@ export function DeleteAccountDialog() {
             Permanently delete your account and remove all fund configurations and SIP
             entries.
           </Text>
+          {hasCounts && (
+            <Text
+              variant="caption"
+              color={colors.foreground}
+              style={{ marginTop: 4, fontSize: fontSize.sm, fontWeight: "700" }}
+            >
+              This will erase{" "}
+              <Text style={{ fontVariant: ["tabular-nums"] }}>{fundCount ?? 0}</Text>{" "}
+              {fundCount === 1 ? "fund" : "funds"} and{" "}
+              <Text style={{ fontVariant: ["tabular-nums"] }}>{entryCount ?? 0}</Text>{" "}
+              {entryCount === 1 ? "entry" : "entries"}.
+            </Text>
+          )}
         </CardHeader>
 
         <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xl }}>

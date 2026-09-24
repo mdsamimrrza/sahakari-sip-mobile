@@ -43,6 +43,10 @@ export interface FundConfigInput {
   start_date: string; // "YYYY-MM-DD"
   monthly_sip: number;
   latest_nav: number;
+  frequency?: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUALLY" | "ANNUALLY" | null;
+  calendar_system?: "AD" | "BS" | null;
+  anchor_date?: string | null;
+  schedule_verified?: boolean;
 }
 
 export interface LatestNavInput {
@@ -64,6 +68,12 @@ export interface GetEntriesParams {
   page?: number;
   pageSize?: number;
   sortOrder?: "asc" | "desc";
+}
+
+// ---------- Profile ----------
+
+export interface ProfileImageResult {
+  image: string | null;
 }
 
 export interface DataStore {
@@ -111,6 +121,11 @@ export interface DataStore {
   getNotifications(): Promise<ActionResult<NotificationItem[]>>;
   markNotificationRead(id: string): Promise<ActionResult>;
   markAllNotificationsRead(): Promise<ActionResult>;
+
+  // ---------- Profile ----------
+  getProfile(): Promise<ActionResult<{ name: string | null; image: string | null; email: string | null }>>;
+  updateProfileImage(uri: string, mimeType: string): Promise<ActionResult<ProfileImageResult>>;
+  removeProfileImage(): Promise<ActionResult<ProfileImageResult>>;
 
   // ---------- Account ----------
   deleteAllUserData(): Promise<ActionResult>;

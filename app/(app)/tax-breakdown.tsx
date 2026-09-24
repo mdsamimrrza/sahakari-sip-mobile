@@ -46,6 +46,12 @@ import {
 import { formatFundShortName } from "@/lib/utils";
 import { DP_CHARGE } from "@/lib/constants";
 import {
+  CGT_NP_REDEMPTION,
+  getExitLoadSchedule,
+  getTaxStatusSummary,
+  TAX_DISCLAIMER,
+} from "@/lib/tax";
+import {
   Text,
   Card,
   Badge,
@@ -78,12 +84,13 @@ function animateLayout() {
 const GLOSSARY: Array<{ term: string; full: string; tintKey: "info" | "purple" | "amber" | "rose" | "success" | "emerald" }> = [
   { term: "Entry fee", full: "NPR 5 taken on every deposit before units are given.", tintKey: "info" },
   { term: "Yearly fund fee", full: "Taken a little every day inside the unit price. Shown here only for info, never charged twice.", tintKey: "purple" },
-  { term: "Tax on profit", full: "7.5% if your money stayed over 1 year, 10% if under 1 year. No profit means no tax.", tintKey: "amber" },
+  { term: "Tax on profit", full: `${CGT_NP_REDEMPTION.longTermRatePct}% if your money stayed over 1 year, ${CGT_NP_REDEMPTION.shortTermRatePct}% if under 1 year. No profit means no tax.`, tintKey: "amber" },
   { term: "Unit price", full: "The market price of one unit on any day.", tintKey: "emerald" },
   { term: "Spare cash", full: "Leftover change from rounding to full units. You always get it back.", tintKey: "info" },
   { term: "Unit value", full: "The value of all your units at today's price.", tintKey: "success" },
   { term: "Final payout", full: "The cash you receive. Unit value plus spare cash minus tax.", tintKey: "success" },
-  { term: "IRD Nepal", full: "Nepal's tax office. It sets the 7.5% and 10% tax rates used here.", tintKey: "rose" },
+  { term: "IRD Nepal", full: "Nepal's tax office. It sets the tax rates used here.", tintKey: "rose" },
+  { term: "Exit load", full: "A fund charge if you withdraw early. Checked per fund from official docs.", tintKey: "info" },
 ];
 
 // ------------------------------------------------------------
@@ -294,6 +301,16 @@ export default function TaxBreakdownScreen() {
     animateLayout();
     setHowToOpen((v) => !v);
   };
+
+  // ---------- Derived tax status for exit-load section ----------
+  const fundNames = useMemo(
+    () => funds.map((f) => f.fund_name),
+    [funds]
+  );
+  const taxStatus = useMemo(
+    () => getTaxStatusSummary(fundNames),
+    [fundNames]
+  );
 
   return (
     <Screen
@@ -684,40 +701,40 @@ export default function TaxBreakdownScreen() {
             </Card>
 
           {/* ============ SECTION 03 ============ */}
-          <Card style={{ borderWidth: 0, borderLeftWidth: 3, borderLeftColor: colors.amber, ...SHADOW }}>
-              <SectionHead
-                index="03"
-                title="Tax on Your Profit"
-                description="Tax on the profit, by how long you held"
-                badge="IRD Nepal"
-                accent={colors.amber}
-                open={!!open.sec3}
-                onToggle={() => toggle("sec3")}
-              />
-              {open.sec3 ? (
-                <View style={{ backgroundColor: `${colors.amber}08` }}>
-                  <LedgerRow
-                    label="Long-term tax 7.5% (over 1 year)"
-                    sub="Units held for more than a year"
-                    value={formatPrivate(formatCurrencyWhole(estimatedCgtLongTerm))}
-                    bordered={false}
-                  />
-                  <LedgerRow
-                    label="Short-term tax 10% (under 1 year)"
-                    sub="Units sold within a year"
-                    value={formatPrivate(formatCurrencyWhole(estimatedCgtShortTerm))}
-                  />
-                  <LedgerRow
-                    label="Total tax to pay"
-                    sub="Owed when you sell, paid to IRD Nepal"
-                    value={formatPrivate(formatCurrencyWhole(totalEstimatedCgt))}
-                    color={colors.rose}
-                    fill={`${colors.rose}12`}
-                    emphasis
-                  />
-                </View>
-              ) : null}
-            </Card>
+  <Card style={{ borderWidth: 0, borderLeftWidth: 3, borderLeftColor: colors.amber, ...SHADOW }}>
+      <SectionHead
+        index="03"
+        title="Tax on Your Profit"
+        description="Tax on the profit, by how long you held"
+        badge="IRD Nepal"
+        accent={colors.amber}
+        open={!!open.sec3}
+        onToggle={() => toggle("sec3")}
+      />
+      {open.sec3 ? (
+        <View style={{ backgroundColor: `${colors.amber}08` }}>
+          <LedgerRow
+            label={`Long-term tax ${CGT_NP_REDEMPTION.longTermRatePct}% (over 1 year)`}
+            sub="Units held for more than a year"
+            value={formatPrivate(formatCurrencyWhole(estimatedCgtLongTerm))}
+            bordered={false}
+          />
+          <LedgerRow
+            label={`Short-term tax ${CGT_NP_REDEMPTION.shortTermRatePct}% (under 1 year)`}
+            sub="Units sold within a year"
+            value={formatPrivate(formatCurrencyWhole(estimatedCgtShortTerm))}
+          />
+          <LedgerRow
+            label="Total tax to pay"
+            sub="Owed when you sell, paid to IRD Nepal"
+            value={formatPrivate(formatCurrencyWhole(totalEstimatedCgt))}
+            color={colors.rose}
+            fill={`${colors.rose}12`}
+            emphasis
+          />
+        </View>
+      ) : null}
+    </Card>
 
           {/* ============ SECTION 04 ============ */}
           <Card style={{ borderWidth: 0, borderLeftWidth: 3, borderLeftColor: colors.success, backgroundColor: `${colors.success}0A`, ...SHADOW }}>
@@ -761,6 +778,127 @@ export default function TaxBreakdownScreen() {
                 </View>
               ) : null}
             </Card>
+
+          {/* ============ SECTION 05: Verified Exit-Load Rules ============ */}
+          {taxStatus.exitLoadVerified.length > 0 || taxStatus.exitLoadUnverified.length > 0 ? (
+            <Card style={{ borderWidth: 0, borderLeftWidth: 3, borderLeftColor: colors.info, ...SHADOW }}>
+              <SectionHead
+                index="05"
+                title="Exit-Load Rules (Fund Charges, Not Tax)"
+                description="Applied at redemption based on each lot's holding period"
+                badge={taxStatus.exitLoadVerified.length > 0 ? "Verified" : "Unverified"}
+                accent={colors.info}
+                open={!!open.sec5}
+                onToggle={() => toggle("sec5")}
+              />
+              {open.sec5 ? (
+                <View style={{ backgroundColor: `${colors.info}08`, gap: spacing.md }}>
+                  {taxStatus.exitLoadVerified.map((v) => {
+                    const schedule = getExitLoadSchedule(v.fundName);
+                    return (
+                      <View
+                        key={v.fundName}
+                        style={{
+                          flexDirection: "row",
+                          gap: spacing.sm,
+                          padding: spacing.md,
+                          borderRadius: radius.lg,
+                          backgroundColor: colors.muted,
+                        }}
+                      >
+                        <View
+                          style={{
+                            height: 34,
+                            width: 34,
+                            borderRadius: 11,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: `${colors.success}1F`,
+                          }}
+                        >
+                          <Check size={16} color={colors.success} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text variant="label" style={{ fontWeight: "800" }}>
+                            {v.fundName}
+                          </Text>
+                          {schedule && (
+                            <Text
+                              variant="caption"
+                              color={colors.mutedForeground}
+                              style={{ fontSize: fontSize.xs }}
+                            >
+                              {schedule.tiers
+                                .map((t) =>
+                                  t.maxDays === null
+                                    ? `${t.ratePct}% thereafter`
+                                    : `${t.ratePct}% if held under ${t.maxDays} days`
+                                )
+                                .join(", ")}
+                            </Text>
+                          )}
+                          {v.sourceUrl && (
+                            <Text
+                              variant="caption"
+                              color={colors.primary}
+                              style={{ marginTop: 2, fontSize: fontSize.xs }}
+                            >
+                              Verified source: {v.sourceUrl}
+                            </Text>
+                          )}
+                        </View>
+                        <Badge bg={`${colors.success}1F`} color={colors.success}>
+                          VERIFIED
+                        </Badge>
+                      </View>
+                    );
+                  })}
+                  {taxStatus.exitLoadUnverified.map((name) => (
+                    <View
+                      key={name}
+                      style={{
+                        flexDirection: "row",
+                        gap: spacing.sm,
+                        padding: spacing.md,
+                        borderRadius: radius.lg,
+                        backgroundColor: `${colors.warning}0F`,
+                        borderWidth: 1,
+                        borderColor: `${colors.warning}33`,
+                      }}
+                    >
+                      <View
+                        style={{
+                          height: 34,
+                          width: 34,
+                          borderRadius: 11,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: `${colors.warning}1F`,
+                        }}
+                      >
+                        <Info size={16} color={colors.warning} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="label" style={{ fontWeight: "800" }}>
+                          {name}
+                        </Text>
+                        <Text
+                          variant="caption"
+                          color={colors.mutedForeground}
+                          style={{ fontSize: fontSize.xs }}
+                        >
+                          Exit-load rules could not be verified — no rate assumed.
+                        </Text>
+                      </View>
+                      <Badge bg={`${colors.warning}1F`} color={colors.warning}>
+                        NOT VERIFIED
+                      </Badge>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </Card>
+          ) : null}
 
           {/* ---------- How to read (collapsed by default) ---------- */}
           <Card style={{ borderWidth: 0, ...SHADOW }}>
@@ -865,6 +1003,20 @@ export default function TaxBreakdownScreen() {
           })}
         </View>
       </Modal>
+
+      {/* ---------- Disclaimer ---------- */}
+      <Text
+        variant="caption"
+        color={colors.mutedForeground}
+        style={{
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
+          fontSize: fontSize.xs,
+          lineHeight: 18,
+        }}
+      >
+        {TAX_DISCLAIMER}
+      </Text>
     </Screen>
   );
 }

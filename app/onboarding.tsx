@@ -1,13 +1,13 @@
 // ============================================================
 // SahakariSIP — Onboarding wizard
 // ============================================================
-// 5-step first-time fund setup, ported from the web app's
+// 6-step first-time fund setup, ported from the web app's
 // components/onboarding/onboarding-wizard.tsx:
 //   1. Choose Fund   2. Fee Rate   3. Monthly SIP
-//   4. Start Date    5. Current NAV
+//   4. Start Date    5. Current NAV   6. SIP Schedule
 // ============================================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, ScrollView, KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +20,7 @@ import {
   Coins,
   CalendarDays,
   TrendingUp,
+  CalendarRange,
 } from "lucide-react-native";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { FUND_PRESETS, MIN_SIP_AMOUNT } from "@/lib/constants";
@@ -28,6 +29,8 @@ import { useTheme, spacing, radius, fontSize } from "@/theme";
 import { Text, Button, Input, Card } from "@/components/ui/primitives";
 import { Select, useToast } from "@/components/ui/overlays";
 import { AppLogo } from "@/components/layout/AppLogo";
+import { SIPScheduleFields, EMPTY_SCHEDULE, type SIPScheduleValue, scheduleToFormFields } from "@/components/settings/sip-schedule-fields";
+import { getFundMeta } from "@/lib/fund-meta";
 
 const STEPS = [
   { title: "Choose Fund", description: "Which fund are you tracking?", icon: Building2, tintKey: "purple" as const },
@@ -35,6 +38,7 @@ const STEPS = [
   { title: "Monthly SIP", description: "Your planned monthly investment", icon: Coins, tintKey: "emerald" as const },
   { title: "Start Date", description: "When did you start?", icon: CalendarDays, tintKey: "info" as const },
   { title: "Current NAV", description: "Current market NAV of the fund", icon: TrendingUp, tintKey: "success" as const },
+  { title: "SIP Schedule", description: "Your registered due date and frequency", icon: CalendarRange, tintKey: "primary" as const },
 ];
 
 export default function OnboardingScreen() {
@@ -52,6 +56,17 @@ export default function OnboardingScreen() {
   const [monthlySip, setMonthlySip] = useState("");
   const [startDate, setStartDate] = useState(todayKey());
   const [latestNav, setLatestNav] = useState("10.00");
+  const [schedule, setSchedule] = useState<SIPScheduleValue>(EMPTY_SCHEDULE);
+  // The SIP start date mirrors the registration date until customized.
+  const [anchorEdited, setAnchorEdited] = useState(false);
+
+  useEffect(() => {
+    if (!anchorEdited) {
+      setSchedule((s) =>
+        s.anchorDate === startDate ? s : { ...s, anchorDate: startDate, verified: false }
+      );
+    }
+  }, [startDate, anchorEdited]);
 
   const isCustomFund = fundName === "other";
   const actualFundName = isCustomFund ? customFundName : fundName;
@@ -72,12 +87,18 @@ export default function OnboardingScreen() {
         return isCustomFund ? customFundName.trim().length > 0 : fundName.length > 0;
       case 1:
         return parseFloat(feeRate) > 0;
-      case 2:
-        return parseFloat(monthlySip) >= MIN_SIP_AMOUNT;
+      case 2: {
+        const min = getFundMeta(actualFundName)?.minimumSipAmount ?? MIN_SIP_AMOUNT;
+        return parseFloat(monthlySip) >= (min || 1);
+      }
       case 3:
         return startDate.length > 0;
       case 4:
         return parseFloat(latestNav) > 0;
+      case 5:
+        // Skippable: an unconfirmed schedule simply gets no reminders.
+        // The component only allows checking "confirmed" when complete.
+        return true;
       default:
         return false;
     }
@@ -87,12 +108,18 @@ export default function OnboardingScreen() {
     if (!store) return;
     setLoading(true);
 
+    const scheduleFields = scheduleToFormFields(schedule);
+
     const result = await store.createFundConfig({
       fund_name: actualFundName,
       fee_rate_pct: parseFloat(feeRate),
       start_date: startDate,
       monthly_sip: parseFloat(monthlySip),
       latest_nav: parseFloat(latestNav),
+      frequency: (scheduleFields.frequency as "MONTHLY" | "QUARTERLY" | "SEMI_ANNUALLY" | "ANNUALLY" | null) || undefined,
+      calendar_system: (scheduleFields.calendar_system as "AD" | "BS" | null) || undefined,
+      anchor_date: scheduleFields.anchor_date || undefined,
+      schedule_verified: scheduleFields.schedule_verified === "true",
     });
 
     setLoading(false);
@@ -280,6 +307,16 @@ export default function OnboardingScreen() {
                   Current market NAV for tracking portfolio valuation and returns.
                 </Text>
               </View>
+            )}
+
+            {step === 5 && (
+              <SIPScheduleFields
+                fundName={actualFundName}
+                value={schedule}
+                onChange={setSchedule}
+                startDateLocked={!anchorEdited}
+                onEditStartDate={() => setAnchorEdited(true)}
+              />
             )}
           </View>
 

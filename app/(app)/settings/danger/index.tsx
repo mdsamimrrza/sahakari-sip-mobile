@@ -1,31 +1,37 @@
 // ============================================================
-// SahakariSIP — Settings → Danger Zone (legacy route)
+// SahakariSIP — Settings → Danger Zone
 // ============================================================
-// Delete Account now lives inside Profile, but this route is kept so
-// old deep-links don't break — it renders the same dialog.
+// Matches the web app's danger zone: shows fund/entry counts
+// and the delete account dialog with "DELETE" confirmation.
 // ============================================================
 
 import React from "react";
+import { useFunds, useEntries } from "@/hooks/useData";
+import { useTheme } from "@/theme";
 import { Text } from "@/components/ui/primitives";
 import { Screen } from "@/components/ui/layout";
 import { SettingsDetailHeader } from "@/components/settings/menu";
 import { DeleteAccountDialog } from "@/components/settings/DeleteAccountDialog";
 
 export default function SettingsDangerScreen() {
+  const { colors } = useTheme();
+  const { funds } = useFunds();
+  const { entries } = useEntries("all");
+
   return (
     <Screen
       header={
         <SettingsDetailHeader
           title="Danger Zone"
-          subtitle="Permanent actions"
+          subtitle="Irreversible actions"
         />
       }
     >
-      <Text variant="caption" align="center">
+      <Text variant="caption" align="center" color={colors.mutedForeground}>
         These actions are permanent and cannot be undone. Prefer managing
         them from Profile.
       </Text>
-      <DeleteAccountDialog />
+      <DeleteAccountDialog fundCount={funds.length} entryCount={entries.length} />
     </Screen>
   );
 }

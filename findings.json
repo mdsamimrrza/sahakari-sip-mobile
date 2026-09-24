@@ -1,0 +1,272 @@
+{
+  "run_id": "sahakarisip-2026-09-24-001",
+  "repo": "sahakari-sip-mobile",
+  "target": "C:\\Users\\samim_40uxmfb\\Desktop\\deplyed project\\sipapk",
+  "source_ref": "3953983 (v1.2.1, versionCode 8)",
+  "profile": "standard",
+  "scope_paths": [
+    "app/",
+    "src/",
+    "android/app/src/main/",
+    ".github/workflows/",
+    "package.json",
+    "app.json",
+    ".env.example"
+  ],
+  "execution_policy": "sandboxed-source-and-local-only",
+  "findings": [
+    {
+      "id": "FIND-001",
+      "status": "confirmed",
+      "severity": "high",
+      "title": "CI Build Auto-Generates Weak Keystore When Signing Secrets Absent",
+      "attack_class": "SUPPLY-CHAIN-AND-RELEASE.md#Build-to-promotion substitution",
+      "trust_boundary": "CI/CD → Release Artifact → User Device",
+      "lower_trust_principal": "Attacker with access to published APK",
+      "affected_resource": "App signing identity (keystore)",
+      "result": "Attacker can re-sign malicious updates with same identity, enabling persistent app replacement",
+      "affected_files": [
+        ".github/workflows/build-release-apk.yml:83-92"
+      ],
+      "evidence": "Lines 83-92 generate keystore with hardcoded 'android123' password when KEYSTORE_BASE64 secret unset. Keystore used to sign release APK.",
+      "attack_scenario": "If repository secrets are not configured, CI generates a self-signed keystore with well-known low-entropy password. Attacker extracts keystore from APK (standard Android tooling) and re-signs malicious updates. Users' devices accept updates signed with same key.",
+      "remediation": "1. Remove fallback keystore generation; fail build if KEYSTORE_BASE64 secret absent. 2. Document release signing requirements. 3. Rotate any APKs published with auto-generated keystore.",
+      "fingerprint": "sha256:ci-weak-keystore-fallback"
+    },
+    {
+      "id": "FIND-002",
+      "status": "confirmed",
+      "severity": "medium",
+      "title": "On-Device Password Hashing Uses Bare SHA-256 (No Key Stretching)",
+      "attack_class": "ATTACK-CLASSES.md#Cryptography and secrets",
+      "trust_boundary": "User Device Storage → Attacker (Physical/Forensic Access)",
+      "lower_trust_principal": "Attacker with extracted AsyncStorage",
+      "affected_resource": "Local-mode user passwords",
+      "result": "Offline GPU cracking at ~10-50B attempts/sec; 8-char minimum falls in hours-days",
+      "affected_files": [
+        "src/lib/auth/AuthContext.tsx:181-186"
+      ],
+      "evidence": "hashPassword() uses single SHA-256: Crypto.digestStringAsync(SHA256, `${salt}::${password}`). No PBKDF2, Argon2, scrypt, or iteration count. expo-crypto does not expose KDF.",
+      "attack_scenario": "Device lost/stolen. Attacker extracts AsyncStorage (rooted device, adb backup, forensic tool). Finds salt + SHA256(salt::password). With single fast hash, offline brute force recovers weak passwords quickly.",
+      "remediation": "Replace with PBKDF2 (expo-crypto + manual iterations, min 100k) or Argon2 (native module). Store iteration count in profile for future upgrades.",
+      "fingerprint": "sha256:local-auth-bare-sha256"
+    },
+    {
+      "id": "FIND-003",
+      "status": "confirmed",
+      "severity": "medium",
+      "title": "Merge Deduplication by Case-Insensitive Fund Name Can Conflate Distinct Funds",
+      "attack_class": "ATTACK-CLASSES.md#Business logic / DATA-ISOLATION-AND-LIFECYCLE.md#Composite-key and namespace collision",
+      "trust_boundary": "Local Device Data → Cloud Account (Merge)",
+      "lower_trust_principal": "N/A (data integrity violation during user-initiated merge)",
+      "affected_resource": "Portfolio analytics (XIRR, fee drag, CGT, fund-level breakdowns)",
+      "result": "Two funds differing only in case merged into one; entries combined, analytics corrupted",
+      "affected_files": [
+        "src/lib/data/merge.ts:253, 288-290"
+      ],
+      "evidence": "fundKey = name.trim().toLowerCase(); fundsByName Map uses this key. No secondary discriminator (user_id, AMC code, ISIN). Case variance in user-entered fund names causes collision.",
+      "attack_scenario": "User has 'NMB Saral Bachat Fund-E' on phone and 'nmb saral bachat fund-e' in cloud (or another device). Merge treats as single fund. All entries combined under one fund_id. Dashboard XIRR, fee drag, CGT, monthly contributions all incorrect.",
+      "remediation": "Use composite key: (user_id, fund_name_lowercase). Since merge is per-user, add cloud user ID to key. Or add explicit fund-match confirmation step in merge UI.",
+      "fingerprint": "sha256:merge-case-insensitive-dedup"
+    },
+    {
+      "id": "FIND-004",
+      "status": "confirmed",
+      "severity": "medium",
+      "title": "Deep Link Token Replay Possible If Web Backend Doesn't Enforce Single-Use",
+      "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Deep-link, callback, and navigation attack classes / WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "trust_boundary": "Google OAuth Callback (Deep Link) → Mobile App → Web Backend Token Exchange",
+      "lower_trust_principal": "Attacker who captures handoff token",
+      "affected_resource": "Victim's Supabase RLS JWT (portfolio access)",
+      "result": "Replay of captured token yields valid session if web backend doesn't enforce single-use",
+      "affected_files": [
+        "src/lib/auth/AuthContext.tsx:871-888",
+        "src/lib/auth/mobileApi.ts:87-100"
+      ],
+      "evidence": "Client mints 16-byte nonce, sends to web /api/mobile/google. On callback, token from sahakarisip://auth/callback?token=... exchanged via /api/mobile/exchange. Client has no replay protection; relies entirely on server.",
+      "attack_scenario": "Attacker captures token (clipboard, notification preview, browser history). Replays to /api/mobile/exchange. If server doesn't mark token consumed, attacker obtains valid RLS JWT and accesses victim's portfolio.",
+      "remediation": "1. Verify web backend marks nonce/token consumed on first exchange (idempotent rejection). 2. Add short expiry (≤5 min). 3. Consider binding token to device fingerprint at issuance.",
+      "fingerprint": "sha256:oauth-handoff-token-replay"
+    },
+    {
+      "id": "FIND-005",
+      "status": "confirmed",
+      "severity": "low",
+      "title": "Android allowBackup=\"true\" Exposes App Data via adb backup",
+      "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+      "trust_boundary": "Device (USB/ADB) → App Private Storage",
+      "lower_trust_principal": "Attacker with physical USB access to unlocked device",
+      "affected_resource": "AsyncStorage (local profiles, session, privacy settings), potentially SecureStore",
+      "result": "adb backup extracts app data including financial records and auth tokens",
+      "affected_files": [
+        "android/app/src/main/AndroidManifest.xml:14"
+      ],
+      "evidence": "<application android:allowBackup=\"true\" ... android:fullBackupContent=\"@xml/secure_store_backup_rules\">. Backup API enabled; referenced XML may not exclude all sensitive keys.",
+      "attack_scenario": "Attacker with unlocked device runs 'adb backup -f backup.ab com.samimrrza.sahakarisip'. Backup includes AsyncStorage keys (sahakarisip.v1.*) and potentially SecureStore data (biometric entries with Supabase JWTs).",
+      "remediation": "Set android:allowBackup=\"false\" in AndroidManifest.xml, or define fullBackupContent XML to explicitly exclude sahakarisip.v1.* keys and SecureStore.",
+      "fingerprint": "sha256:android-allowbackup-enabled"
+    },
+    {
+      "id": "FIND-006",
+      "status": "confirmed",
+      "severity": "low",
+      "title": "CSV Import Accepts User-Supplied units Without Cross-Field Validation",
+      "attack_class": "ATTACK-CLASSES.md#Business logic",
+      "trust_boundary": "User Input (CSV) → Stored Entries → Analytics",
+      "lower_trust_principal": "Authenticated user (self-impact)",
+      "affected_resource": "Data integrity (XIRR, fee drag, CGT, portfolio value)",
+      "result": "Inconsistent units stored; dashboard recomputes from stored values producing incorrect analytics",
+      "affected_files": [
+        "src/lib/data/cloud.ts:601-603",
+        "src/lib/data/local.ts:483-486"
+      ],
+      "evidence": "units = parsed.data.units ?? Math.floor(effectiveCash / nav). If units provided in CSV, used directly without verifying units * nav ≈ amount - DP_CHARGE. csvRowSchema allows optional units but no cross-field refine.",
+      "attack_scenario": "User imports CSV with units=999999 for a small amount. Entry stored with bogus units. Dashboard calculations (totalUnits, currentValue, XIRR, fee drag) all incorrect. Self-impact only; no cross-user boundary.",
+      "remediation": "Add Zod .refine() on csvRowSchema: if units provided, verify units === Math.floor((amount - DP_CHARGE) / nav). Reject rows violating SEBON whole-unit rule.",
+      "fingerprint": "sha256:csv-units-no-cross-validation"
+    },
+    {
+      "id": "FIND-007",
+      "status": "confirmed",
+      "severity": "low",
+      "title": ".env File with Production Credentials Exists in Working Directory",
+      "attack_class": "ATTACK-CLASSES.md#Obvious things",
+      "trust_boundary": "Developer Workspace → Git History (Accidental Commit)",
+      "lower_trust_principal": "Anyone with repo access if committed",
+      "affected_resource": "Supabase project identifier and anon key",
+      "result": "If committed, requires key rotation and exposes project URL",
+      "affected_files": [
+        ".env"
+      ],
+      "evidence": ".env contains EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY for production project. .gitignore excludes .env but file persists in workspace.",
+      "attack_scenario": "Developer runs 'git add .' accidentally committing .env. Anon key is public-by-design (RLS constrained) but project URL exposure aids reconnaissance. Key rotation required if leaked.",
+      "remediation": "1. Delete .env from workspace; use .env.local (also gitignored) for local overrides. 2. Add pre-commit hook rejecting .env. 3. Rotate anon key if ever committed (Supabase Dashboard → API → Regenerate).",
+      "fingerprint": "sha256:env-file-in-workspace"
+    },
+    {
+      "id": "NEEDS-VAL-001",
+      "status": "needs_validation",
+      "severity": null,
+      "title": "Google OAuth Handoff — Web Backend Single-Use Token Enforcement",
+      "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "trust_boundary": "Mobile App → Web Backend (/api/mobile/exchange)",
+      "lower_trust_principal": "Attacker with captured handoff token",
+      "affected_resource": "Victim's Supabase RLS JWT",
+      "result": "Unknown — depends on web backend implementation",
+      "affected_files": [
+        "src/lib/auth/AuthContext.tsx:871-888",
+        "src/lib/auth/mobileApi.ts:97-100"
+      ],
+      "evidence": "Client relies on web backend to enforce single-use of handoff token. Web backend (sahakari-sip NextAuth) not in this repository.",
+      "blocker": "Web backend token consumption logic not observable in this repository.",
+      "validation_plan": "Owner deploys test instance, captures handoff token, exchanges twice, verifies second request fails (400/409).",
+      "fingerprint": "sha256:oauth-handoff-server-validation"
+    },
+    {
+      "id": "NEEDS-VAL-002",
+      "status": "needs_validation",
+      "severity": null,
+      "title": "Supabase RLS Policies Correctly Enforce Per-User Isolation",
+      "attack_class": "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+      "trust_boundary": "Supabase (Postgres) → User Data",
+      "lower_trust_principal": "Authenticated cloud user attempting cross-user access",
+      "affected_resource": "All user data tables (fund_config, entries, nav_history, notification_preferences, notifications_log)",
+      "result": "Unknown — depends on deployed Supabase RLS policies",
+      "affected_files": [
+        "src/lib/data/cloud.ts (all methods)"
+      ],
+      "evidence": "All cloud queries filter by user_id from JWT (RLS). Source assumes RLS policies exist: auth.uid() = user_id. Not verifiable from this repo.",
+      "blocker": "Supabase RLS policies are deployed configuration, not in source.",
+      "validation_plan": "Owner checks Supabase Dashboard → Authentication → Policies. Tests with two dummy users: sign in as user A, attempt to read user B's rows via Supabase client with user A's JWT.",
+      "fingerprint": "sha256:supabase-rls-policies"
+    },
+    {
+      "id": "NEEDS-VAL-003",
+      "status": "needs_validation",
+      "severity": null,
+      "title": "Android fullBackupContent XML Actually Excludes Sensitive Keys",
+      "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+      "trust_boundary": "Device (USB/ADB) → App Private Storage",
+      "lower_trust_principal": "Attacker with physical USB access",
+      "affected_resource": "AsyncStorage and SecureStore data",
+      "result": "Unknown — depends on XML content",
+      "affected_files": [
+        "android/app/src/main/AndroidManifest.xml:14",
+        "android/app/src/main/res/xml/secure_store_backup_rules.xml (referenced)"
+      ],
+      "evidence": "Manifest references @xml/secure_store_backup_rules but file content not reviewed. If missing or permissive, allowBackup=true enables full backup.",
+      "blocker": "XML file content not accessible in current workspace view.",
+      "validation_plan": "Owner inspects secure_store_backup_rules.xml. If missing or permissive, set allowBackup=\"false\".",
+      "fingerprint": "sha256:android-backup-rules-xml"
+    }
+  ],
+  "rejected": [
+    {
+      "id": "REJ-001",
+      "claim": "SQL Injection via Supabase queries",
+      "reason": "Supabase JS client uses parameterized queries; no string interpolation in any query in cloud.ts or local.ts"
+    },
+    {
+      "id": "REJ-002",
+      "claim": "XSS/Injection via React Native rendering",
+      "reason": "React Native doesn't render HTML; all dynamic values go through Text components with no dangerouslySetInnerHTML equivalent"
+    },
+    {
+      "id": "REJ-003",
+      "claim": "Hardcoded secrets in source",
+      "reason": "No secrets in source. .env is gitignored. Anon key is public by design (RLS constrained)."
+    },
+    {
+      "id": "REJ-004",
+      "claim": "Service role key exposure",
+      "reason": "Explicitly excluded: README and .env.example state service role key must never ship in APK"
+    },
+    {
+      "id": "REJ-005",
+      "claim": "Biometric PIN fallback bypass",
+      "reason": "disableDeviceFallback: true enforced in biometric.ts:106"
+    },
+    {
+      "id": "REJ-006",
+      "claim": "Session fixation",
+      "reason": "Cloud sign-in mints fresh JWT from web backend; local mode creates new salted hash profile"
+    },
+    {
+      "id": "REJ-007",
+      "claim": "Account enumeration via signup",
+      "reason": "Web backend handles rate limiting; mobile surfaces generic errors"
+    },
+    {
+      "id": "REJ-008",
+      "claim": "CSRF on cloud mutations",
+      "reason": "No cookie-based auth; all cloud requests use Bearer token (JWT) from mobileSession"
+    },
+    {
+      "id": "REJ-009",
+      "claim": "Path traversal via file handling",
+      "reason": "No file path handling from user input; CSV parsed in memory via expo-document-picker"
+    },
+    {
+      "id": "REJ-010",
+      "claim": "SSRF via user-supplied URLs",
+      "reason": "No outbound fetch to user-supplied URLs; only configured Supabase and web backend endpoints"
+    },
+    {
+      "id": "REJ-011",
+      "claim": "Insecure randomness for nonce/uuid",
+      "reason": "expo-crypto.getRandomBytes(16) used for nonce (CSPRNG). uuid() falls back to Math.random only in Node scripts (verify.test.ts), not in app bundle"
+    }
+  ],
+  "coverage_summary": {
+    "total_units": 28,
+    "planned": 0,
+    "in_progress": 0,
+    "covered": 25,
+    "candidate": 7,
+    "blocked": 0,
+    "deferred": 0,
+    "out_of_scope": 0,
+    "not_applicable": 3
+  },
+  "run_status": "complete"
+}
