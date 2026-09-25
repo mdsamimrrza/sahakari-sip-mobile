@@ -38,7 +38,7 @@ export interface FundConfig {
   is_active: boolean;
   // ---- Registered SIP schedule (source of truth for due dates) ----
   sip_type: "UNLIMITED";
-  frequency: "MONTHLY" | "QUARTERLY" | null;
+  frequency: "MONTHLY" | "QUARTERLY" | "SEMI_ANNUALLY" | "ANNUALLY" | null;
   calendar_system: "AD" | "BS" | null;
   /** User's registered first SIP due date (AD ISO string), null until confirmed. */
   anchor_date: string | null;

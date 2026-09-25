@@ -1,5 +1,5 @@
 // ============================================================
-// SahakariSIP — Fund Configuration Manager
+// SahakariSIP - Fund Configuration Manager
 // ============================================================
 // Mobile port of `src/components/settings/fund-config-form.tsx`.
 // Behaviour kept identical:
@@ -8,7 +8,7 @@
 //   • create / edit share one form, pre-filled from FUND_PRESETS
 //   • presets fill the name + fee rate but never overwrite the
 //     user's monthly SIP or NAV (same rule as the web app)
-//   • a fund that still has SIP entries cannot be deleted — the
+//   • a fund that still has SIP entries cannot be deleted - the
 //     store rejects it and we surface the reason
 // ============================================================
 
@@ -41,6 +41,12 @@ import {
 } from "../ui/primitives";
 import { Modal, Select, useToast } from "../ui/overlays";
 import { DateField } from "../ui/DateField";
+import {
+  SIPScheduleFields,
+  scheduleToFormFields,
+  EMPTY_SCHEDULE,
+  type SIPScheduleValue,
+} from "./sip-schedule-fields";
 
 const ITEMS_PER_PAGE = 5;
 
@@ -78,6 +84,7 @@ export function FundConfigForm({
   const [open, setOpen] = useState(false);
   const [editingFund, setEditingFund] = useState<FundConfig | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [schedule, setSchedule] = useState<SIPScheduleValue>(EMPTY_SCHEDULE);
   const [formError, setFormError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -104,6 +111,7 @@ export function FundConfigForm({
   function openCreate() {
     setEditingFund(null);
     setForm(EMPTY_FORM);
+    setSchedule(EMPTY_SCHEDULE);
     setFormError(null);
     setOpen(true);
   }
@@ -119,6 +127,12 @@ export function FundConfigForm({
       latestNav: fund.latest_nav ? fund.latest_nav.toString() : "",
       preset: preset ? preset.name : "custom",
     });
+    // Pre-fill the registered schedule so it survives edits (same as web).
+    setSchedule({
+      frequency: (fund.frequency as SIPScheduleValue["frequency"]) ?? null,
+      anchorDate: fund.anchor_date ?? null,
+      verified: Boolean(fund.schedule_verified),
+    });
     setFormError(null);
     setOpen(true);
   }
@@ -128,7 +142,7 @@ export function FundConfigForm({
       if (!value || value === "custom") return { ...prev, preset: value };
       const preset = FUND_PRESETS.find((p) => p.name === value);
       if (!preset) return { ...prev, preset: value };
-      // Do not override monthly SIP or latest NAV — the user may want custom values.
+      // Do not override monthly SIP or latest NAV - the user may want custom values.
       return {
         ...prev,
         preset: value,
@@ -151,7 +165,7 @@ export function FundConfigForm({
     if (!name) return setFormError("Fund name is required");
     if (name.length > 100) return setFormError("Fund name is too long");
     if (isNaN(fee) || fee < 0) return setFormError("Fee rate cannot be negative");
-    if (fee > 10) return setFormError("Fee rate seems too high — please verify");
+    if (fee > 10) return setFormError("Fee rate seems too high - please verify");
     if (!form.startDate) return setFormError("Start date is required");
     if (isNaN(sip) || sip < MIN_SIP_AMOUNT)
       return setFormError(
@@ -160,12 +174,26 @@ export function FundConfigForm({
     if (isNaN(nav) || nav <= 0) return setFormError("Current NAV must be greater than 0");
 
     setIsLoading(true);
+    // Same payload the onboarding sends: the registered schedule rides along
+    // so the cloud fund carries it and the web reminder cron can use it.
+    const scheduleFields = scheduleToFormFields(schedule);
     const input = {
       fund_name: name,
       fee_rate_pct: fee,
       start_date: form.startDate,
       monthly_sip: sip,
       latest_nav: nav,
+      frequency:
+        (scheduleFields.frequency as
+          | "MONTHLY"
+          | "QUARTERLY"
+          | "SEMI_ANNUALLY"
+          | "ANNUALLY"
+          | null) || undefined,
+      calendar_system:
+        (scheduleFields.calendar_system as "AD" | "BS" | null) || undefined,
+      anchor_date: scheduleFields.anchor_date || undefined,
+      schedule_verified: scheduleFields.schedule_verified === "true",
     };
 
     const result = editingFund
@@ -250,7 +278,7 @@ export function FundConfigForm({
         </CardHeader>
 
         <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.xl, gap: spacing.sm }}>
-          {/* Search — only once the list is long enough to need it */}
+          {/* Search - only once the list is long enough to need it */}
           {funds.length > 3 && (
             <Input
               placeholder="Search funds by name…"
@@ -352,7 +380,7 @@ export function FundConfigForm({
                     {formatCurrencyWhole(fund.monthly_sip)}/mo
                   </Badge>
                   <Badge bg={`${colors.success}1F`} color={colors.success}>
-                    NAV {fund.latest_nav?.toFixed(2) ?? "—"}
+                    NAV {fund.latest_nav?.toFixed(2) ?? "-"}
                   </Badge>
                 </View>
               </View>
@@ -489,7 +517,7 @@ export function FundConfigForm({
           </View>
 
           <Input
-            label={`Planned Monthly SIP (NPR) — minimum ${MIN_SIP_AMOUNT.toLocaleString("en-IN")}`}
+            label={`Planned Monthly SIP (NPR) - minimum ${MIN_SIP_AMOUNT.toLocaleString("en-IN")}`}
             value={form.monthlySip}
             onChangeText={(t) => setForm((p) => ({ ...p, monthlySip: t }))}
             keyboardType="number-pad"
@@ -500,6 +528,13 @@ export function FundConfigForm({
             label="Start Date"
             value={form.startDate}
             onChange={(d) => setForm((p) => ({ ...p, startDate: d }))}
+          />
+
+          {/* Section 2 - SIP schedule (same as the web fund settings page) */}
+          <SIPScheduleFields
+            fundName={form.fundName}
+            value={schedule}
+            onChange={setSchedule}
           />
         </View>
       </Modal>
@@ -532,7 +567,7 @@ export function FundConfigForm({
       >
         <Text variant="caption" color={colors.mutedForeground}>
           This only removes the fund's configuration. Your SIP entry history for this fund
-          must be deleted first — that guard protects your records.
+          must be deleted first - that guard protects your records.
         </Text>
       </Modal>
     </>

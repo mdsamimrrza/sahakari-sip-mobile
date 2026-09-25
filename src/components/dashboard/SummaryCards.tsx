@@ -1,5 +1,5 @@
 // ============================================================
-// SahakariSIP — Dashboard summary cards
+// SahakariSIP - Dashboard summary cards
 // ============================================================
 // Port of the web app's components/dashboard/summary-cards.tsx:
 //   Card 1 · Portfolio Value (+ fund scope + Add SIP)
@@ -33,6 +33,7 @@ import {
   formatStreak,
 } from "@/lib/format";
 import { formatFundShortName } from "@/lib/utils";
+import { CGT_NP_REDEMPTION } from "@/lib/tax";
 import { useTheme, radius, spacing, fontSize } from "@/theme";
 import { Text, Card, Button, Skeleton } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/overlays";
@@ -103,7 +104,7 @@ export function SummaryCards({
 
   return (
     <View style={{ gap: spacing.md }}>
-      {/* HERO: Portfolio Value — wrapper lets the fund dropdown overlay
+      {/* HERO: Portfolio Value - wrapper lets the fund dropdown overlay
           the card without being clipped by its overflow:"hidden" */}
       <View>
       <View
@@ -280,7 +281,7 @@ export function SummaryCards({
 
       </View>
 
-      {/* Fund dropdown chip — overlaid on the card's top-right corner */}
+      {/* Fund dropdown chip - overlaid on the card's top-right corner */}
       <View
         style={{
           position: "absolute",
@@ -418,7 +419,7 @@ export function SummaryCards({
           tint={colors.amber}
           icon={<TrendingUp size={15} color={colors.amber} />}
           label="XIRR Return"
-          value={summary.xirr !== null ? formatPercentage(summary.xirr * 100) : "—"}
+          value={summary.xirr !== null ? formatPercentage(summary.xirr * 100) : "-"}
         />
         <KpiChip
           tint={colors.info}
@@ -573,19 +574,19 @@ export function SummaryCards({
             {[
               {
                 label: "Latest NAV",
-                // Selected fund's NAV, else the freshest NAV across funds —
-                // never a bare "—" when we know the last updated NAV.
+                // Selected fund's NAV, else the freshest NAV across funds -
+                // never a bare "-" when we know the last updated NAV.
                 value:
                   activeFund?.latest_nav
                     ? formatPrivate(`NPR ${Number(activeFund.latest_nav).toFixed(2)}`)
                     : summary.latestNav
                       ? formatPrivate(`NPR ${Number(summary.latestNav).toFixed(2)}`)
-                      : "—",
+                      : "-",
               },
               { label: "Total Units", value: formatUnits(summary.totalUnits) },
               {
                 label: "Avg Unit Cost",
-                value: avgUnitCost > 0 ? formatPrivate(`NPR ${avgUnitCost.toFixed(2)}`) : "—",
+                value: avgUnitCost > 0 ? formatPrivate(`NPR ${avgUnitCost.toFixed(2)}`) : "-",
               },
               { label: "SIP Streak", value: formatStreak(summary.sipStreak) },
             ].map((m) => (
@@ -659,11 +660,11 @@ export function SummaryCards({
           >
             <Text variant="label">Capital Gains Tax (CGT)</Text>
             <ReconRow
-              label="Long-Term (> 1 yr @ 7.5%)"
+              label={`Long-Term (> 1 yr @ ${CGT_NP_REDEMPTION.longTermRatePct}%)`}
               value={formatPrivate(formatCurrencyWhole(summary.estimatedCgtLongTerm ?? 0))}
             />
             <ReconRow
-              label="Short-Term (< 1 yr @ 10.0%)"
+              label={`Short-Term (< 1 yr @ ${CGT_NP_REDEMPTION.shortTermRatePct}%)`}
               value={formatPrivate(formatCurrencyWhole(summary.estimatedCgtShortTerm ?? 0))}
             />
           </View>

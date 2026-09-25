@@ -89,10 +89,13 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           WEB_URL:           ${{ secrets.WEB_URL }}
         run: |
-          printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\nEXPO_PUBLIC_DEFAULT_DATA_MODE=cloud\nEXPO_PUBLIC_WEB_URL=%s\n' \
-            "${SUPABASE_URL:-https://entbhjpnhdjfhcctcvmt.supabase.co}" \
-            "${SUPABASE_ANON_KEY:-sb_publishable_Qox-u2IFEpaoUHus51Ofhw_4XyVPI3D}" \
-            "${WEB_URL:-https://sahakari-sip.vercel.app}" > .env
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\nEXPO_PUBLIC_DEFAULT_DATA_MODE=cloud\nEXPO_PUBLIC_WEB_URL=%s\n' \
+              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "${WEB_URL:-https://sahakari-sip.vercel.app}" > .env
+            echo "Cloud mode enabled from repository secrets."
+          else
+            echo "Supabase secrets not set - building a local-mode-only APK (no .env written)."
+          fi
 
       - name: Stamp versionName & versionCode into build.gradle
         run: |

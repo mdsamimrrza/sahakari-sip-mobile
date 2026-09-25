@@ -96,10 +96,9 @@ export default function LandingScreen() {
       <View
         style={{
           flex: 1,
-          justifyContent: "center",
+          justifyContent: "space-evenly",
           padding: spacing.lg,
           paddingBottom: insets.bottom + spacing.lg,
-          gap: spacing.md,
         }}
       >
         {/* Hero */}

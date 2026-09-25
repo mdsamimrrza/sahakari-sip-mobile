@@ -5,12 +5,12 @@
 // (min 8 chars, one uppercase, one digit, passwords must match).
 // ============================================================
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff } from "lucide-react-native";
 import { useAuth } from "@/lib/auth/AuthContext";
-import type { DataMode } from "@/lib/data/store";
+import { loadSavedDataMode, saveDataMode, type DataMode } from "@/lib/data/store";
 import { signupSchema } from "@/lib/schemas/auth";
 import { useTheme, spacing, fontSize } from "@/theme";
 import { Text, Button, Input, Card, Separator } from "@/components/ui/primitives";
@@ -28,7 +28,15 @@ export default function SignupScreen() {
 
   // Cloud is the first-class path — always start there when Supabase is
   // configured. The env default only matters with no cloud configured.
+  // The user's explicit choice (toggle) persists and wins over the default,
+  // so navigating to login/sign-up or restarting never flips it back.
   const [mode, setMode] = useState<DataMode>(cloudAvailable ? "cloud" : "local");
+
+  useEffect(() => {
+    loadSavedDataMode().then((saved) => {
+      if (saved) setMode(saved);
+    });
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -139,6 +147,7 @@ export default function SignupScreen() {
         onSwitch={(next) => {
           setError(null);
           setMode(next);
+          void saveDataMode(next);
         }}
       />
 

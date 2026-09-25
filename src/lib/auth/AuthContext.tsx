@@ -248,20 +248,33 @@ let googleHandoffResolvers: Array<(token: string | null) => void> = [];
 // Tokens are 32-char hex; we keep them for 24h to prevent accidental replays.
 const USED_HANDOFF_TOKENS_KEY = "sahakarisip.v1.used_handoff_tokens";
 const HANDOFF_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+/** Bound the map so a flood of sign-in attempts can't grow storage forever. */
+const HANDOFF_TOKEN_MAX_ENTRIES = 50;
 
 async function markHandoffTokenUsed(token: string): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(USED_HANDOFF_TOKENS_KEY);
     const tokens: Record<string, number> = raw ? JSON.parse(raw) : {};
     tokens[token] = Date.now();
-    // Prune expired
+    // Prune expired, then cap: drop the oldest entries past the limit.
     const now = Date.now();
     for (const [t, ts] of Object.entries(tokens)) {
       if (now - ts > HANDOFF_TOKEN_TTL_MS) delete tokens[t];
     }
-    await AsyncStorage.setItem(USED_HANDOFF_TOKENS_KEY, JSON.stringify(tokens));
+    const entries = Object.entries(tokens).sort((a, b) => b[1] - a[1]);
+    const kept = Object.fromEntries(entries.slice(0, HANDOFF_TOKEN_MAX_ENTRIES));
+    await AsyncStorage.setItem(USED_HANDOFF_TOKENS_KEY, JSON.stringify(kept));
   } catch {
     // Best-effort; server enforces single-use.
+  }
+}
+
+/** Drop the replay-protection store — called on sign-out and account deletion. */
+async function clearHandoffTokens(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(USED_HANDOFF_TOKENS_KEY);
+  } catch {
+    // Best-effort.
   }
 }
 
@@ -1092,6 +1105,7 @@ const next: AppUser = {
     await clearBiometricEntry();
     setBiometricEnabled(false);
     await clearMobileSession();
+    await clearHandoffTokens();
     await persistSession(null);
   }, [cloudAvailable, persistSession, user]);
 
@@ -1130,10 +1144,12 @@ const next: AppUser = {
     }
 
     // Sweep derived copies the stores' purge lists don't cover: the merge
-    // recovery snapshot, merge-done markers, and the profile photo.
+    // recovery snapshot, merge-done markers, the profile photo, and the
+    // OAuth replay-protection journal.
     try {
       await purgeMergeArtifacts();
       await removeProfilePhoto(user.id);
+      await clearHandoffTokens();
     } catch {
       // Best-effort — the primary data is already purged.
     }

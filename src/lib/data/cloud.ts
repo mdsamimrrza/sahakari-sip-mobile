@@ -213,6 +213,13 @@ export class CloudStore implements DataStore {
         monthly_sip: parsed.data.monthly_sip,
         latest_nav: parsed.data.latest_nav,
         latest_nav_date: input.start_date,
+        // Registered SIP schedule - same columns the web writes
+        // (20260923_sip_schedule.sql), so the web reminder cron resolves
+        // the user's CONFIRMED schedule instead of guessing an anchor.
+        frequency: input.frequency ?? null,
+        calendar_system: input.calendar_system ?? null,
+        anchor_date: input.anchor_date ?? null,
+        schedule_verified: input.schedule_verified ?? false,
       })
       .select()
       .single();
@@ -268,6 +275,12 @@ export class CloudStore implements DataStore {
         start_date: input.start_date,
         monthly_sip: parsed.data.monthly_sip,
         latest_nav: parsed.data.latest_nav,
+        // Registered SIP schedule - same columns the web writes, so a
+        // schedule confirmed on the phone reaches the web reminder cron.
+        frequency: input.frequency ?? null,
+        calendar_system: input.calendar_system ?? null,
+        anchor_date: input.anchor_date ?? null,
+        schedule_verified: input.schedule_verified ?? false,
         ...(navChanged ? { latest_nav_date: newNavDate } : {}),
       })
       .eq("id", id)

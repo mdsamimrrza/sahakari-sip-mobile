@@ -35,6 +35,10 @@ import {
   Separator,
 } from "../ui/primitives";
 import { useToast } from "../ui/overlays";
+import {
+  cancelLocalReminders,
+  refreshLocalReminders,
+} from "../../lib/notifications/local-reminders";
 
 type PermissionState = "granted" | "denied" | "undetermined" | "unsupported";
 
@@ -208,9 +212,10 @@ export function NotificationSettings({ userEmail }: { userEmail: string }) {
   async function handleTogglePush() {
     if (isPushLoading) return;
 
-    // Turning it off is always allowed — no permission needed.
+    // Turning it off is always allowed - no permission needed.
     if (prefs.push_enabled) {
       await persist({ ...prefs, push_enabled: false });
+      await cancelLocalReminders();
       return;
     }
 
@@ -243,6 +248,9 @@ export function NotificationSettings({ userEmail }: { userEmail: string }) {
       if (status === "granted") {
         setPermission("granted");
         await persist({ ...prefs, push_enabled: true });
+        // Schedule the on-device countdown reminders (10/5/3/1 days + due day).
+        // Without this the toggle is a no-op switch - nothing delivers.
+        if (store) await refreshLocalReminders(store);
         toast({
           title: "Push reminders enabled",
           description: "You'll be alerted before each installment is due.",

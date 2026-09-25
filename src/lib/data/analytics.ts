@@ -1,5 +1,5 @@
 // ============================================================
-// SahakariSIP — Portfolio Analytics Engine
+// SahakariSIP - Portfolio Analytics Engine
 // ============================================================
 // Backend-agnostic port of the web app's `getDashboardData()`
 // (src/lib/actions/dashboard.ts). Both the Supabase store and the
@@ -68,7 +68,7 @@ export function computeDashboardData({
     latestNav = fund?.latest_nav ? Number(fund.latest_nav) : null;
     latestNavDate = fund?.latest_nav_date ?? null;
   } else {
-    // "All Funds" — use each fund's latest NAV for its units, then derive
+    // "All Funds" - use each fund's latest NAV for its units, then derive
     // the blended per-unit value.
     let totalValue = 0;
     let hasAllNavs = true;
@@ -146,6 +146,10 @@ export function computeDashboardData({
     const lotCurrentValue = Number(e.units) * fundNav;
     const lotGain = lotCurrentValue - lotCostBasis;
 
+    // Loss lots are excluded from the taxable buckets (matches the web
+    // dashboard: only net-positive lots are aged into long/short sums).
+    if (lotGain <= 0) continue;
+
     const purchaseMs = parseDateSafe(e.purchase_date).getTime();
     const daysHeld = (todayMs - purchaseMs) / MS_PER_DAY;
 
@@ -156,19 +160,16 @@ export function computeDashboardData({
     }
   }
 
-  // Tax applies only to NET positive gain within each bucket.
   // Use verified rates from tax.ts (CGT_NP_REDEMPTION: 3.75% long-term, 5% short-term)
   const cgtLongRate = CGT_NP_REDEMPTION.longTermRatePct / 100;
   const cgtShortRate = CGT_NP_REDEMPTION.shortTermRatePct / 100;
 
-  const estimatedCgtLongTerm =
-    longTermGainSum > 0 ? longTermGainSum * cgtLongRate : 0;
-  const estimatedCgtShortTerm =
-    shortTermGainSum > 0 ? shortTermGainSum * cgtShortRate : 0;
+  const estimatedCgtLongTerm = longTermGainSum * cgtLongRate;
+  const estimatedCgtShortTerm = shortTermGainSum * cgtShortRate;
 
-  // Taxable bases (loss lots excluded)
-  const cgtTaxableLongTerm = Math.max(0, longTermGainSum);
-  const cgtTaxableShortTerm = Math.max(0, shortTermGainSum);
+  // Taxable bases (loss lots already excluded above)
+  const cgtTaxableLongTerm = longTermGainSum;
+  const cgtTaxableShortTerm = shortTermGainSum;
 
   // CGT status from verified source
   const { status: cgtStatus, message: cgtMessage } = getCapitalGainsStatus();
@@ -191,7 +192,8 @@ export function computeDashboardData({
     gainLoss,
     gainLossPct,
     cgtStatus,
-    cgtMessage,
+    // Nulled when verified - same shape the web dashboard emits.
+    cgtMessage: cgtStatus === "VERIFIED" ? null : cgtMessage,
     estimatedCgtLongTerm,
     estimatedCgtShortTerm,
     cgtTaxableLongTerm,
@@ -203,7 +205,7 @@ export function computeDashboardData({
   };
 
   // ---- Chart data ----
-  // NAV history & Portfolio Value timeline — built PER FUND throughout,
+  // NAV history & Portfolio Value timeline - built PER FUND throughout,
   // because a blended/scalar NAV is only valid when exactly one fund is in
   // view. Tracking each fund's own units and NAV independently prevents one
   // fund's NAV from overwriting another's on a shared date.
@@ -243,7 +245,7 @@ export function computeDashboardData({
     ])
   ).sort((a, b) => a.localeCompare(b));
 
-  // Running state PER FUND — units accumulated and last-known NAV.
+  // Running state PER FUND - units accumulated and last-known NAV.
   const runningUnitsByFund = new Map<string, number>();
   const lastKnownNavByFund = new Map<string, number>();
   for (const f of funds) {

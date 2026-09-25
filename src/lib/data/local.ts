@@ -201,12 +201,13 @@ export class LocalStore implements DataStore {
       latest_nav: parsed.data.latest_nav,
       latest_nav_date: input.start_date,
       is_active: true,
-      // SIP schedule fields (defaults for backward compatibility)
+      // Registered SIP schedule - persisted from the input (same columns the
+      // web writes) so a confirmed schedule survives in local mode too.
       sip_type: "UNLIMITED",
-      frequency: null,
-      calendar_system: null,
-      anchor_date: null,
-      schedule_verified: false,
+      frequency: input.frequency ?? null,
+      calendar_system: input.calendar_system ?? null,
+      anchor_date: input.anchor_date ?? null,
+      schedule_verified: input.schedule_verified ?? false,
       created_at: now,
       updated_at: now,
     };
@@ -247,6 +248,12 @@ export class LocalStore implements DataStore {
       start_date: input.start_date,
       monthly_sip: parsed.data.monthly_sip,
       latest_nav: parsed.data.latest_nav,
+      // Registered SIP schedule - persisted from the input (same columns
+      // the web writes) so edits keep the confirmed schedule in sync.
+      frequency: input.frequency ?? null,
+      calendar_system: input.calendar_system ?? null,
+      anchor_date: input.anchor_date ?? null,
+      schedule_verified: input.schedule_verified ?? false,
       latest_nav_date: newNavDate,
       updated_at: new Date().toISOString(),
     };

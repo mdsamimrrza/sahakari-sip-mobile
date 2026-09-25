@@ -11,12 +11,12 @@
 // profile that works fully offline.
 // ============================================================
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Eye, EyeOff, Fingerprint } from "lucide-react-native";
 import { useAuth } from "@/lib/auth/AuthContext";
-import type { DataMode } from "@/lib/data/store";
+import { loadSavedDataMode, saveDataMode, type DataMode } from "@/lib/data/store";
 import { useTheme, spacing, fontSize, radius } from "@/theme";
 import { Text, Button, Input, Card, Separator } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/overlays";
@@ -40,7 +40,15 @@ export default function LoginScreen() {
 
   // Cloud is the first-class path — always start there when Supabase is
   // configured. The env default only matters with no cloud configured.
+  // The user's explicit choice (toggle) persists and wins over the default,
+  // so navigating to signup/sign-in or restarting never flips it back.
   const [mode, setMode] = useState<DataMode>(cloudAvailable ? "cloud" : "local");
+
+  useEffect(() => {
+    loadSavedDataMode().then((saved) => {
+      if (saved) setMode(saved);
+    });
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -132,6 +140,7 @@ export default function LoginScreen() {
         onSwitch={(next) => {
           setError(null);
           setMode(next);
+          void saveDataMode(next);
         }}
       />
 

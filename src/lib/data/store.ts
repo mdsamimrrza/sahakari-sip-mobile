@@ -23,8 +23,33 @@ import type {
   NotificationItem,
   NotificationPreferences,
 } from "../types";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type DataMode = "local" | "cloud";
+
+// ---------- Persisted mode choice ----------
+// The user's Cloud-vs-Local choice on the auth screens persists here so it
+// survives navigation between login/signup (each screen restores the same
+// value instead of re-defaulting) and app restarts. Cloud stays the default
+// whenever nothing has been chosen yet.
+const DATA_MODE_KEY = "sahakarisip.v1.data_mode";
+
+export async function loadSavedDataMode(): Promise<DataMode | null> {
+  try {
+    const raw = await AsyncStorage.getItem(DATA_MODE_KEY);
+    return raw === "cloud" || raw === "local" ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveDataMode(mode: DataMode): Promise<void> {
+  try {
+    await AsyncStorage.setItem(DATA_MODE_KEY, mode);
+  } catch {
+    // Best-effort - the default rule still applies.
+  }
+}
 
 // ---------- Input payloads (the mobile equivalent of FormData) ----------
 

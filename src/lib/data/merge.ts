@@ -129,7 +129,20 @@ async function cloudUserIds(cloud: CloudStore): Promise<string[]> {
   const authId = await cloud.getUserId();
   return Array.from(
     new Set([effectiveId, authId].filter((x): x is string => !!x))
-  );
+  ).map(requireSafeUserId);
+}
+
+/**
+ * Restrict reads to the id this session owns. `cloudIds` may hold more
+ * than one legacy id, but only the first is ever written to, and the
+ * fields this merge filters on are all `|`-joined composite keys — so a
+ * user id containing `|` would let a crafted id prefix-match another
+ * user's key. Reject it before it reaches a Map lookup.
+ */
+function requireSafeUserId(id: string | undefined): string {
+  if (!id) throw new Error("Not authenticated");
+  if (id.includes("|")) throw new Error("Unsupported account identifier");
+  return id;
 }
 
 async function readCloudRows<T>(
@@ -252,6 +265,15 @@ export async function hasUnmergedLocalData(cloud: CloudStore): Promise<boolean> 
 
 const fundKey = (userId: string, name: string) => `${userId}|${name.trim().toLowerCase()}`;
 
+/** Owning user id of a `fundKey` — the prefix before the first `|`. */
+const keyUserId = (key: string) => key.slice(0, key.indexOf("|"));
+
+/** Resolve a local fund id to its name from the dataset. */
+function fundNameForLocalId(ds: LocalDataset, fundId: string): string {
+  const f = ds.funds.find((f) => f.id === fundId);
+  return f ? f.fund_name.trim().toLowerCase() : fundId;
+}
+
 /**
  * ISO-timestamp "is a newer than b". Local timestamps come from the device
  * clock (toISOString), cloud ones from Postgres — formats differ slightly
@@ -277,15 +299,25 @@ export async function mergeLocalIntoCloud(
 
   // Cloud entries already on record — the dedupe key set. Grows as we
   // push, so two device profiles holding the same entry don't both import.
+  // Keyed by fund NAME, not fund_id: the read set can span legacy id
+  // spaces whose fund ids differ while the portfolio is the same, and an
+  // id-based key would re-import the same purchase under each id.
   const cloudEntries = await readCloudRows<Entry>("entries", cloudIds);
+  const cloudFundNames = new Map<string, string>();
+  for (const f of await readCloudRows<FundConfig>("fund_config", cloudIds, "id, fund_name")) {
+    cloudFundNames.set(f.id, f.fund_name.trim().toLowerCase());
+  }
   const seenEntries = new Set(
-    cloudEntries.map((e) => `${e.fund_id}|${e.purchase_date}|${Number(e.amount)}`)
+    cloudEntries.map(
+      (e) =>
+        `${cloudFundNames.get(e.fund_id) ?? e.fund_id}|${e.purchase_date}|${Number(e.amount)}`
+    )
   );
 
   // Cloud funds by name — grows as we create, so two device profiles with
   // the same fund name share one cloud fund.
   // Key includes cloud user ID to prevent cross-user collisions.
-  const effectiveUserId = cloudIds[0];
+  const effectiveUserId = requireSafeUserId(cloudIds[0]);
   const cloudFunds = await readCloudRows<FundConfig>("fund_config", cloudIds);
   const fundsByName = new Map<string, FundConfig>();
   for (const f of cloudFunds) fundsByName.set(fundKey(effectiveUserId, f.fund_name), f);
@@ -304,7 +336,12 @@ export async function mergeLocalIntoCloud(
       const name = fundKey(effectiveUserId, localFund.fund_name);
       const existing = fundsByName.get(name);
 
-      if (existing) {
+      // A legacy id in the read set can surface a fund whose key belongs to
+      // a different id space. Adopt it for id remapping only — never write
+      // through it, or the merge would mutate rows this session doesn't own.
+      const owned = existing ? keyUserId(name) === effectiveUserId : false;
+
+      if (existing && owned) {
         fundIdMap.set(localFund.id, existing.id);
         if (isNewer(localFund.updated_at, existing.updated_at)) {
           const updated = await cloud.updateFundConfig(existing.id, {
@@ -320,6 +357,13 @@ export async function mergeLocalIntoCloud(
           fundsByName.set(name, updated.data);
           result.fundsUpdated++;
         }
+        continue;
+      }
+
+      // Already reachable under a legacy id: point entries at it and leave
+      // the cloud row untouched.
+      if (existing) {
+        fundIdMap.set(localFund.id, existing.id);
         continue;
       }
 
@@ -347,6 +391,7 @@ export async function mergeLocalIntoCloud(
     // 2. Entries — remap fund ids, drop duplicates, bulk-import per fund
     // via the CSV path (it handles nav_history upserts + latest_nav).
     const rowsByCloudFund = new Map<string, CsvImportRow[]>();
+    const nameByCloudFund = new Map<string, string>();
     for (const entry of ds.entries) {
       const cloudFundId = fundIdMap.get(entry.fund_id);
       if (!cloudFundId) {
@@ -354,7 +399,12 @@ export async function mergeLocalIntoCloud(
         result.duplicatesSkipped++;
         continue;
       }
-      const dedupeKey = `${cloudFundId}|${entry.purchase_date}|${Number(entry.amount)}`;
+      const cloudFundName =
+        nameByCloudFund.get(cloudFundId) ??
+        cloudFundNames.get(cloudFundId) ??
+        fundNameForLocalId(ds, entry.fund_id);
+      nameByCloudFund.set(cloudFundId, cloudFundName);
+      const dedupeKey = `${cloudFundName}|${entry.purchase_date}|${Number(entry.amount)}`;
       if (seenEntries.has(dedupeKey)) {
         result.duplicatesSkipped++;
         continue;

@@ -22,12 +22,21 @@ import {
 import { useAuth } from "@/lib/auth/AuthContext";
 import { useTheme, fontSize, radius } from "@/theme";
 import { Text } from "@/components/ui/primitives";
+import { refreshLocalReminders } from "@/lib/notifications/local-reminders";
+import { InstallmentsPopup } from "@/components/layout/InstallmentsPopup";
 
 export default function AppLayout() {
   const { status, store } = useAuth();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const segments = useSegments();
+
+  // Re-schedule the on-device installment reminders on every app open
+  // (countdown cadence 10/5/3/1 days + due day). The scheduler checks
+  // the OS permission itself, so this call is unconditionally safe.
+  useEffect(() => {
+    if (store) void refreshLocalReminders(store);
+  }, [store]);
 
   // Auth guard — the mobile equivalent of the web middleware.ts
   if (status === "loading") {
@@ -55,7 +64,8 @@ export default function AppLayout() {
       segments.length > 2);
 
   return (
-    <Tabs
+    <>
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
@@ -123,6 +133,9 @@ export default function AppLayout() {
       />
       {/* Reached from the dashboard / settings rather than the tab bar */}
       <Tabs.Screen name="tax-breakdown" options={{ href: null }} />
-    </Tabs>
+      </Tabs>
+      {/* Once-per-day upcoming-installments popup (port of the web's) */}
+      <InstallmentsPopup />
+    </>
   );
 }
