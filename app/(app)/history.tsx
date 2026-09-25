@@ -325,23 +325,20 @@ export default function HistoryScreen() {
             <Text variant="title" color="#FFFFFF" numberOfLines={1} style={{ flex: 1 }}>
               SIP History
             </Text>
-            <View style={{ alignItems: "flex-end", gap: spacing.xs }}>
-              <PrivacyEyeButton variant="hero" />
-              <View
-                style={{
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: 5,
-                  borderRadius: radius.full,
-                  backgroundColor: "#FFFFFF",
-                }}
+            <View
+              style={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: 5,
+                borderRadius: radius.full,
+                backgroundColor: "#FFFFFF",
+              }}
+            >
+              <Text
+                style={{ fontSize: fontSize.xs, fontWeight: "800", color: isDark ? "#1E293B" : colors.primary }}
+                numberOfLines={1}
               >
-                <Text
-                  style={{ fontSize: fontSize.xs, fontWeight: "800", color: isDark ? "#1E293B" : colors.primary }}
-                  numberOfLines={1}
-                >
-                  {totals.count} {totals.count === 1 ? "payment" : "payments"}
-                </Text>
-              </View>
+                {totals.count} {totals.count === 1 ? "payment" : "payments"}
+              </Text>
             </View>
           </View>
           {loading && entries.length === 0 ? (
@@ -350,18 +347,30 @@ export default function HistoryScreen() {
             </View>
           ) : (
             <>
-              <Text
+              {/* Amount row: value + eye on the same line, right side (like dashboard) */}
+              <View
                 style={{
-                  fontSize: fontSize.xxxl,
-                  fontWeight: "900",
-                  color: "#FFFFFF",
-                  fontVariant: ["tabular-nums"],
+                  flexDirection: "row",
+                  alignItems: "center",
                   marginTop: spacing.xs,
                 }}
-                numberOfLines={1}
               >
-                {formatPrivate(formatCurrency(totals.invested))}
-              </Text>
+                <Text
+                  style={{
+                    fontSize: fontSize.xxxl,
+                    fontWeight: "900",
+                    color: "#FFFFFF",
+                    fontVariant: ["tabular-nums"],
+                    flex: 1,
+                  }}
+                  numberOfLines={1}
+                >
+                  {formatPrivate(formatCurrency(totals.invested))}
+                </Text>
+                <View style={{ marginLeft: spacing.sm }}>
+                  <PrivacyEyeButton variant="hero" />
+                </View>
+              </View>
               <View
                 style={{
                   flexDirection: "row",

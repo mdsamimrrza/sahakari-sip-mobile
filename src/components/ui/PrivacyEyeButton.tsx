@@ -23,11 +23,11 @@ export function PrivacyEyeButton({
   const { isPrivate, togglePrivacy } = usePrivacy();
 
   const hero = variant === "hero";
-  // Hero variant sits on the colored green band: no circle, just a white
-  // glyph — same look as the dashboard header eye (HeaderIconButton).
+  // Hero variant matches the dashboard's portfolio-value eye exactly:
+  // translucent white circle + white glyph, rose when hidden.
   const size = hero ? 38 : 34;
-  const backgroundColor = hero ? "transparent" : colors.muted;
-  const iconColor = isPrivate
+  const backgroundColor = hero ? "#FFFFFF26" : colors.muted;
+  const iconColor = isPrivate && !hero
     ? colors.rose
     : hero
       ? "#FFFFFF"
