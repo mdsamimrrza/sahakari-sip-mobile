@@ -1007,7 +1007,7 @@ const next: AppUser = {
         if (GoogleSignin) {
           try {
             GoogleSignin.configure({
-              webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "416335590615-e96duqpfc9f7eg4qg0aqnj42avuiqs8l.apps.googleusercontent.com",
+              webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "416335590615-7qmsb34qr1aegnng0rfsib9lca10ke3m.apps.googleusercontent.com",
             });
 
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
