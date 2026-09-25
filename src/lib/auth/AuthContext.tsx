@@ -34,7 +34,6 @@ import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 
-import { GoogleSignin, isErrorWithCode, statusCodes } from "@react-native-google-signin/google-signin";
 import { getSupabase, isSupabaseConfigured } from "../supabase";
 import { createStore } from "../data";
 import { CloudStore } from "../data/cloud";
@@ -986,49 +985,63 @@ const next: AppUser = {
       }
 
       // --- Native Android / iOS path ---
-      // Uses the native Google account picker - no browser opens.
       if (Platform.OS !== "web") {
+        let GoogleSignin: any = null;
+        let isErrorWithCode: any = null;
+        let statusCodes: any = null;
+
         try {
-          GoogleSignin.configure({
-            webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
-          });
+          const googleModule = require("@react-native-google-signin/google-signin");
+          GoogleSignin = googleModule.GoogleSignin;
+          isErrorWithCode = googleModule.isErrorWithCode;
+          statusCodes = googleModule.statusCodes;
+        } catch {
+          // Native module not linked in current dev environment (e.g. Expo Go)
+        }
 
-          await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-          const userInfo = await GoogleSignin.signIn();
-          const idToken = userInfo.data?.idToken;
-          if (!idToken) {
-            return { success: false, error: "Google sign-in did not return a token. Please try again." };
-          }
+        if (GoogleSignin) {
+          try {
+            GoogleSignin.configure({
+              webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
+            });
 
-          const session = await googleNativeSignIn(idToken);
-          await saveMobileSession(session);
-          const nextUser: AppUser = {
-            id: session.user.id,
-            email: session.user.email ?? "",
-            name: session.user.name ?? undefined,
-            avatarUrl: session.user.image ?? undefined,
-            mode: "cloud",
-          };
-          await persistSession(nextUser);
-          void refreshDbProfile();
-          void maybeOfferBiometric(nextUser);
-          return { success: true };
-        } catch (e) {
-          if (isErrorWithCode(e)) {
-            if (e.code === statusCodes.SIGN_IN_CANCELLED) {
-              return { success: false, error: "Google sign-in was cancelled." };
+            await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+            const userInfo = await GoogleSignin.signIn();
+            const idToken = userInfo.data?.idToken;
+            if (!idToken) {
+              return { success: false, error: "Google sign-in did not return a token. Please try again." };
             }
-            if (e.code === statusCodes.IN_PROGRESS) {
-              return { success: false, error: "Google sign-in is already in progress." };
+
+            const session = await googleNativeSignIn(idToken);
+            await saveMobileSession(session);
+            const nextUser: AppUser = {
+              id: session.user.id,
+              email: session.user.email ?? "",
+              name: session.user.name ?? undefined,
+              avatarUrl: session.user.image ?? undefined,
+              mode: "cloud",
+            };
+            await persistSession(nextUser);
+            void refreshDbProfile();
+            void maybeOfferBiometric(nextUser);
+            return { success: true };
+          } catch (e) {
+            if (isErrorWithCode && isErrorWithCode(e) && statusCodes) {
+              if (e.code === statusCodes.SIGN_IN_CANCELLED) {
+                return { success: false, error: "Google sign-in was cancelled." };
+              }
+              if (e.code === statusCodes.IN_PROGRESS) {
+                return { success: false, error: "Google sign-in is already in progress." };
+              }
+              if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+                return { success: false, error: "Google Play Services is not available on this device." };
+              }
             }
-            if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-              return { success: false, error: "Google Play Services is not available on this device." };
-            }
+            return {
+              success: false,
+              error: e instanceof MobileApiError ? e.message : "Google sign-in failed. Please try again.",
+            };
           }
-          return {
-            success: false,
-            error: e instanceof MobileApiError ? e.message : "Google sign-in failed. Please try again.",
-          };
         }
       }
 
@@ -1045,13 +1058,18 @@ const next: AppUser = {
           let settled = false;
           const finish = (t: string | null) => {
             if (settled) return;
-            if (t) { settled = true; resolve(t); }
+            if (t) {
+              settled = true;
+              resolve(t);
+            }
           };
 
           const resolverPromise = new Promise<string | null>((res) => {
             googleHandoffResolvers.push(res);
           });
-          resolverPromise.then((t) => { if (t) finish(t); });
+          resolverPromise.then((t) => {
+            if (t) finish(t);
+          });
 
           WebBrowser.openAuthSessionAsync(url, redirectTo)
             .then((result) => {
@@ -1061,23 +1079,42 @@ const next: AppUser = {
                   ? result.url
                   : undefined;
               const t = candidate?.match(/[?&]token=([0-9a-f]{32})/i)?.[1] ?? null;
-              if (t) { finish(t); } else {
-                setTimeout(() => { if (!settled) { settled = true; resolve(null); } }, 5000);
+              if (t) {
+                finish(t);
+              } else {
+                setTimeout(() => {
+                  if (!settled) {
+                    settled = true;
+                    resolve(null);
+                  }
+                }, 5000);
               }
             })
             .catch(() => {
-              setTimeout(() => { if (!settled) { settled = true; resolve(null); } }, 5000);
+              setTimeout(() => {
+                if (!settled) {
+                  settled = true;
+                  resolve(null);
+                }
+              }, 5000);
             });
         });
+
         WebBrowser.dismissBrowser();
         if (!token) {
-          return { success: false, error: "Google sign-in was cancelled or failed. Please try again." };
+          return {
+            success: false,
+            error: "Google sign-in was cancelled or failed. Please try again.",
+          };
         }
         return await googleHandoffRef.current(token);
       } catch (e) {
         return {
           success: false,
-          error: e instanceof Error ? e.message : "Google sign-in was cancelled or failed. Please try again.",
+          error:
+            e instanceof Error
+              ? e.message
+              : "Google sign-in was cancelled or failed. Please try again.",
         };
       }
     },
