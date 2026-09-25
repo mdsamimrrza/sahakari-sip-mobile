@@ -1053,7 +1053,7 @@ const next: AppUser = {
       // --- Web / browser fallback path (Expo Go / Web / Dev Server without native module) ---
       try {
         const redirectTo =
-          typeof window !== "undefined"
+          Platform.OS === "web" && typeof window !== "undefined" && window.location
             ? `${window.location.origin}/auth/callback`
             : "sahakarisip://auth/callback";
 
