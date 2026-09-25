@@ -1013,7 +1013,16 @@ const next: AppUser = {
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
             const userInfo = await GoogleSignin.signIn();
             const idToken = userInfo.data?.idToken;
-            if (idToken) {
+            if (!idToken) {
+              return {
+                success: false,
+                error: "Google returned no token for this account. Check the Android client SHA-1 in Google Cloud Console.",
+              };
+            }
+            // From here on the user HAS chosen an account in the native
+            // sheet — a server-side failure must surface as an error, not
+            // silently reopen the browser picker.
+            try {
               const session = await googleNativeSignIn(idToken);
               await saveMobileSession(session);
               const nextUser: AppUser = {
@@ -1027,18 +1036,30 @@ const next: AppUser = {
               void refreshDbProfile();
               void maybeOfferBiometric(nextUser);
               return { success: true };
+            } catch (e) {
+              console.warn("[AuthContext] Native token exchange failed:", e);
+              return {
+                success: false,
+                error:
+                  e instanceof MobileApiError
+                    ? `Google sign-in rejected by server: ${e.message}`
+                    : "Google sign-in failed while finishing. Please try again.",
+              };
             }
           } catch (e) {
             console.warn("[AuthContext] Native Google sign-in failed, falling back to WebBrowser:", e);
             if (isErrorWithCode && isErrorWithCode(e) && statusCodes) {
-              if (e.code === statusCodes.SIGN_IN_CANCELLED) {
+              const code = (e as { code?: number }).code;
+              if (code === statusCodes.SIGN_IN_CANCELLED) {
                 return { success: false, error: "Google sign-in was cancelled." };
               }
-              if (e.code === statusCodes.IN_PROGRESS) {
+              if (code === statusCodes.IN_PROGRESS) {
                 return { success: false, error: "Google sign-in is already in progress." };
               }
             }
-            // Fall through to WebBrowser fallback below on DEVELOPER_ERROR or native config issue
+            // Only config-level failures (DEVELOPER_ERROR etc., thrown by
+            // configure/hasPlayServices/signIn before an account was
+            // chosen) fall through to the browser.
           }
         }
       }
