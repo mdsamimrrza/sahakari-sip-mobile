@@ -1,4 +1,4 @@
-name: Build & attach release APK
+﻿name: Build & attach release APK
 
 on:
   push:
@@ -83,15 +83,16 @@ jobs:
             "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" \
             > android/keystore.properties
 
-      - name: Write app .env (Supabase — optional, app works without it)
+      - name: Write app .env (Supabase + Google Sign-In)
         env:
-          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          WEB_URL:           ${{ secrets.WEB_URL }}
+          SUPABASE_URL:           ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY:      ${{ secrets.SUPABASE_ANON_KEY }}
+          WEB_URL:                ${{ secrets.WEB_URL }}
+          GOOGLE_WEB_CLIENT_ID:   ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
         run: |
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\nEXPO_PUBLIC_DEFAULT_DATA_MODE=cloud\nEXPO_PUBLIC_WEB_URL=%s\n' \
-              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "${WEB_URL:-https://sahakari-sip.vercel.app}" > .env
+            printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\nEXPO_PUBLIC_DEFAULT_DATA_MODE=cloud\nEXPO_PUBLIC_WEB_URL=%s\nEXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=%s\n' \
+              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "${WEB_URL:-https://sahakari-sip.vercel.app}" "${GOOGLE_WEB_CLIENT_ID:-}" > .env
             echo "Cloud mode enabled from repository secrets."
           else
             echo "Supabase secrets not set - building a local-mode-only APK (no .env written)."
@@ -101,7 +102,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./app.json').expo.version")
           VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode")
-          echo "Stamping build.gradle → versionName=\"${VERSION}\" versionCode=${VERSION_CODE}"
+          echo "Stamping build.gradle - versionName=\"${VERSION}\" versionCode=${VERSION_CODE}"
           sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/g" android/app/build.gradle
           sed -i "s/versionCode [0-9]*/versionCode ${VERSION_CODE}/g"       android/app/build.gradle
           grep -E 'versionName|versionCode' android/app/build.gradle
@@ -121,25 +122,21 @@ jobs:
           cp "$SRC" "SahakariSIP.apk"
 
           cat > release_notes.md <<'NOTES'
-          React Native / Expo build of **SahakariSIP** — Nepali mutual-fund & open-ended SIP tracker following SEBON accounting rules.
+          React Native / Expo build of **SahakariSIP** - Nepali mutual-fund & open-ended SIP tracker following SEBON accounting rules.
 
-          🌐 **Web app:** https://sahakari-sip.vercel.app
+          **Web app:** https://sahakari-sip.vercel.app
 
           ## Download
 
-          [**SahakariSIP.apk**](https://github.com/mdsamimrrza/sahakari-sip-mobile/releases/latest/download/SahakariSIP.apk) — permanent link, always the latest build.
+          [**SahakariSIP.apk**](https://github.com/mdsamimrrza/sahakari-sip-mobile/releases/latest/download/SahakariSIP.apk) - permanent link, always the latest build.
 
           ## What changed
-          - Dark-mode splash: the native launch screen is now dark (#0B0F19) when your phone is in dark mode, and the animated splash matches in both modes — no more light flash.
+          - Native Google Sign-In: tapping "Sign in with Google" now shows the native Android account picker instead of opening a browser.
           NOTES
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            # Release already exists (e.g. published from the UI): keep its
-            # description, just replace the APK.
             gh release upload "$TAG" "SahakariSIP.apk" --clobber --repo "$GITHUB_REPOSITORY"
           else
-            # Fresh version tag: create the release. --generate-notes appends
-            # the auto changelog (commits + contributors) under "What changed".
             gh release create "$TAG" "SahakariSIP.apk" \
               --repo "$GITHUB_REPOSITORY" \
               --title "SahakariSIP Mobile ${TAG}" \

@@ -1,5 +1,5 @@
-// ============================================================
-// SahakariSIP — Auth Provider
+﻿// ============================================================
+// SahakariSIP â€” Auth Provider
 // ============================================================
 // The web app (NextAuth v5: Google + bcrypt credentials, OTP emails)
 // owns ALL cloud authentication. The APK delegates to it through the
@@ -9,9 +9,9 @@
 // as the Bearer token on every data request (src/lib/supabase.ts).
 // Same account, same user id, same portfolio on phone and browser.
 //
-//   1. CLOUD  — via the web's NextAuth backend (requires the web URL
+//   1. CLOUD  â€” via the web's NextAuth backend (requires the web URL
 //               configured: EXPO_PUBLIC_WEB_URL).
-//   2. DEVICE — an on-device profile (salted SHA-256 hash, never leaves
+//   2. DEVICE â€” an on-device profile (salted SHA-256 hash, never leaves
 //               the phone). Everything works offline; the portfolio
 //               lives in local storage only.
 //
@@ -29,10 +29,12 @@ import React, {
   useState,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+
+import { GoogleSignin, isErrorWithCode, statusCodes } from "@react-native-google-signin/google-signin";
 import { getSupabase, isSupabaseConfigured } from "../supabase";
 import { createStore } from "../data";
 import { CloudStore } from "../data/cloud";
@@ -52,6 +54,7 @@ import {
   fetchProfile,
   googleExchange,
   googleStart,
+  googleNativeSignIn,
   isWebConfigured,
   passwordLogin,
   requestPasswordReset as apiRequestReset,
@@ -127,11 +130,11 @@ interface AuthContextValue {
   unlockWithBiometric: () => Promise<{ success: boolean; error?: string }>;
   enableBiometric: () => Promise<{ success: boolean; error?: string }>;
   disableBiometric: () => Promise<void>;
-  /** Post-login offer state — the root-mounted BiometricPromptDialog. */
+  /** Post-login offer state â€” the root-mounted BiometricPromptDialog. */
   offerBiometric: boolean;
   dismissBiometricOffer: (declined: boolean) => void;
   /**
-   * One-time local→cloud merge offer, set when the user asks to merge from
+   * One-time localâ†’cloud merge offer, set when the user asks to merge from
    * Settings (GoCloudCard). The root-mounted MergePromptDialog renders it.
    * Nothing is merged unless the user confirms there. Null once confirmed,
    * dismissed, or when there's nothing to merge.
@@ -239,7 +242,7 @@ const BACKGROUND_LOCK_GRACE_MS = 30_000;
 
 // Google handoff waiters. On Android the sahakarisip:// redirect can be
 // delivered by the Custom Tab's openAuthSessionAsync result OR by
-// expo-router launching /auth/callback with the token — whichever wins
+// expo-router launching /auth/callback with the token â€” whichever wins
 // resolves these waiters, and completeGoogleHandoff dedupes the exchange
 // (the token is single-use server-side too).
 let googleHandoffResolvers: Array<(token: string | null) => void> = [];
@@ -269,7 +272,7 @@ async function markHandoffTokenUsed(token: string): Promise<void> {
   }
 }
 
-/** Drop the replay-protection store — called on sign-out and account deletion. */
+/** Drop the replay-protection store â€” called on sign-out and account deletion. */
 async function clearHandoffTokens(): Promise<void> {
   try {
     await AsyncStorage.removeItem(USED_HANDOFF_TOKENS_KEY);
@@ -348,10 +351,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     biometricEnabledRef.current = biometricEnabled;
   }, [biometricEnabled]);
 
-  // ---------- Background → foreground lock ----------
+  // ---------- Background â†’ foreground lock ----------
   // Banking-style: with biometrics armed and a session in memory, coming
   // back after a longer-than-grace background stay drops the app on the
-  // lock screen. The session itself stays live — the fingerprint reveals
+  // lock screen. The session itself stays live â€” the fingerprint reveals
   // it, no re-authentication needed.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextState) => {
@@ -393,9 +396,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus(next ? "authenticated" : "unauthenticated");
   }, []);
 
-  // ---------- One-time local → cloud merge (Settings-gated) ----------
+  // ---------- One-time local â†’ cloud merge (Settings-gated) ----------
   //
-  // Nothing merges on its own. The only entry point is Settings →
+  // Nothing merges on its own. The only entry point is Settings â†’
   // "Go Cloud" / "Move phone data to cloud" (GoCloudCard), which calls
   // offerMerge() to raise the confirm dialog; the merge runs only when
   // the user confirms there.
@@ -413,7 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const has = await scanUnmergedLocalData(new CloudStore());
         if (!cancelled && mounted.current) setHasUnmergedLocalData(has);
       } catch {
-        // Offline / RPC missing — treat as "nothing to merge".
+        // Offline / RPC missing â€” treat as "nothing to merge".
         if (!cancelled && mounted.current) setHasUnmergedLocalData(false);
       }
     })();
@@ -432,7 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const counts = await inspectMergeCandidate(new CloudStore());
       if (counts && mounted.current) setPendingMerge(counts);
     } catch {
-      // No cloud session / offline — nothing to offer.
+      // No cloud session / offline â€” nothing to offer.
     }
   }, []);
 
@@ -547,7 +550,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Google logins on the WEB app store the photo in next_auth.users.image.
   // This pulls name/image from the web's /api/mobile/account endpoint
   // (authorized by the stored RLS JWT) and patches the session WITHOUT
-  // resetting the session clock. Offline / expired token / no row →
+  // resetting the session clock. Offline / expired token / no row â†’
   // silently keeps whatever avatar we already have.
   const refreshDbProfile = useCallback(async () => {
     if (!cloudAvailable) return;
@@ -574,8 +577,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted.current) setUser(saved);
       }
     } catch {
-      // Offline or token rejected — avatar stays as-is.
-      if (__DEV__) console.warn("[profile] refreshDbProfile threw — photo stays as-is.");
+      // Offline or token rejected â€” avatar stays as-is.
+      if (__DEV__) console.warn("[profile] refreshDbProfile threw â€” photo stays as-is.");
     }
   }, [cloudAvailable]);
 
@@ -665,7 +668,7 @@ const next: AppUser = {
             if (mounted.current) {
               setUser(next);
               // Biometric armed for THIS account? The app opens on the lock
-              // screen even though the session is live — the fingerprint
+              // screen even though the session is live â€” the fingerprint
               // just reveals it (no token minting needed).
               const entry = await readBiometricEntry();
               if (
@@ -712,7 +715,7 @@ const next: AppUser = {
           }
         }
 
-        // 3. No active session — but biometric unlock may be armed from a
+        // 3. No active session â€” but biometric unlock may be armed from a
         // previous lock. Hand the decision to the lock screen.
         if (await isBiometricEnabled()) {
           const entry = await readBiometricEntry();
@@ -870,7 +873,7 @@ const next: AppUser = {
   /**
    * Cloud signup step 2: the emailed 6-digit code confirms the account
    * (web OTP) and mints the mobile session. After this the user is signed
-   * in — mirrors the web's (auth)/signup + verify flow.
+   * in â€” mirrors the web's (auth)/signup + verify flow.
    */
   const confirmSignup = useCallback(
     async (email: string, code: string): Promise<AuthResult> => {
@@ -982,58 +985,103 @@ const next: AppUser = {
         };
       }
 
-      try {
-        // Kickoff: ask the web where to start Google auth (nonce minted
-        // locally). The browser completes NextAuth's Google flow and the
-        // web's relay page bounces back to our scheme URL with the token.
-        const { url } = await googleStart();
-        // Must exactly match the scheme URL emitted by the web handoff relay.
-        // Using Linking.createURL here can produce a triple-slash URI on
-        // Android, which makes the Custom Tab miss the callback result.
-        const redirectTo = "sahakarisip://auth/callback";
+      // --- Native Android / iOS path ---
+      // Uses the native Google account picker - no browser opens.
+      if (Platform.OS !== "web") {
+        try {
+          GoogleSignin.configure({
+            webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
+          });
 
-        // Path A: the Custom Tab's openAuthSessionAsync result.
-        // Path B: expo-router / LaunchEvents delivering /auth/callback?token=…
-        // Whichever the OS picked resolves first; on Android the tab may
-        // close as "cancel" right as the scheme launches — give Path B a
-        // grace period before declaring a real cancellation.
-        const tokenFromSession = WebBrowser.openAuthSessionAsync(
-          url,
-          redirectTo
-        ).then(async (result) => {
-          const redirectBase = redirectTo.split("?")[0];
-          const candidate =
-            result.type === "success" && "url" in result && result.url?.startsWith(redirectBase)
-              ? result.url
-              : undefined;
-          const t = candidate?.match(/[?&]token=([0-9a-f]{32})/i)?.[1] ?? null;
-          if (!t) await new Promise((r) => setTimeout(r, 2500));
-          return t;
-        });
-        const tokenFromResolver = new Promise<string | null>((resolve) => {
-          googleHandoffResolvers.push(resolve);
-        });
-        const token = await Promise.race([tokenFromSession, tokenFromResolver]);
-        // Best-effort cleanup of the other path.
-        WebBrowser.dismissBrowser();
-        if (!token) {
+          await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+          const userInfo = await GoogleSignin.signIn();
+          const idToken = userInfo.data?.idToken;
+          if (!idToken) {
+            return { success: false, error: "Google sign-in did not return a token. Please try again." };
+          }
+
+          const session = await googleNativeSignIn(idToken);
+          await saveMobileSession(session);
+          const nextUser: AppUser = {
+            id: session.user.id,
+            email: session.user.email ?? "",
+            name: session.user.name ?? undefined,
+            avatarUrl: session.user.image ?? undefined,
+            mode: "cloud",
+          };
+          await persistSession(nextUser);
+          void refreshDbProfile();
+          void maybeOfferBiometric(nextUser);
+          return { success: true };
+        } catch (e) {
+          if (isErrorWithCode(e)) {
+            if (e.code === statusCodes.SIGN_IN_CANCELLED) {
+              return { success: false, error: "Google sign-in was cancelled." };
+            }
+            if (e.code === statusCodes.IN_PROGRESS) {
+              return { success: false, error: "Google sign-in is already in progress." };
+            }
+            if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+              return { success: false, error: "Google Play Services is not available on this device." };
+            }
+          }
           return {
             success: false,
-            error: "Google sign-in was cancelled or failed. Please try again.",
+            error: e instanceof MobileApiError ? e.message : "Google sign-in failed. Please try again.",
           };
+        }
+      }
+
+      // --- Web / browser fallback path ---
+      try {
+        const redirectTo =
+          typeof window !== "undefined"
+            ? `${window.location.origin}/auth/callback`
+            : "sahakarisip://auth/callback";
+
+        const { url } = await googleStart(redirectTo);
+
+        const token = await new Promise<string | null>((resolve) => {
+          let settled = false;
+          const finish = (t: string | null) => {
+            if (settled) return;
+            if (t) { settled = true; resolve(t); }
+          };
+
+          const resolverPromise = new Promise<string | null>((res) => {
+            googleHandoffResolvers.push(res);
+          });
+          resolverPromise.then((t) => { if (t) finish(t); });
+
+          WebBrowser.openAuthSessionAsync(url, redirectTo)
+            .then((result) => {
+              const redirectBase = redirectTo.split("?")[0];
+              const candidate =
+                result.type === "success" && "url" in result && result.url?.startsWith(redirectBase)
+                  ? result.url
+                  : undefined;
+              const t = candidate?.match(/[?&]token=([0-9a-f]{32})/i)?.[1] ?? null;
+              if (t) { finish(t); } else {
+                setTimeout(() => { if (!settled) { settled = true; resolve(null); } }, 5000);
+              }
+            })
+            .catch(() => {
+              setTimeout(() => { if (!settled) { settled = true; resolve(null); } }, 5000);
+            });
+        });
+        WebBrowser.dismissBrowser();
+        if (!token) {
+          return { success: false, error: "Google sign-in was cancelled or failed. Please try again." };
         }
         return await googleHandoffRef.current(token);
       } catch (e) {
         return {
           success: false,
-          error:
-            e instanceof Error
-              ? e.message
-              : "Google sign-in was cancelled or failed. Please try again.",
+          error: e instanceof Error ? e.message : "Google sign-in was cancelled or failed. Please try again.",
         };
       }
     },
-    [cloudAvailable]
+    [cloudAvailable, persistSession, refreshDbProfile, maybeOfferBiometric]
   );
 
   // ---------- Sign out ----------
@@ -1046,7 +1094,7 @@ const next: AppUser = {
     if (biometricEnabledRef.current && user) {
       try {
         // Only the account that armed the lock may leave its session in the
-        // biometric entry — never capture another principal's tokens, and
+        // biometric entry â€” never capture another principal's tokens, and
         // never capture for an account that declined the offer.
         const armed = await readBiometricEntry();
         const isArmingAccount =
@@ -1090,13 +1138,13 @@ const next: AppUser = {
         biometricEnabledRef.current = false;
         setBiometricEnabled(false);
       } catch {
-        // Lock bookkeeping failed — fall through to the full logout so we
+        // Lock bookkeeping failed â€” fall through to the full logout so we
         // never leave the session in a half-cleared state.
       }
     }
     try {
       if (cloudAvailable) {
-        // The NextAuth JWT is stateless — nothing to revoke server-side
+        // The NextAuth JWT is stateless â€” nothing to revoke server-side
         // beyond deleting it locally below.
       }
     } catch {
@@ -1122,12 +1170,12 @@ const next: AppUser = {
       await writeProfiles(profiles.filter((p) => p.id !== user.id));
     }
 
-    // The account is gone — the biometric key must not survive it.
+    // The account is gone â€” the biometric key must not survive it.
     await clearBiometricEntry();
     setBiometricEnabled(false);
 
     // Terminal action: delete the identity row server-side (web's
-    // /api/mobile/account — removes next_auth.users + password/OTP rows)
+    // /api/mobile/account â€” removes next_auth.users + password/OTP rows)
     // and purge the local session so a cold start cannot silently
     // re-authenticate as the "deleted" account.
     if (user.mode === "cloud" && cloudAvailable) {
@@ -1151,7 +1199,7 @@ const next: AppUser = {
       await removeProfilePhoto(user.id);
       await clearHandoffTokens();
     } catch {
-      // Best-effort — the primary data is already purged.
+      // Best-effort â€” the primary data is already purged.
     }
 
     await persistSession(null);
@@ -1178,7 +1226,7 @@ const next: AppUser = {
         }
       }
 
-      // Device-local profiles have no email channel — the honest answer is
+      // Device-local profiles have no email channel â€” the honest answer is
       // that the password cannot be recovered, so we say so.
       const profiles = await readProfiles();
       const exists = profiles.some((p) => p.email === normalized);

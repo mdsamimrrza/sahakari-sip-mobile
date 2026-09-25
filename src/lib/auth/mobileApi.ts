@@ -1,5 +1,5 @@
-// ============================================================
-// SahakariSIP — Mobile API client (web NextAuth backend)
+﻿// ============================================================
+// SahakariSIP - Mobile API client (web NextAuth backend)
 // ============================================================
 // Thin fetch wrapper over the web app's /api/mobile/* routes (see
 // sahakari-sip repo). Every cloud-mode auth operation goes through
@@ -52,7 +52,7 @@ async function request<T>(
   try {
     data = (await res.json()) as Record<string, unknown>;
   } catch {
-    // non-JSON error body (proxy/5xx) — fall through with {}
+    // non-JSON error body (proxy/5xx) - fall through with {}
   }
 
   if (!res.ok) {
@@ -77,18 +77,18 @@ function toSession(r: SessionResponse): { user: MobileUser; accessToken: string;
   };
 }
 
-// ---------- Google handoff ----------
+// ---------- Google handoff (web browser flow - kept as fallback) ----------
 
 /**
- * Ask the web where to start Google sign-in. We mint the nonce here —
- * 32 hex chars — so only this device knows the value that will come
+ * Ask the web where to start Google sign-in. We mint the nonce here -
+ * 32 hex chars - so only this device knows the value that will come
  * back through the sahakarisip:// redirect.
  */
-export async function googleStart(): Promise<{ url: string; nonce: string }> {
+export async function googleStart(redirectUrl?: string): Promise<{ url: string; nonce: string }> {
   const bytes = getRandomBytes(16);
   const nonce = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   const res = await request<{ url: string; nonce: string }>("/google", {
-    body: { nonce },
+    body: { nonce, redirectUrl },
   });
   return { url: res.url, nonce: res.nonce };
 }
@@ -96,6 +96,20 @@ export async function googleStart(): Promise<{ url: string; nonce: string }> {
 /** Turn a handoff token captured from the redirect into a session. */
 export async function googleExchange(nonce: string) {
   const res = await request<SessionResponse>("/exchange", { body: { nonce } });
+  return toSession(res);
+}
+
+// ---------- Google native sign-in (no browser, native account picker) ----------
+
+/**
+ * Exchange a Google ID token (from @react-native-google-signin/google-signin)
+ * for a SahakariSIP session. The server verifies the token with Google,
+ * finds or creates the next_auth user, and returns the Supabase RLS JWT.
+ */
+export async function googleNativeSignIn(idToken: string) {
+  const res = await request<SessionResponse>("/google-native", {
+    body: { idToken },
+  });
   return toSession(res);
 }
 
