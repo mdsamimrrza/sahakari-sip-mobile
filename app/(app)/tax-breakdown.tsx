@@ -321,25 +321,22 @@ export default function TaxBreakdownScreen() {
           title="Tax & Settlement"
           subtitle="Fees, tax, and what you take home"
           right={
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <PrivacyEyeButton />
-              <Pressable
-                onPress={() => setGlossaryOpen(true)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="Glossary of terms"
-                style={{
-                  height: 34,
-                  width: 34,
-                  borderRadius: 17,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: `${colors.info}1F`,
-                }}
-              >
-                <Info size={17} color={colors.info} />
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={() => setGlossaryOpen(true)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Glossary of terms"
+              style={{
+                height: 34,
+                width: 34,
+                borderRadius: 17,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: `${colors.info}1F`,
+              }}
+            >
+              <Info size={17} color={colors.info} />
+            </Pressable>
           }
         />
       }
@@ -445,6 +442,16 @@ export default function TaxBreakdownScreen() {
                   </Text>
                 </View>
               </View>
+              <View
+                pointerEvents="box-none"
+                style={{
+                  position: "absolute",
+                  top: spacing.md,
+                  right: spacing.md,
+                  alignItems: "flex-end",
+                  gap: spacing.sm,
+                }}
+              >
               <Pressable
                 ref={fundPillRef}
                 onPress={() => {
@@ -458,9 +465,6 @@ export default function TaxBreakdownScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Choose fund scope"
                 style={({ pressed }) => ({
-                  position: "absolute",
-                  top: spacing.md,
-                  right: spacing.md,
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 4,
@@ -487,6 +491,8 @@ export default function TaxBreakdownScreen() {
                   strokeWidth={3}
                 />
               </Pressable>
+              <PrivacyEyeButton variant="hero" />
+              </View>
             </View>
             <View style={{ flexDirection: "row", gap: spacing.sm, padding: spacing.md }}>
               <View
