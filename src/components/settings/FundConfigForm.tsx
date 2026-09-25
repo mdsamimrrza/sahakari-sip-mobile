@@ -36,7 +36,6 @@ import {
   CardTitle,
   Button,
   Input,
-  Badge,
   EmptyState,
 } from "../ui/primitives";
 import { Modal, Select, useToast } from "../ui/overlays";
@@ -49,6 +48,57 @@ import {
 } from "./sip-schedule-fields";
 
 const ITEMS_PER_PAGE = 5;
+
+// Accent palette cycled per fund row — tinted stripe, initial tile, stat icons.
+const ROW_ACCENTS = [
+  { tint: "#147A64", bg: "#147A6414" }, // teal
+  { tint: "#A8791F", bg: "#A8791F14" }, // brass
+  { tint: "#2A6F86", bg: "#2A6F8614" }, // aqua
+  { tint: "#047857", bg: "#04785714" }, // emerald
+  { tint: "#A5442B", bg: "#A5442B14" }, // rust
+];
+
+/** Up to two initials from a fund name: "NMB Saral Bachat" -> "NS". */
+function fundInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter((w) => /[a-zA-Z0-9]/.test(w));
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+/** One column in the fund row's stat strip. */
+function FundStat({
+  label,
+  value,
+  color,
+  flex = 1,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  flex?: number;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex, gap: 2 }}>
+      <Text
+        variant="micro"
+        color={colors.mutedForeground}
+        style={{ fontSize: 9, fontWeight: "800", letterSpacing: 0.6, textTransform: "uppercase" }}
+      >
+        {label}
+      </Text>
+      <Text
+        variant="caption"
+        color={color}
+        style={{ fontWeight: "900", fontSize: fontSize.sm }}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 interface FormState {
   fundName: string;
@@ -310,83 +360,129 @@ export function FundConfigForm({
               }
             />
           ) : (
-            paginatedFunds.map((fund) => (
+            paginatedFunds.map((fund, idx) => {
+              const accent = ROW_ACCENTS[idx % ROW_ACCENTS.length];
+              return (
               <View
                 key={fund.id}
                 style={{
                   borderWidth: 1,
                   borderColor: colors.border,
                   borderRadius: radius.xl,
-                  backgroundColor: colors.muted,
-                  padding: spacing.md,
-                  gap: spacing.sm,
+                  backgroundColor: colors.card,
+                  overflow: "hidden",
                 }}
               >
+                {/* Accent stripe */}
                 <View
                   style={{
-                    flexDirection: "row",
-                    alignItems: "flex-start",
-                    justifyContent: "space-between",
-                    gap: spacing.sm,
+                    height: 4,
+                    backgroundColor: accent.tint,
                   }}
-                >
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text variant="label" numberOfLines={2}>
-                      {fund.fund_name}
-                    </Text>
-                    <Text variant="caption" color={colors.mutedForeground} style={{ fontSize: fontSize.xs }}>
-                      Since {formatDate(fund.start_date)}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: "row", gap: spacing.xs }}>
-                    <Pressable
-                      onPress={() => openEdit(fund)}
-                      hitSlop={6}
+                />
+                <View style={{ padding: spacing.md, gap: spacing.md }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing.md,
+                    }}
+                  >
+                    <View
                       style={{
-                        height: 32,
-                        width: 32,
-                        borderRadius: radius.md,
+                        height: 44,
+                        width: 44,
+                        borderRadius: 14,
                         alignItems: "center",
                         justifyContent: "center",
-                        backgroundColor: colors.card,
-                        borderWidth: 1,
-                        borderColor: colors.border,
+                        backgroundColor: accent.bg,
                       }}
                     >
-                      <Pencil size={14} color={colors.mutedForeground} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setDeletingId(fund.id)}
-                      hitSlop={6}
-                      style={{
-                        height: 32,
-                        width: 32,
-                        borderRadius: radius.md,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: colors.card,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }}
-                    >
-                      <Trash2 size={14} color={colors.destructive} />
-                    </Pressable>
+                      <Text
+                        style={{ fontSize: fontSize.md, fontWeight: "900", color: accent.tint }}
+                      >
+                        {fundInitials(fund.fund_name)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text variant="label" numberOfLines={2} style={{ fontWeight: "800" }}>
+                        {fund.fund_name}
+                      </Text>
+                      <Text variant="caption" color={colors.mutedForeground} style={{ fontSize: fontSize.xs }}>
+                        Since {formatDate(fund.start_date)}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", gap: spacing.xs }}>
+                      <Pressable
+                        onPress={() => openEdit(fund)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit ${fund.fund_name}`}
+                        style={({ pressed }) => ({
+                          height: 34,
+                          width: 34,
+                          borderRadius: radius.lg,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: colors.muted,
+                          opacity: pressed ? 0.65 : 1,
+                        })}
+                      >
+                        <Pencil size={14} color={colors.mutedForeground} />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => setDeletingId(fund.id)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete ${fund.fund_name}`}
+                        style={({ pressed }) => ({
+                          height: 34,
+                          width: 34,
+                          borderRadius: radius.lg,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: `${colors.destructive}14`,
+                          opacity: pressed ? 0.65 : 1,
+                        })}
+                      >
+                        <Trash2 size={14} color={colors.destructive} />
+                      </Pressable>
+                    </View>
                   </View>
-                </View>
 
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
-                  <Badge bg={`${colors.purple}1F`} color={colors.purple}>
-                    {fund.fee_rate_pct}% fee
-                  </Badge>
-                  <Badge bg={`${colors.info}1F`} color={colors.info}>
-                    {formatCurrencyWhole(fund.monthly_sip)}/mo
-                  </Badge>
-                  <Badge bg={`${colors.success}1F`} color={colors.success}>
-                    NAV {fund.latest_nav?.toFixed(2) ?? ""}
-                  </Badge>
+                  {/* Stat strip: fee · monthly SIP · latest NAV */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      backgroundColor: colors.muted,
+                      borderRadius: radius.lg,
+                      paddingVertical: spacing.sm,
+                      paddingHorizontal: spacing.md,
+                      gap: spacing.sm,
+                    }}
+                  >
+                    <FundStat
+                      label="Fee"
+                      value={`${fund.fee_rate_pct}%`}
+                      color={accent.tint}
+                    />
+                    <View style={{ width: 1, backgroundColor: colors.border }} />
+                    <FundStat
+                      label="Monthly SIP"
+                      value={formatCurrencyWhole(fund.monthly_sip)}
+                      color={colors.foreground}
+                    />
+                    <View style={{ width: 1, backgroundColor: colors.border }} />
+                    <FundStat
+                      label="Latest NAV"
+                      value={fund.latest_nav ? fund.latest_nav.toFixed(2) : ""}
+                      color={colors.foreground}
+                    />
+                  </View>
                 </View>
               </View>
-            ))
+              );
+            })
           )}
 
           {/* Pagination */}
