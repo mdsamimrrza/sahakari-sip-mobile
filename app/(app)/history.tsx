@@ -325,22 +325,24 @@ export default function HistoryScreen() {
             <Text variant="title" color="#FFFFFF" numberOfLines={1} style={{ flex: 1 }}>
               SIP History
             </Text>
-            <View
-              style={{
-                paddingHorizontal: spacing.md,
-                paddingVertical: 5,
-                borderRadius: radius.full,
-                backgroundColor: "#FFFFFF",
-              }}
-            >
-              <Text
-                style={{ fontSize: fontSize.xs, fontWeight: "800", color: isDark ? "#1E293B" : colors.primary }}
-                numberOfLines={1}
+            <View style={{ alignItems: "flex-end", gap: spacing.xs }}>
+              <PrivacyEyeButton variant="hero" />
+              <View
+                style={{
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 5,
+                  borderRadius: radius.full,
+                  backgroundColor: "#FFFFFF",
+                }}
               >
-                {totals.count} {totals.count === 1 ? "payment" : "payments"}
-              </Text>
+                <Text
+                  style={{ fontSize: fontSize.xs, fontWeight: "800", color: isDark ? "#1E293B" : colors.primary }}
+                  numberOfLines={1}
+                >
+                  {totals.count} {totals.count === 1 ? "payment" : "payments"}
+                </Text>
+              </View>
             </View>
-            <PrivacyEyeButton variant="hero" />
           </View>
           {loading && entries.length === 0 ? (
             <View style={{ marginTop: spacing.sm }}>
