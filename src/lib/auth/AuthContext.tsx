@@ -29,7 +29,7 @@ import React, {
   useState,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AppState, Platform } from "react-native";
+import { AppState, Platform, NativeModules, TurboModuleRegistry } from "react-native";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
@@ -984,8 +984,13 @@ const next: AppUser = {
         };
       }
 
-      // --- Native Android / iOS path ---
-      if (Platform.OS !== "web") {
+      // Check if native RNGoogleSignin module exists in native binary
+      const hasNativeModule =
+        Boolean(NativeModules?.RNGoogleSignin) ||
+        Boolean(typeof TurboModuleRegistry?.get === "function" && TurboModuleRegistry.get("RNGoogleSignin"));
+
+      // --- Native Android / iOS path (only when RNGoogleSignin module is present in binary) ---
+      if (Platform.OS !== "web" && hasNativeModule) {
         let GoogleSignin: any = null;
         let isErrorWithCode: any = null;
         let statusCodes: any = null;
@@ -996,7 +1001,7 @@ const next: AppUser = {
           isErrorWithCode = googleModule.isErrorWithCode;
           statusCodes = googleModule.statusCodes;
         } catch {
-          // Native module not linked in current dev environment (e.g. Expo Go)
+          // Fallback if require fails
         }
 
         if (GoogleSignin) {
@@ -1045,7 +1050,7 @@ const next: AppUser = {
         }
       }
 
-      // --- Web / browser fallback path ---
+      // --- Web / browser fallback path (Expo Go / Web / Dev Server without native module) ---
       try {
         const redirectTo =
           typeof window !== "undefined"
