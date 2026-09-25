@@ -1001,7 +1001,7 @@ const next: AppUser = {
           isErrorWithCode = googleModule.isErrorWithCode;
           statusCodes = googleModule.statusCodes;
         } catch {
-          // Fallback if require fails
+          // Native module not linked in current dev environment
         }
 
         if (GoogleSignin) {
@@ -1013,24 +1013,23 @@ const next: AppUser = {
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
             const userInfo = await GoogleSignin.signIn();
             const idToken = userInfo.data?.idToken;
-            if (!idToken) {
-              return { success: false, error: "Google sign-in did not return a token. Please try again." };
+            if (idToken) {
+              const session = await googleNativeSignIn(idToken);
+              await saveMobileSession(session);
+              const nextUser: AppUser = {
+                id: session.user.id,
+                email: session.user.email ?? "",
+                name: session.user.name ?? undefined,
+                avatarUrl: session.user.image ?? undefined,
+                mode: "cloud",
+              };
+              await persistSession(nextUser);
+              void refreshDbProfile();
+              void maybeOfferBiometric(nextUser);
+              return { success: true };
             }
-
-            const session = await googleNativeSignIn(idToken);
-            await saveMobileSession(session);
-            const nextUser: AppUser = {
-              id: session.user.id,
-              email: session.user.email ?? "",
-              name: session.user.name ?? undefined,
-              avatarUrl: session.user.image ?? undefined,
-              mode: "cloud",
-            };
-            await persistSession(nextUser);
-            void refreshDbProfile();
-            void maybeOfferBiometric(nextUser);
-            return { success: true };
           } catch (e) {
+            console.warn("[AuthContext] Native Google sign-in failed, falling back to WebBrowser:", e);
             if (isErrorWithCode && isErrorWithCode(e) && statusCodes) {
               if (e.code === statusCodes.SIGN_IN_CANCELLED) {
                 return { success: false, error: "Google sign-in was cancelled." };
@@ -1038,20 +1037,13 @@ const next: AppUser = {
               if (e.code === statusCodes.IN_PROGRESS) {
                 return { success: false, error: "Google sign-in is already in progress." };
               }
-              if (e.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-                return { success: false, error: "Google Play Services is not available on this device." };
-              }
             }
-            const details = e instanceof Error ? e.message : (typeof e === "object" && e ? JSON.stringify(e) : String(e));
-            return {
-              success: false,
-              error: e instanceof MobileApiError ? e.message : `Google sign-in error: ${details}`,
-            };
+            // Fall through to WebBrowser fallback below on DEVELOPER_ERROR or native config issue
           }
         }
       }
 
-      // --- Web / browser fallback path (Expo Go / Web / Dev Server without native module) ---
+      // --- Web / browser fallback path (Expo Go / Web / Dev Server / DEVELOPER_ERROR fallback) ---
       try {
         const redirectTo =
           Platform.OS === "web" && typeof window !== "undefined" && window.location
