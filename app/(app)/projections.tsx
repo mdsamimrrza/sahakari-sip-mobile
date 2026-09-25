@@ -266,7 +266,7 @@ export default function ProjectionsScreen() {
   const cold = loading && !data;
 
   return (
-    <Screen header={<AppHeader />}>
+    <Screen refreshing={loading} onRefresh={reload} header={<AppHeader />}>
       {/* ---------- Hero: the 20-year number ---------- */}
       <View
         style={{
