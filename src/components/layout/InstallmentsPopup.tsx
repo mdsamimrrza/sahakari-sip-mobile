@@ -1,16 +1,17 @@
 // ============================================================
 // SahakariSIP - Upcoming Installments Popup (mobile)
 // ============================================================
-// Port of the web app's daily-installments-popup. Appears once per
-// day on app open and groups upcoming installments into today /
-// tomorrow / this week / later.
+// Reminder ladder ported from the web daily-installments-popup: a fund
+// pings once at 10 days before its due date, then 5, 3, 1 and the due
+// day - tracked per fund + cycle, so quiet days stay quiet. Groups the
+// list into today / tomorrow / this week / later.
 //
 // The web version asks the server for upcoming installments; here the
 // same list is computed locally from the store using the central
 // schedule engine - identical due-date rule, and it works offline.
 // ============================================================
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -30,6 +31,11 @@ import { resolveSchedule } from "@/lib/sip-schedule";
 import type { DataStore } from "@/lib/data/store";
 
 const POPUP_KEY = "sahakarisip.v1.installments_popup_shown";
+const SHOWN_KEY = "sahakarisip.v1.installments_milestones_shown";
+
+// Reminder ladder: a fund pings once at 10 days out, then 5, 3, 1, 0.
+// Miss a rung (app closed) and the next unshown rung triggers instead.
+const REMINDER_MILESTONES = [10, 5, 3, 1, 0];
 
 interface UpcomingInstallment {
   fundId: string;
@@ -203,41 +209,57 @@ export function InstallmentsPopup() {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<UpcomingInstallment[]>([]);
-  const [loading, setLoading] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  // Which ladder rungs this fund cycle has already pinged for.
+  const shownRungs = useRef<Set<string>>(new Set());
+  const pendingRungs = useRef<string[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
+        const raw = await AsyncStorage.getItem(SHOWN_KEY);
+        if (raw) shownRungs.current = new Set(JSON.parse(raw) as string[]);
+        const items = store ? await loadUpcoming(store) : [];
+        setItems(items);
+        // Rung for each item: the next milestone it has reached or passed
+        // (rungs are descending, so the LAST match is the nearest one).
+        // d=6 -> 10 (5 not yet due); d=0 -> 0, never 10.
+        pendingRungs.current = items.flatMap((u) => {
+          const reached = REMINDER_MILESTONES.filter((m) => m >= u.daysRemaining);
+          const rung = reached[reached.length - 1];
+          return rung === undefined ? [] : [`${u.fundId}|${u.nextDue}|${rung}`];
+        });
+        const fresh = pendingRungs.current.filter((k) => !shownRungs.current.has(k));
+        if (fresh.length === 0) return;
         const shown = await AsyncStorage.getItem(POPUP_KEY);
-        if (shown !== nepalTodayAD()) {
-          const timer = setTimeout(() => setOpen(true), 400);
-          return () => clearTimeout(timer);
-        }
-      } catch {
+        if (shown === nepalTodayAD()) return; // "don't show again today"
         const timer = setTimeout(() => setOpen(true), 400);
         return () => clearTimeout(timer);
+      } catch {
+        // Schedule unreadable — stay quiet rather than nagging with a
+        // popup that only ever shows "All caught up".
       }
     })();
-  }, []);
-
-  useEffect(() => {
-    if (open && store) {
-      setLoading(true);
-      loadUpcoming(store)
-        .then(setItems)
-        .catch(() => setItems([]))
-        .finally(() => setLoading(false));
-    }
-  }, [open, store]);
+    // Runs once per app session; store is restored before this mounts in practice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store]);
 
   const handleClose = useCallback(async () => {
-    if (dontShowAgain) {
-      try {
+    try {
+      for (const k of pendingRungs.current) shownRungs.current.add(k);
+      // Drop keys from past cycles (fund+due-date pairs no longer due).
+      const current = new Set(
+        items.map((u) => `${u.fundId}|${u.nextDue}`)
+      );
+      const kept = [...shownRungs.current].filter((k) =>
+        current.has(k.split("|").slice(0, 2).join("|"))
+      );
+      await AsyncStorage.setItem(SHOWN_KEY, JSON.stringify(kept));
+      if (dontShowAgain) {
         await AsyncStorage.setItem(POPUP_KEY, nepalTodayAD());
-      } catch {
-        // Best-effort.
       }
+    } catch {
+      // Best-effort.
     }
     setOpen(false);
   }, [dontShowAgain]);
@@ -263,11 +285,7 @@ export function InstallmentsPopup() {
         <StatPill label="Total" value={totalAmount} color="success" currency />
       </View>
 
-      {loading ? (
-        <Text variant="caption" color={colors.mutedForeground} style={{ textAlign: "center", paddingVertical: spacing.xl }}>
-          Loading schedule...
-        </Text>
-      ) : hasItems ? (
+      {hasItems ? (
         <View style={{ gap: spacing.md }}>
           {today.length > 0 && (
             <View style={{ gap: spacing.xs }}>

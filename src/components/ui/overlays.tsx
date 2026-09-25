@@ -13,6 +13,7 @@ import React, {
 } from "react";
 import {
   Animated,
+  KeyboardAvoidingView,
   Modal as RNModal,
   Pressable,
   ScrollView,
@@ -59,6 +60,10 @@ export function Modal({
       onRequestClose={onClose}
       statusBarTranslucent
     >
+      {/* The sheet window does not resize with the keyboard on its own;
+          without this the keyboard covers the lower half of every sheet
+          (e.g. the Add Fund date fields). */}
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <Pressable
         onPress={onClose}
         style={{
@@ -140,6 +145,7 @@ export function Modal({
           ) : null}
         </Pressable>
       </Pressable>
+      </KeyboardAvoidingView>
     </RNModal>
   );
 }

@@ -1,38 +1,24 @@
 // ============================================================
 // SahakariSIP — App logo
 // ============================================================
-// Matches the splash / launcher icon exactly: a gold rounded tile
-// with dark-navy bars and a rising arrow.
+// The exact app icon (assets/icon.png), used everywhere inside the
+// app: splash, header, auth screens, onboarding.
 // ============================================================
 
 import React from "react";
-import { View } from "react-native";
-import Svg, { Path, Rect } from "react-native-svg";
+import { Image, View } from "react-native";
 import { useTheme, fontSize } from "../../theme";
 import { Text } from "../ui/primitives";
 
+const ICON = require("../../../assets/icon.png");
+
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <Rect width="32" height="32" rx="9" fill="#EAB308" />
-      <Rect x="6" y="21" width="4.5" height="5.5" rx="1.5" fill="#1F2A37" />
-      <Rect x="13.5" y="13" width="4.5" height="13.5" rx="1.5" fill="#1F2A37" />
-      <Rect x="21" y="6" width="4.5" height="20.5" rx="1.5" fill="#1F2A37" />
-      <Path
-        d="M4 23.5L11 16.5L16 19.5L26 9.5"
-        stroke="#1F2A37"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M22 8.5H27.5V14"
-        stroke="#1F2A37"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
+    <Image
+      source={ICON}
+      style={{ width: size, height: size, borderRadius: size * (9 / 32) }}
+      resizeMode="cover"
+    />
   );
 }
 

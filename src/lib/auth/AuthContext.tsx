@@ -1047,7 +1047,7 @@ const next: AppUser = {
               };
             }
           } catch (e) {
-            console.warn("[AuthContext] Native Google sign-in failed, falling back to WebBrowser:", e);
+            console.warn("[AuthContext] Native Google sign-in failed:", e);
             if (isErrorWithCode && isErrorWithCode(e) && statusCodes) {
               const code = (e as { code?: number }).code;
               if (code === statusCodes.SIGN_IN_CANCELLED) {
@@ -1056,10 +1056,23 @@ const next: AppUser = {
               if (code === statusCodes.IN_PROGRESS) {
                 return { success: false, error: "Google sign-in is already in progress." };
               }
+              if (code === statusCodes.DEVELOPER_ERROR) {
+                return {
+                  success: false,
+                  error:
+                    "Google rejected this app's configuration (DEVELOPER_ERROR). Add this APK's SHA-1 fingerprint to the Android OAuth client in Google Cloud Console.",
+                };
+              }
             }
-            // Only config-level failures (DEVELOPER_ERROR etc., thrown by
-            // configure/hasPlayServices/signIn before an account was
-            // chosen) fall through to the browser.
+            // Native path was taken — surface the failure instead of
+            // silently opening the browser picker.
+            return {
+              success: false,
+              error:
+                e instanceof Error && e.message
+                  ? `Google sign-in failed: ${e.message}`
+                  : "Google sign-in failed. Please try again.",
+            };
           }
         }
       }

@@ -22,13 +22,14 @@ export function formatCurrency(value: number, showSign = false): string {
 }
 
 /**
- * Format a number as NPR without decimals (for summary cards).
- * e.g. 1234567 → "NPR 1,234,567"
+ * Format a number as NPR. Paisa shows only when there is one:
+ * 1234567 → "NPR 1,234,567", 10000.26 → "NPR 10,000.26".
  */
 export function formatCurrencyWhole(value: number, showSign = false): string {
+  const hasPaisa = Math.abs(value) % 1 >= 0.005;
   const formatted = new Intl.NumberFormat(CURRENCY_LOCALE, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: hasPaisa ? 2 : 0,
+    maximumFractionDigits: 2,
   }).format(Math.abs(value));
 
   const sign = showSign && value > 0 ? "+" : value < 0 ? "-" : "";
@@ -43,7 +44,7 @@ export function formatPercentage(
   value: number | null | undefined,
   showSign = true
 ): string {
-  if (value === null || value === undefined || isNaN(value)) return "—";
+  if (value === null || value === undefined || isNaN(value)) return "";
   const sign = showSign && value > 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
 }
