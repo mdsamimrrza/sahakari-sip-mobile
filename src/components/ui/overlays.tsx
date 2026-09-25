@@ -14,10 +14,8 @@ import React, {
 import {
   Animated,
   Modal as RNModal,
-  Platform,
   Pressable,
   ScrollView,
-  StatusBar,
   useWindowDimensions,
   View,
   type StyleProp,
@@ -343,9 +341,20 @@ export function DropdownMenu({
     )
   );
 
-  const statusOffset =
-    Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
-  const computedTop = anchor.y + anchor.height + 6 + statusOffset;
+  // measureInWindow is already window-absolute (status bar included); adding
+  // StatusBar.currentHeight here used to push the popup ~24px out of line.
+  const screenHeight = useWindowDimensions().height;
+  const spaceBelow = screenHeight - (anchor.y + anchor.height) - spacing.lg;
+  // Trigger sitting in the lower half with little room below (e.g. the
+  // 4-option NIBL interval list): open upward instead of clipping.
+  const openUp = spaceBelow < 200 && anchor.y > screenHeight / 2;
+
+  const computedTop = openUp ? 0 : anchor.y + anchor.height + 6;
+  const computedBottom = openUp ? screenHeight - anchor.y + 6 : 0;
+  const clampedMaxHeight = Math.min(
+    maxHeight,
+    Math.max(140, openUp ? anchor.y - spacing.lg : spaceBelow - 6)
+  );
 
   return (
     <RNModal
@@ -361,10 +370,11 @@ export function DropdownMenu({
           onPress={(e) => e.stopPropagation()}
           style={{
             position: "absolute",
-            top: computedTop,
+            top: openUp ? undefined : computedTop,
+            bottom: openUp ? computedBottom : undefined,
             left,
             width: actualWidth,
-            maxHeight,
+            maxHeight: clampedMaxHeight,
             backgroundColor: colors.card,
             borderWidth: 1.5,
             borderColor: colors.border,

@@ -111,7 +111,8 @@ export function FundConfigForm({
   function openCreate() {
     setEditingFund(null);
     setForm(EMPTY_FORM);
-    setSchedule(EMPTY_SCHEDULE);
+    // SIP start date defaults to the registration (Start Date) value.
+    setSchedule({ ...EMPTY_SCHEDULE, anchorDate: EMPTY_FORM.startDate });
     setFormError(null);
     setOpen(true);
   }
@@ -128,9 +129,10 @@ export function FundConfigForm({
       preset: preset ? preset.name : "custom",
     });
     // Pre-fill the registered schedule so it survives edits (same as web).
+    // An older fund without an explicit anchor inherits its start date.
     setSchedule({
       frequency: (fund.frequency as SIPScheduleValue["frequency"]) ?? null,
-      anchorDate: fund.anchor_date ?? null,
+      anchorDate: fund.anchor_date ?? fund.start_date ?? null,
       verified: Boolean(fund.schedule_verified),
     });
     setFormError(null);
@@ -527,7 +529,12 @@ export function FundConfigForm({
           <DateField
             label="Start Date"
             value={form.startDate}
-            onChange={(d) => setForm((p) => ({ ...p, startDate: d }))}
+            onChange={(d) => {
+              setForm((p) => ({ ...p, startDate: d }));
+              // SIP start date mirrors the registration date unless the
+              // user overrides it in the schedule section below.
+              setSchedule((s) => ({ ...s, anchorDate: d || null, verified: false }));
+            }}
           />
 
           {/* Section 2 - SIP schedule (same as the web fund settings page) */}
