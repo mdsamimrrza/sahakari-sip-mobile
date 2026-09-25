@@ -1007,7 +1007,7 @@ const next: AppUser = {
         if (GoogleSignin) {
           try {
             GoogleSignin.configure({
-              webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "",
+              webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "416335590615-e96duqpfc9f7eg4qg0aqnj42avuiqs8l.apps.googleusercontent.com",
             });
 
             await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -1042,9 +1042,10 @@ const next: AppUser = {
                 return { success: false, error: "Google Play Services is not available on this device." };
               }
             }
+            const details = e instanceof Error ? e.message : (typeof e === "object" && e ? JSON.stringify(e) : String(e));
             return {
               success: false,
-              error: e instanceof MobileApiError ? e.message : "Google sign-in failed. Please try again.",
+              error: e instanceof MobileApiError ? e.message : `Google sign-in error: ${details}`,
             };
           }
         }
