@@ -74,6 +74,8 @@ export default function DashboardScreen() {
     "Investor";
   const greetName =
     displayName.length > 14 ? displayName.split(" ")[0] : displayName;
+  // Time-synced: reads the device clock on every render, so the greeting
+  // changes morning / afternoon / evening on its own.
   const hour = new Date().getHours();
   const daypart =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -83,7 +85,7 @@ export default function DashboardScreen() {
       <Screen refreshing={loading} onRefresh={reload} header={<AppHeader />}>
         <PageHeader
           title={`Hi ${greetName} 🇳🇵`}
-          subtitle={`${daypart} — here's your portfolio at a glance.`}
+          subtitle={`${daypart}, here's your portfolio at a glance.`}
           right={
             <Pressable
               onPress={() => setEntryOpen(true)}

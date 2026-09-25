@@ -663,7 +663,7 @@ export default function TaxBreakdownScreen() {
                   <LedgerRow
                     label="Average buying price"
                     sub="Total spent divided by units owned"
-                    value={avgPurchaseNav !== null ? formatPrivate(`NPR ${avgPurchaseNav.toFixed(2)}`) : "-"}
+                    value={avgPurchaseNav !== null ? formatPrivate(`NPR ${avgPurchaseNav.toFixed(2)}`) : ""}
                   />
                   <LedgerRow
                     label={`Yearly fund fee, in price (${activeFund?.fee_rate_pct || 1.5}%)`}

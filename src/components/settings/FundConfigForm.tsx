@@ -382,7 +382,7 @@ export function FundConfigForm({
                     {formatCurrencyWhole(fund.monthly_sip)}/mo
                   </Badge>
                   <Badge bg={`${colors.success}1F`} color={colors.success}>
-                    NAV {fund.latest_nav?.toFixed(2) ?? "-"}
+                    NAV {fund.latest_nav?.toFixed(2) ?? ""}
                   </Badge>
                 </View>
               </View>

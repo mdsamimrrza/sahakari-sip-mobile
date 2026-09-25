@@ -419,7 +419,7 @@ export function SummaryCards({
           tint={colors.amber}
           icon={<TrendingUp size={15} color={colors.amber} />}
           label="XIRR Return"
-          value={summary.xirr !== null ? formatPercentage(summary.xirr * 100) : "-"}
+          value={summary.xirr !== null ? formatPercentage(summary.xirr * 100) : ""}
         />
         <KpiChip
           tint={colors.info}
@@ -575,18 +575,18 @@ export function SummaryCards({
               {
                 label: "Latest NAV",
                 // Selected fund's NAV, else the freshest NAV across funds -
-                // never a bare "-" when we know the last updated NAV.
+                // blank (never a dash) when no NAV is known yet.
                 value:
                   activeFund?.latest_nav
                     ? formatPrivate(`NPR ${Number(activeFund.latest_nav).toFixed(2)}`)
                     : summary.latestNav
                       ? formatPrivate(`NPR ${Number(summary.latestNav).toFixed(2)}`)
-                      : "-",
+                      : "",
               },
               { label: "Total Units", value: formatUnits(summary.totalUnits) },
               {
                 label: "Avg Unit Cost",
-                value: avgUnitCost > 0 ? formatPrivate(`NPR ${avgUnitCost.toFixed(2)}`) : "-",
+                value: avgUnitCost > 0 ? formatPrivate(`NPR ${avgUnitCost.toFixed(2)}`) : "",
               },
               { label: "SIP Streak", value: formatStreak(summary.sipStreak) },
             ].map((m) => (
