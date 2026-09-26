@@ -17,8 +17,9 @@
       "versionCode": 9,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#EDEAE0",
-        "foregroundImage": "./assets/adaptive-icon.png"
+        "backgroundColor": "#EAB308",
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundImage": "./assets/adaptive-icon-background.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [

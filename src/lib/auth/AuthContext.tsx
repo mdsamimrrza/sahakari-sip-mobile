@@ -1060,7 +1060,7 @@ const next: AppUser = {
                 return {
                   success: false,
                   error:
-                    "Google rejected this app's configuration (DEVELOPER_ERROR). Add this APK's SHA-1 fingerprint to the Android OAuth client in Google Cloud Console.",
+                    "Google rejected this app's configuration (DEVELOPER_ERROR). In Google Cloud Console > APIs & Services > Credentials, create an Android OAuth client for package com.samimrrza.sahakarisip with this APK's SHA-1: B2:5D:0F:D8:64:00:AF:18:24:FE:4B:39:82:F4:F3:3C:16:F0:93:1F (release) and 5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25 (debug), then wait a few minutes and retry.",
                 };
               }
             }
