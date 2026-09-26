@@ -18,8 +18,7 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#EAB308",
-        "foregroundImage": "./assets/adaptive-icon-foreground.png",
-        "backgroundImage": "./assets/adaptive-icon-background.png"
+        "foregroundImage": "./assets/icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
