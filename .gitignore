@@ -42,3 +42,7 @@ android/keystore.properties
 .zcode/
 
 .vercel
+src/graphify-out/
+_verify/*.png
+_verify/*.ab
+assets/adaptive-icon2.png
