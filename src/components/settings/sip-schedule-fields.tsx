@@ -14,6 +14,7 @@ import { CalendarRange, Info, ShieldCheck } from "lucide-react-native";
 import { useTheme, spacing, radius, fontSize } from "@/theme";
 import { Text, Input, Card, Badge, Button } from "@/components/ui/primitives";
 import { Select } from "@/components/ui/overlays";
+import { DateField } from "@/components/ui/DateField";
 import { formatBSDate, type SIPFrequency } from "@/lib/calendar/bs";
 import { getFundMeta } from "@/lib/fund-meta";
 
@@ -102,9 +103,9 @@ export function SIPScheduleFields({
 
   return (
     <View style={{ gap: spacing.md }}>
-      {/* Interval + start date, side by side */}
-      <View style={{ flexDirection: "row", gap: spacing.md }}>
-        <View style={{ flex: 1, gap: 4 }}>
+      {/* Interval first, then start date - stacked */}
+      <View style={{ gap: spacing.md }}>
+        <View style={{ gap: 4 }}>
           <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "700", fontSize: fontSize.xs }}>
             SIP Interval
           </Text>
@@ -118,28 +119,31 @@ export function SIPScheduleFields({
             }))}
           />
         </View>
-        <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ gap: 4 }}>
           <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "700", fontSize: fontSize.xs }}>
             SIP Start Date
           </Text>
-          <View style={{ flexDirection: "row", gap: spacing.sm, alignItems: "center" }}>
-            <Input
-              containerStyle={{ flex: 1 }}
-              value={value.anchorDate ?? ""}
-              onChangeText={(v) => {
-                onEditStartDate?.();
-                set({ anchorDate: v || null, verified: false });
-              }}
-              placeholder="YYYY-MM-DD"
-              keyboardType="numeric"
-              editable={!startDateLocked}
-            />
-            {startDateLocked && (
+          {startDateLocked ? (
+            <>
+              <Input
+                value={value.anchorDate ?? ""}
+                onChangeText={(v) => {
+                  onEditStartDate?.();
+                  set({ anchorDate: v || null, verified: false });
+                }}
+                placeholder="YYYY-MM-DD"
+                editable={false}
+              />
               <Button size="sm" variant="ghost" onPress={() => onEditStartDate?.()}>
                 Change
               </Button>
-            )}
-          </View>
+            </>
+          ) : (
+            <DateField
+              value={value.anchorDate ?? ""}
+              onChange={(next) => set({ anchorDate: next || null, verified: false })}
+            />
+          )}
           {startDateLocked && (
             <Text variant="caption" color={colors.mutedForeground} style={{ fontSize: fontSize.xs }}>
               Same as your registration date

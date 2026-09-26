@@ -120,6 +120,9 @@ export interface DataStore {
   deleteFundConfig(id: string): Promise<ActionResult>;
   updateLatestNav(input: LatestNavInput): Promise<ActionResult>;
 
+  /** Device-mode only: pull the public NAV feed (throttled, opt-out). */
+  syncNavFeed?(): Promise<void>;
+
   // ---------- Entries ----------
   getEntries(
     params?: GetEntriesParams

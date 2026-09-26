@@ -151,6 +151,39 @@ export class CloudStore implements DataStore {
       created_at: "",
     }));
 
+    // Shared market series (nav_reference): ONE row per (fund, date) for
+    // ALL users, written by the server cron. Merged under the user's own
+    // nav_history rows (manual corrections win) by normalized fund name.
+    const fundKeyToIds = new Map<string, string[]>();
+    for (const f of funds) {
+      const k = f.fund_name.trim().toLowerCase();
+      fundKeyToIds.set(k, [...(fundKeyToIds.get(k) ?? []), f.id]);
+    }
+    if (fundKeyToIds.size > 0) {
+      const { data: refData } = await this.db
+        .from("nav_reference")
+        .select("fund_key, nav_date, nav_value")
+        .in("fund_key", [...fundKeyToIds.keys()])
+        .order("nav_date", { ascending: true });
+      const own = new Set(navHistory.map((r) => `${r.fund_id}|${r.nav_date}`));
+      for (const row of (refData ?? []) as any[]) {
+        for (const fid of fundKeyToIds.get(String(row.fund_key)) ?? []) {
+          const key = `${fid}|${row.nav_date}`;
+          if (!own.has(key)) {
+            navHistory.push({
+              id: `${fid}-${row.nav_date}-ref`,
+              user_id: userId,
+              fund_id: fid,
+              nav_date: row.nav_date,
+              nav_value: Number(row.nav_value),
+              created_at: "",
+            });
+          }
+        }
+      }
+      navHistory.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
+    }
+
     const data = computeDashboardData({
       funds,
       entries: entries.map((e) => ({
@@ -715,6 +748,43 @@ export class CloudStore implements DataStore {
 
     const { data } = await query;
     const rows = (data ?? []) as NavHistoryRow[];
+
+    // Shared market series (nav_reference) merged under the user's own
+    // rows - manual corrections win per (fund_id, date).
+    const fundsRes = await this.db
+      .from("fund_config")
+      .select("id, fund_name")
+      .eq("user_id", userId);
+    const fundKeyToIds = new Map<string, string[]>();
+    for (const f of (fundsRes.data ?? []) as any[]) {
+      const k = String(f.fund_name).trim().toLowerCase();
+      fundKeyToIds.set(k, [...(fundKeyToIds.get(k) ?? []), f.id]);
+    }
+    if (fundKeyToIds.size > 0) {
+      const { data: refData } = await this.db
+        .from("nav_reference")
+        .select("fund_key, nav_date, nav_value")
+        .in("fund_key", [...fundKeyToIds.keys()])
+        .order("nav_date", { ascending: true });
+      const own = new Set(rows.map((r) => `${r.fund_id}|${r.nav_date}`));
+      for (const row of (refData ?? []) as any[]) {
+        for (const fid of fundKeyToIds.get(String(row.fund_key)) ?? []) {
+          const key = `${fid}|${row.nav_date}`;
+          if (!own.has(key) && (!fundId || fundId === "all" || fid === fundId)) {
+            rows.push({
+              id: `${fid}-${row.nav_date}-ref`,
+              user_id: userId,
+              fund_id: fid,
+              nav_date: row.nav_date,
+              nav_value: Number(row.nav_value),
+              created_at: "",
+            });
+          }
+        }
+      }
+      rows.sort((a, b) => a.nav_date.localeCompare(b.nav_date));
+    }
+
     cacheSet(cacheKey, rows);
     return rows;
   }

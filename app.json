@@ -1,8 +1,8 @@
-﻿{
+{
   "expo": {
     "name": "SahakariSIP",
     "slug": "sahakarisip",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "sahakarisip",
@@ -14,11 +14,11 @@
     },
     "android": {
       "package": "com.samimrrza.sahakarisip",
-      "versionCode": 9,
+      "versionCode": 10,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "backgroundColor": "#EAB308",
-        "foregroundImage": "./assets/icon.png"
+        "backgroundColor": "#E3A92D",
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -71,7 +71,8 @@
         }
       ],
       "expo-font",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "react-native-quick-crypto"
     ],
     "extra": {
       "router": {

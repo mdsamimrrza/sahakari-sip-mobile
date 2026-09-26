@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/primitives";
 import { Modal, Select, useToast } from "@/components/ui/overlays";
 import { DateField } from "@/components/ui/DateField";
+import { log } from "@/lib/logger";
 
 export function EntryFormModal({
   visible,
@@ -68,13 +69,19 @@ export function EntryFormModal({
 
   const activeFund = funds.find((f) => f.id === fundId);
 
-  // Reset the form each time the sheet opens
+  // Reset the form each time the sheet opens. New entries pre-fill the
+  // amount with the fund's monthly SIP and NAV with its latest NAV -
+  // both remain fully editable.
   useEffect(() => {
     if (!visible) return;
-    setFundId(entry?.fund_id ?? defaultFundId ?? funds[0]?.id ?? "");
+    const presetFundId = entry?.fund_id ?? defaultFundId ?? funds[0]?.id ?? "";
+    const presetFund = funds.find((f) => f.id === presetFundId);
+    setFundId(presetFundId);
     setPurchaseDate(entry?.purchase_date ?? todayKey());
-    setAmount(entry?.amount?.toString() ?? "");
-    setNav(entry?.nav?.toString() ?? "");
+    setAmount(
+      entry?.amount?.toString() ?? presetFund?.monthly_sip?.toString() ?? ""
+    );
+    setNav(entry?.nav?.toString() ?? presetFund?.latest_nav?.toString() ?? "");
     setUnits(entry?.units?.toString() ?? "");
     setNotes(entry?.notes ?? "");
     setOverrideUnits(false);
@@ -97,6 +104,16 @@ export function EntryFormModal({
       active = false;
     };
   }, [visible, fundId, isEdit, store]);
+
+  // Switching fund on a new entry re-fills only the BLANK amount/NAV
+  // fields from the newly selected fund (never overwrites user input).
+  useEffect(() => {
+    if (isEdit || !fundId) return;
+    const fund = funds.find((f) => f.id === fundId);
+    if (!fund) return;
+    setNav((cur) => cur || fund.latest_nav?.toString() || "");
+    setAmount((cur) => cur || fund.monthly_sip?.toString() || "");
+  }, [fundId, isEdit, funds]);
 
   // Auto-calculate whole units (integer only)
   useEffect(() => {
@@ -147,7 +164,18 @@ export function EntryFormModal({
 
     const parsed = entrySchema.safeParse(payload);
     if (!parsed.success) {
-      setError(parsed.error.errors[0].message);
+      const issue = parsed.error.errors[0];
+      const field = issue.path?.length ? `${issue.path[0]}: ` : "";
+      log("entry.formInvalid", { issues: parsed.error.errors, payload });
+      setError(`${field}${issue.message}`);
+      return;
+    }
+
+    // Entry amount cannot fall below the fund's own monthly SIP amount
+    if (activeFund?.monthly_sip && payload.amount < activeFund.monthly_sip) {
+      setError(
+        `Amount cannot be less than the fund's monthly SIP (NPR ${activeFund.monthly_sip.toLocaleString("en-IN")})`
+      );
       return;
     }
 

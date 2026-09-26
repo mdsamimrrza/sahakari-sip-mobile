@@ -24,6 +24,7 @@ import { AuthShell } from "@/components/layout/AuthShell";
 import { AuthModeSwitch } from "@/components/auth/AuthModeSwitch";
 import { DataModeDetailsLink } from "@/components/auth/DataModeDetails";
 import { GoogleButton } from "@/components/auth/GoogleButton";
+import { RecoveryKeyOnce } from "@/components/auth/RecoveryKeyOnce";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -31,6 +32,7 @@ export default function LoginScreen() {
   const {
     signIn,
     signInWithGoogle,
+    resetLocalPassword,
     cloudAvailable,
     biometricEnabled,
     biometricSupported,
@@ -56,6 +58,16 @@ export default function LoginScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // One-time recovery key (legacy profile upgraded to a vault on login).
+  const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
+  // Local forgot-password flow (device mode only — recovery key based).
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [frEmail, setFrEmail] = useState("");
+  const [frKey, setFrKey] = useState("");
+  const [frNew, setFrNew] = useState("");
+  const [frConfirm, setFrConfirm] = useState("");
+  const [frLoading, setFrLoading] = useState(false);
+  const [frError, setFrError] = useState<string | null>(null);
 
   // Fingerprint unlock from the login screen itself (banking-style) — only
   // offered when the user has actually armed biometric unlock before.
@@ -90,17 +102,58 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    const result = await signIn(email, password, mode);
-    setLoading(false);
+    let result: Awaited<ReturnType<typeof signIn>>;
+    try {
+      result = await signIn(email, password, mode);
+    } catch (e) {
+      result = {
+        success: false,
+        error: e instanceof Error ? e.message : "Sign in failed unexpectedly.",
+      };
+    } finally {
+      setLoading(false);
+    }
 
     if (!result.success) {
       setError(result.error ?? "Sign in failed. Please try again.");
       return;
     }
 
+    if (result.recoveryKey) {
+      // Legacy profile upgraded to an encrypted vault — show the key once.
+      setRecoveryKey(result.recoveryKey);
+      return;
+    }
+
     toast({
       title: "Welcome back",
       description: "Signed in successfully.",
+      variant: "success",
+    });
+    router.replace("/(app)/dashboard");
+  }
+
+  async function handleForgotSubmit() {
+    setFrError(null);
+    setFrLoading(true);
+    let result: Awaited<ReturnType<typeof resetLocalPassword>>;
+    try {
+      result = await resetLocalPassword(frEmail, frKey, frNew, frConfirm);
+    } catch (e) {
+      result = {
+        success: false,
+        error: e instanceof Error ? e.message : "Password reset failed.",
+      };
+    } finally {
+      setFrLoading(false);
+    }
+    if (!result.success) {
+      setFrError(result.error ?? "Password reset failed.");
+      return;
+    }
+    toast({
+      title: "Password reset",
+      description: "Your password has been changed and you are signed in.",
       variant: "success",
     });
     router.replace("/(app)/dashboard");
@@ -129,6 +182,89 @@ export default function LoginScreen() {
       variant: "success",
     });
     router.replace("/(app)/dashboard");
+  }
+
+  if (recoveryKey) {
+    return (
+      <AuthShell compact>
+        <RecoveryKeyOnce
+          recoveryKey={recoveryKey}
+          onDone={() => {
+            setRecoveryKey(null);
+            router.replace("/(app)/dashboard");
+          }}
+        />
+      </AuthShell>
+    );
+  }
+
+  if (forgotOpen) {
+    return (
+      <AuthShell compact>
+        <Card padded style={{ borderWidth: 0 }}>
+          <Text variant="heading">Reset your password</Text>
+          <Text
+            variant="caption"
+            color={colors.mutedForeground}
+            style={{ marginTop: 2, marginBottom: spacing.md }}
+          >
+            Enter the recovery key you saved when creating this on-device
+            account. Nothing is sent anywhere - the reset happens on this
+            phone.
+          </Text>
+
+          <View style={{ gap: spacing.md }}>
+            <Input
+              label="Email"
+              value={frEmail}
+              onChangeText={setFrEmail}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              error={frError}
+            />
+            <Input
+              label="Recovery key"
+              value={frKey}
+              onChangeText={setFrKey}
+              placeholder="XXXX-XXXX-XXXX-XXXX-…"
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+            <Input
+              label="New password"
+              value={frNew}
+              onChangeText={setFrNew}
+              placeholder="At least 8 characters"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            <Input
+              label="Confirm new password"
+              value={frConfirm}
+              onChangeText={setFrConfirm}
+              placeholder="Repeat the new password"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+
+            <Button size="lg" loading={frLoading} onPress={handleForgotSubmit}>
+              Reset password &amp; sign in
+            </Button>
+            <Button
+              variant="ghost"
+              onPress={() => {
+                setForgotOpen(false);
+                setFrError(null);
+              }}
+            >
+              Back to sign in
+            </Button>
+          </View>
+        </Card>
+      </AuthShell>
+    );
   }
 
   return (
@@ -216,14 +352,15 @@ export default function LoginScreen() {
               </Text>
             </Pressable>
           ) : (
-            <Text
-              variant="caption"
-              color={colors.mutedForeground}
-              style={{ textAlign: "center", fontSize: fontSize.xs }}
-            >
-              Forgot your password? On-device profiles can&apos;t be recovered
-              by email.
-            </Text>
+            <Pressable onPress={() => mode === "local" && setForgotOpen(true)}>
+              <Text
+                variant="caption"
+                color={mode === "local" ? colors.primary : colors.mutedForeground}
+                style={{ fontWeight: "700" }}
+              >
+                Forgot password?
+              </Text>
+            </Pressable>
           )}
 
           <View style={{ flexDirection: "row", gap: spacing.sm }}>

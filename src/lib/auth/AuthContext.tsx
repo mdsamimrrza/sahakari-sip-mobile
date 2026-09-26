@@ -33,8 +33,21 @@ import { AppState, Platform, NativeModules, TurboModuleRegistry } from "react-na
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+import QuickCrypto from "react-native-quick-crypto";
 
 import { getSupabase, isSupabaseConfigured } from "../supabase";
+import {
+  createVault,
+  deleteDek,
+  loadDek,
+  lockVault,
+  rewrapPassword,
+  saveDek,
+  unlockVault,
+  unwrapWithPassword,
+  unwrapWithRecoveryKey,
+  type LocalVaultData,
+} from "./local-vault";
 import { createStore } from "../data";
 import { CloudStore } from "../data/cloud";
 import { cacheInvalidate } from "../data/cache";
@@ -97,6 +110,8 @@ export interface AuthResult {
   error?: string;
   /** Set when signup succeeded but the account still needs email confirmation. */
   needsEmailConfirmation?: boolean;
+  /** One-time recovery key for device-mode accounts — show once, never store. */
+  recoveryKey?: string;
 }
 
 interface AuthContextValue {
@@ -118,6 +133,13 @@ interface AuthContextValue {
   /** Cloud signup step 2: confirm the emailed 6-digit code, then sign in. */
   confirmSignup: (email: string, code: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
+  /** Device-mode only: reset the password with the one-time recovery key. */
+  resetLocalPassword: (
+    email: string,
+    recoveryKey: string,
+    newPassword: string,
+    confirmPassword: string
+  ) => Promise<AuthResult>;
   deleteAccount: () => Promise<AuthResult>;
   /**
    * Biometric unlock (banking-style): with it enabled, signOut() locks the
@@ -167,6 +189,13 @@ const SESSION_KEY = "sahakarisip.v1.session";
 const PROFILES_KEY = "sahakarisip.v1.profiles";
 const SESSION_STARTED_KEY = "sahakarisip.v1.session_started_at";
 
+/** Unlock the vault for a profile from its SecureStore DEK (cold start,
+ *  biometric unlock). No-op when the DEK is absent. */
+async function unlockVaultForProfile(profileId: string): Promise<void> {
+  const dek = await loadDek(profileId);
+  if (dek) unlockVault(dek);
+}
+
 interface LocalProfile {
   id: string;
   email: string;
@@ -175,6 +204,8 @@ interface LocalProfile {
   hash: string;
   iterations: number;
   created_at: string;
+  /** Envelope-encryption vault (device mode data at rest). */
+  vault?: LocalVaultData;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -183,31 +214,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_KEY_LENGTH = 32; // 256 bits
-const PBKDF2_ALGORITHM = "PBKDF2";
-const PBKDF2_HASH = "SHA-256";
 
 async function hashPassword(password: string, salt: string, iterations = PBKDF2_ITERATIONS): Promise<string> {
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    { name: PBKDF2_ALGORITHM },
-    false,
-    ["deriveBits"]
+  // PBKDF2-HMAC-SHA256 via react-native-quick-crypto: the Android JS
+  // engine has no global WebCrypto (crypto.subtle), and a pure-JS
+  // derivation took 10-15s - the native module does it in milliseconds.
+  return QuickCrypto.pbkdf2Sync(password, salt, iterations, PBKDF2_KEY_LENGTH, "sha256").toString(
+    "hex"
   );
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: PBKDF2_ALGORITHM,
-      salt: encoder.encode(salt),
-      iterations,
-      hash: PBKDF2_HASH,
-    },
-    keyMaterial,
-    PBKDF2_KEY_LENGTH * 8
-  );
-  return Array.from(new Uint8Array(derivedBits))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 async function verifyPassword(password: string, salt: string, hash: string, iterations: number): Promise<boolean> {
@@ -238,6 +252,12 @@ function avatarFromMetadata(metadata: unknown): string | undefined {
 /** Returning from a shorter-than-grace background stay (app switch, share
  *  sheet, notification shade) does not re-lock; anything longer does. */
 const BACKGROUND_LOCK_GRACE_MS = 30_000;
+
+/** Banking-style absolute session expiry: this long after login, the next
+ *  app open ends the session. Biometric-armed users land on the lock screen
+ *  (fingerprint re-authenticates and restores the session); everyone else
+ *  is returned to the login screen. */
+const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
 
 // Google handoff waiters. On Android the sahakarisip:// redirect can be
 // delivered by the Custom Tab's openAuthSessionAsync result OR by
@@ -320,6 +340,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // would go stale between renders).
   const userRef = useRef<AppUser | null>(null);
   const backgroundedAtRef = useRef(0);
+  const sessionStartedAtRef = useRef<string | null>(null);
+  const signOutRef = useRef<() => Promise<void>>(async () => {});
+  const expireSessionRef = useRef<() => Promise<void>>(async () => {});
   const appStateRef = useRef(AppState.currentState);
   const mounted = useRef(true);
   // Holds the reset token and email between verify OTP and set password steps.
@@ -328,6 +351,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    sessionStartedAtRef.current = sessionStartedAt;
+  }, [sessionStartedAt]);
 
   const cloudAvailable = isSupabaseConfigured && isWebConfigured;
 
@@ -362,6 +389,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (nextState === "active") {
         if (
           prev !== "active" &&
+          userRef.current &&
+          sessionStartedAtRef.current &&
+          Date.now() - Date.parse(sessionStartedAtRef.current) > SESSION_TTL_MS
+        ) {
+          // Banking-style absolute expiry: the session is over, but
+          // biometric users can re-authenticate on the lock screen.
+          // Only an explicit logout wipes everything.
+          void expireSessionRef.current();
+        } else if (
+          prev !== "active" &&
           biometricEnabledRef.current &&
           userRef.current &&
           Date.now() - backgroundedAtRef.current > BACKGROUND_LOCK_GRACE_MS
@@ -393,6 +430,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setUser(next);
     setStatus(next ? "authenticated" : "unauthenticated");
+    // Device mode: fire-and-forget NAV auto-update (throttled to once a
+    // day inside the store; silently skipped when offline or opted out).
+    if (next?.mode === "local") {
+      void createStore("local", next.id).syncNavFeed?.();
+    }
   }, []);
 
   // ---------- One-time local â†’ cloud merge (Settings-gated) ----------
@@ -590,7 +632,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBiometricEnabled(false);
         setLockInfo(null);
         setStatus("unauthenticated");
-        return { success: false, error: "Biometric unlock is not set up." };
+        return { success: false, error: "Please log in first." };
       }
       const verified = await promptBiometric("Unlock SahakariSIP");
       if (!verified) return { success: false, error: "Not verified." };
@@ -611,6 +653,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           // Restore the mobile session (bearer token) into Supabase client.
           await saveMobileSession(entry.mobileSession);
+          // Fingerprint re-auth starts a fresh TTL window.
+          const nowIso = new Date().toISOString();
+          await AsyncStorage.setItem(SESSION_STARTED_KEY, nowIso);
+          setSessionStartedAt(nowIso);
           void refreshDbProfile();
         } else if (entry.mode === "local" && entry.localProfileId) {
           await persistSession({
@@ -619,6 +665,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             name: entry.name,
             mode: "local",
           });
+          await unlockVaultForProfile(entry.localProfileId);
         } else {
           throw new Error("No stored session for this entry.");
         }
@@ -646,7 +693,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // 1. Restore a cloud session if Supabase has one persisted
         if (cloudAvailable) {
           const mobileSession = await loadMobileSession();
-          if (mobileSession && mobileSession.expiresAt > Date.now()) {
+          const persistedStartedAt = await AsyncStorage.getItem(SESSION_STARTED_KEY);
+          const sessionExpired =
+            !!persistedStartedAt &&
+            Date.now() - Date.parse(persistedStartedAt) > SESSION_TTL_MS;
+          if (mobileSession && mobileSession.expiresAt > Date.now() && !sessionExpired) {
             await saveMobileSession(mobileSession); // ensure token in Supabase client
 const next: AppUser = {
                 id: mobileSession.user.id,
@@ -694,9 +745,18 @@ const next: AppUser = {
           const saved = JSON.parse(raw) as AppUser;
           if (saved.mode === "local") {
             const startedAt = await AsyncStorage.getItem(SESSION_STARTED_KEY);
-            if (mounted.current) {
+            const expired =
+              !!startedAt &&
+              Date.now() - Date.parse(startedAt) > SESSION_TTL_MS;
+            if (expired) {
+              // Session ran past its TTL: fall through to the lock/login
+              // decision below (fingerprint users can re-auth from the
+              // stored biometric entry).
+            } else if (mounted.current) {
               setUser(saved);
               setSessionStartedAt(startedAt);
+              await unlockVaultForProfile(saved.id);
+              void createStore("local", saved.id).syncNavFeed?.();
               const entry = await readBiometricEntry();
               if (
                 (await isBiometricEnabled()) &&
@@ -709,13 +769,16 @@ const next: AppUser = {
               } else {
                 setStatus("authenticated");
               }
+              return;
             }
-            return;
+            // Expired: fall through to the lock/login decision below.
           }
         }
 
-        // 3. No active session â€” but biometric unlock may be armed from a
-        // previous lock. Hand the decision to the lock screen.
+        // 3. No active session â€” but biometric unlock may be armed (a
+        // background lock, or a TTL expiry that stashed the session for
+        // re-auth). The lock screen decides; an explicit logout cleared
+        // the entry, so it never appears after one.
         if (await isBiometricEnabled()) {
           const entry = await readBiometricEntry();
           if (entry) {
@@ -793,6 +856,22 @@ const next: AppUser = {
       if (!valid) {
         return { success: false, error: "Invalid email or password. Please try again." };
       }
+      // Unlock the vault — or migrate a legacy profile into one. Legacy
+      // migration hands back a recovery key, shown once on the login screen.
+      let recoveryKey: string | undefined;
+      if (profile.vault) {
+        let dek = await loadDek(profile.id);
+        if (!dek) dek = await unwrapWithPassword(profile.vault, password);
+        await saveDek(profile.id, dek);
+        unlockVault(dek);
+      } else {
+        const { vault, dek, recoveryKey: rk } = await createVault(password);
+        const updated = { ...profile, vault };
+        await writeProfiles((await readProfiles()).map((p) => (p.id === profile.id ? updated : p)));
+        await saveDek(profile.id, dek);
+        unlockVault(dek);
+        recoveryKey = rk;
+      }
       const localUser: AppUser = {
         id: profile.id,
         email: profile.email,
@@ -801,7 +880,7 @@ const next: AppUser = {
       };
       await persistSession(localUser);
       void maybeOfferBiometric(localUser);
-      return { success: true };
+      return { success: true, recoveryKey };
     },
     [cloudAvailable, persistSession, refreshDbProfile, maybeOfferBiometric]
   );
@@ -850,6 +929,7 @@ const next: AppUser = {
       }
       const salt = uuid();
       const hash = await hashPassword(password, salt);
+      const { vault, dek, recoveryKey } = await createVault(password);
       const profile: LocalProfile = {
         id: uuid(),
         email: normalized,
@@ -857,14 +937,17 @@ const next: AppUser = {
         hash,
         iterations: PBKDF2_ITERATIONS,
         created_at: new Date().toISOString(),
+        vault,
       };
       await writeProfiles([...profiles, profile]);
+      await saveDek(profile.id, dek);
+      unlockVault(dek);
       await persistSession({
         id: profile.id,
         email: profile.email,
         mode: "local",
       });
-      return { success: true };
+      return { success: true, recoveryKey };
     },
     [cloudAvailable, persistSession, refreshDbProfile]
   );
@@ -1153,78 +1236,171 @@ const next: AppUser = {
     [cloudAvailable, persistSession, refreshDbProfile, maybeOfferBiometric]
   );
 
+  // ---------- Forgot password (device-local, recovery key) ----------
+
+  /** Device-mode password reset: the recovery key unwraps the vault DEK,
+   *  the DEK is re-wrapped under the new password, and the user is signed
+   *  in. Nothing ever leaves the device. */
+  const resetLocalPassword = useCallback(
+    async (
+      email: string,
+      recoveryKey: string,
+      newPassword: string,
+      confirmPassword: string
+    ): Promise<AuthResult> => {
+      if (newPassword.length < 8) {
+        return { success: false, error: "Password must be at least 8 characters." };
+      }
+      if (newPassword !== confirmPassword) {
+        return { success: false, error: "Passwords do not match." };
+      }
+      const normalized = email.toLowerCase().trim();
+      const profiles = await readProfiles();
+      const idx = profiles.findIndex((p) => p.email === normalized);
+      if (idx === -1 || !profiles[idx].vault) {
+        return {
+          success: false,
+          error:
+            "No on-device account found for this email, or it has no recovery key. Recovery is only available for accounts created with one.",
+        };
+      }
+      try {
+        const vault = profiles[idx].vault as LocalVaultData;
+        const dek = await unwrapWithRecoveryKey(vault, recoveryKey);
+        const newSalt = uuid();
+        const newHash = await hashPassword(newPassword, newSalt);
+        const newVault = await rewrapPassword(vault, dek, newPassword);
+        profiles[idx] = {
+          ...profiles[idx],
+          salt: newSalt,
+          hash: newHash,
+          iterations: PBKDF2_ITERATIONS,
+          vault: newVault,
+        };
+        await writeProfiles(profiles);
+        await saveDek(profiles[idx].id, dek);
+        unlockVault(dek);
+        await persistSession({
+          id: profiles[idx].id,
+          email: profiles[idx].email,
+          name: profiles[idx].name,
+          mode: "local",
+        });
+        return { success: true };
+      } catch (e) {
+        return {
+          success: false,
+          error:
+            e instanceof Error ? e.message : "Password reset failed. Check the recovery key and try again.",
+        };
+      }
+    },
+    [persistSession]
+  );
+
   // ---------- Sign out ----------
 
-  const signOut = useCallback(async () => {
-    // With biometric armed, "log out" means LOCK: keep a reusable session in
-    // SecureStore so the fingerprint can restore it later. Crucially the
-    // Supabase session is cleared locally WITHOUT server-side revocation
-    // (signOut() would kill the refresh token the fingerprint needs).
-    if (biometricEnabledRef.current && user) {
-      try {
-        // Only the account that armed the lock may leave its session in the
-        // biometric entry â€” never capture another principal's tokens, and
-        // never capture for an account that declined the offer.
-        const armed = await readBiometricEntry();
-        const isArmingAccount =
-          !!armed && armed.email === user.email && armed.mode === user.mode;
-        if (isArmingAccount && !(await hasDeclinedBiometric(user.id))) {
-          if (user.mode === "cloud" && cloudAvailable) {
-            // Save the current mobile session for biometric unlock.
-            const session = await loadMobileSession();
-            if (session) {
-              await saveBiometricEntry({
-                mode: "cloud",
-                email: user.email,
-                name: user.name,
-                savedAt: new Date().toISOString(),
-                mobileSession: session,
-              });
-            }
-          } else {
-            await saveBiometricEntry({
-              mode: "local",
-              email: user.email,
-              name: user.name,
-              savedAt: new Date().toISOString(),
-              localProfileId: user.id,
-            });
-          }
-          await clearMobileSession();
-          await AsyncStorage.removeItem(SESSION_KEY);
-          await AsyncStorage.removeItem(SESSION_STARTED_KEY);
-          setSessionStartedAt(null);
-          setPendingMerge(null);
-          setHasUnmergedLocalData(false);
-          setLockInfo({ email: user.email, name: user.name });
-          setUser(null);
-          setStatus("locked");
-          return;
-        }
-        // A different account signed out (or this one declined biometrics):
-        // disarm the lock and fall through to the full logout below.
-        await clearBiometricEntry();
-        biometricEnabledRef.current = false;
-        setBiometricEnabled(false);
-      } catch {
-        // Lock bookkeeping failed â€” fall through to the full logout so we
-        // never leave the session in a half-cleared state.
-      }
-    }
+  /** Tell Play Services to forget the authorized Google account so the
+   * next native sign-in shows the account chooser instead of silently
+   * re-returning the previously used account. revokeAccess() revokes the
+   * OAuth grant outright - some Play Services builds keep returning the
+   * old account from signOut() alone. */
+  const googleNativeSignOut = useCallback(async () => {
+    if (Platform.OS === "web") return;
     try {
-      if (cloudAvailable) {
-        // The NextAuth JWT is stateless â€” nothing to revoke server-side
-        // beyond deleting it locally below.
+      const googleModule = require("@react-native-google-signin/google-signin");
+      const g = googleModule.GoogleSignin;
+      // The module may not be configured in this process (logout after an
+      // app restart) - configure before touching its state.
+      g.configure({
+        webClientId:
+          process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+          "416335590615-e96duqpfc9f7eg4qg0aqnj42avuiqs8l.apps.googleusercontent.com",
+      });
+      // After an app restart the module holds no account even though Play
+      // Services still does - restore it silently, otherwise revokeAccess
+      // no-ops and the next sign-in auto-picks the old account.
+      if (!g.getCurrentUser()) {
+        await g.signInSilently().catch(() => {});
       }
-    } catch {
-      // ignore
+      await g.revokeAccess();
+      await g.signOut();
+    } catch (e) {
+      // Best effort - the app session is already cleared.
     }
+  }, []);
+
+  /**
+   * End the session: wipe the session AND the biometric entry, revoke the
+   * Google grant, and land on the login page. Logout NEVER locks - the
+   * lock screen exists only for the background auto-lock while a session
+   * is alive, never after an explicit logout.
+   */
+  const signOut = useCallback(async () => {
     await clearBiometricEntry();
+    biometricEnabledRef.current = false;
     setBiometricEnabled(false);
     await clearMobileSession();
     await clearHandoffTokens();
     await persistSession(null);
-  }, [cloudAvailable, persistSession, user]);
+    lockVault();
+    await googleNativeSignOut();
+  }, [persistSession, googleNativeSignOut]);
+
+  useEffect(() => {
+    signOutRef.current = signOut;
+  }, [signOut]);
+
+  /**
+   * Session TTL expiry (banking-style, distinct from explicit logout):
+   * the session is over, but biometric users land on the lock screen and
+   * the fingerprint RE-AUTHENTICATES them by restoring the stashed
+   * session. Users without biometrics get a full logout. Only the
+   * explicit logout (signOut) wipes the biometric entry.
+   */
+  const expireSession = useCallback(async () => {
+    const u = userRef.current;
+    if (!u) return;
+    if (biometricEnabledRef.current) {
+      try {
+        if (u.mode === "cloud" && cloudAvailable) {
+          const session = await loadMobileSession();
+          if (session) {
+            await saveBiometricEntry({
+              mode: "cloud",
+              email: u.email,
+              name: u.name,
+              savedAt: new Date().toISOString(),
+              mobileSession: session,
+            });
+          }
+        } else {
+          await saveBiometricEntry({
+            mode: "local",
+            email: u.email,
+            name: u.name,
+            savedAt: new Date().toISOString(),
+            localProfileId: u.id,
+          });
+        }
+        await clearMobileSession();
+        await AsyncStorage.removeItem(SESSION_KEY);
+        await AsyncStorage.removeItem(SESSION_STARTED_KEY);
+        setSessionStartedAt(null);
+        setLockInfo({ email: u.email, name: u.name });
+        setUser(null);
+        setStatus("locked");
+        return;
+      } catch {
+        // Stash failed - fall through to the full logout below.
+      }
+    }
+    await signOutRef.current();
+  }, [cloudAvailable]);
+
+  useEffect(() => {
+    expireSessionRef.current = expireSession;
+  }, [expireSession]);
 
   // ---------- Delete account ----------
 
@@ -1237,6 +1413,8 @@ const next: AppUser = {
     if (user.mode === "local") {
       const profiles = await readProfiles();
       await writeProfiles(profiles.filter((p) => p.id !== user.id));
+      await deleteDek(user.id);
+      lockVault();
     }
 
     // The account is gone â€” the biometric key must not survive it.
@@ -1272,8 +1450,9 @@ const next: AppUser = {
     }
 
     await persistSession(null);
+    await googleNativeSignOut();
     return { success: true };
-  }, [cloudAvailable, persistSession, user]);
+  }, [cloudAvailable, persistSession, user, googleNativeSignOut]);
 
   // ---------- Password reset ----------
 
@@ -1395,6 +1574,7 @@ const next: AppUser = {
       signInWithGoogle,
       signUp,
       confirmSignup,
+      resetLocalPassword,
       signOut,
       deleteAccount,
       pendingMerge,
@@ -1440,6 +1620,7 @@ const next: AppUser = {
       signInWithGoogle,
       signUp,
       confirmSignup,
+      resetLocalPassword,
       signOut,
       deleteAccount,
       refreshDbProfile,

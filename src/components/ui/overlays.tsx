@@ -15,6 +15,7 @@ import {
   Animated,
   KeyboardAvoidingView,
   Modal as RNModal,
+  PanResponder,
   Pressable,
   ScrollView,
   useWindowDimensions,
@@ -205,35 +206,29 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }, 3800);
   }, []);
 
+  const dismiss = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   const value = useMemo(() => ({ toast }), [toast]);
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <ToastViewport toasts={toasts} />
+      <ToastViewport toasts={toasts} onDismiss={dismiss} />
     </ToastContext.Provider>
   );
 }
 
-function ToastViewport({ toasts }: { toasts: ToastEntry[] }) {
+function ToastViewport({
+  toasts,
+  onDismiss,
+}: {
+  toasts: ToastEntry[];
+  onDismiss: (id: number) => void;
+}) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const anims = useRef(new Map<number, Animated.Value>()).current;
-
-  useEffect(() => {
-    for (const t of toasts) {
-      if (!anims.has(t.id)) {
-        const v = new Animated.Value(0);
-        anims.set(t.id, v);
-        Animated.spring(v, {
-          toValue: 1,
-          useNativeDriver: true,
-          damping: 18,
-          stiffness: 220,
-        }).start();
-      }
-    }
-  }, [toasts, anims]);
 
   if (toasts.length === 0) return null;
 
@@ -249,7 +244,6 @@ function ToastViewport({ toasts }: { toasts: ToastEntry[] }) {
       }}
     >
       {toasts.map((t) => {
-        const v = anims.get(t.id) ?? new Animated.Value(1);
         const accent =
           t.variant === "destructive"
             ? colors.destructive
@@ -258,43 +252,127 @@ function ToastViewport({ toasts }: { toasts: ToastEntry[] }) {
               : colors.primary;
 
         return (
-          <Animated.View
-            key={t.id}
-            style={{
-              opacity: v,
-              transform: [
-                {
-                  translateY: v.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-24, 0],
-                  }),
-                },
-              ],
-              backgroundColor: colors.card,
-              borderRadius: radius.xl,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderLeftWidth: 6,
-              borderLeftColor: accent,
-              padding: spacing.lg,
-            }}
-          >
-            <Text variant="label" style={{ fontSize: fontSize.md }}>
-              {t.title}
-            </Text>
-            {t.description ? (
-              <Text
-                variant="caption"
-                color={colors.mutedForeground}
-                style={{ marginTop: 2 }}
-              >
-                {t.description}
-              </Text>
-            ) : null}
-          </Animated.View>
+          <ToastCard key={t.id} toast={t} accent={accent} cardColor={colors.card} borderColor={colors.border} onDismiss={onDismiss} />
         );
       })}
     </View>
+  );
+}
+
+/** Swipe-to-dismiss toast card: drag it any direction past the threshold
+ *  and it flies off; otherwise it springs back and auto-dismisses later. */
+function ToastCard({
+  toast: t,
+  accent,
+  cardColor,
+  borderColor,
+  onDismiss,
+}: {
+  toast: ToastEntry;
+  accent: string;
+  cardColor: string;
+  borderColor: string;
+  onDismiss: (id: number) => void;
+}) {
+  const { colors } = useTheme();
+  const anim = useRef(new Animated.Value(0)).current;
+  const drag = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const leaving = useRef(false);
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: 1,
+      useNativeDriver: false,
+      damping: 18,
+      stiffness: 220,
+    }).start();
+  }, [anim]);
+
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) =>
+        Math.abs(g.dx) > 8 || Math.abs(g.dy) > 8,
+      onPanResponderMove: Animated.event([null, { dx: drag.x, dy: drag.y }], {
+        useNativeDriver: false,
+      }),
+      onPanResponderRelease: (_e, g) => {
+        const swipedSideways = Math.abs(g.dx) > 70;
+        const swipedUp = g.dy < -50;
+        if (swipedSideways || swipedUp) {
+          leaving.current = true;
+          Animated.parallel([
+            Animated.timing(drag, {
+              toValue: {
+                x: swipedSideways ? (g.dx > 0 ? 500 : -500) : 0,
+                y: swipedUp ? -220 : g.dy,
+              },
+              duration: 180,
+              useNativeDriver: false,
+            }),
+            Animated.timing(anim, {
+              toValue: 0,
+              duration: 180,
+              useNativeDriver: false,
+            }),
+          ]).start(({ finished }) => {
+            if (finished) onDismiss(t.id);
+          });
+        } else {
+          Animated.spring(drag, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+            damping: 18,
+            stiffness: 220,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(drag, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: false,
+          damping: 18,
+          stiffness: 220,
+        }).start();
+      },
+    })
+  ).current;
+
+  const entryOffsetY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-24, 0],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [
+          { translateX: drag.x },
+          { translateY: Animated.add(drag.y, entryOffsetY) },
+        ],
+        backgroundColor: cardColor,
+        borderRadius: radius.xl,
+        borderWidth: 1,
+        borderColor,
+        borderLeftWidth: 6,
+        borderLeftColor: accent,
+        padding: spacing.lg,
+      }}
+      {...pan.panHandlers}
+    >
+      <Text variant="label" style={{ fontSize: fontSize.md }}>
+        {t.title}
+      </Text>
+      {t.description ? (
+        <Text
+          variant="caption"
+          color={colors.mutedForeground}
+          style={{ marginTop: 2 }}
+        >
+          {t.description}
+        </Text>
+      ) : null}
+    </Animated.View>
   );
 }
 

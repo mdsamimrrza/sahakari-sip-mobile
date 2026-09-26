@@ -28,6 +28,7 @@ import { todayKey } from "@/lib/format";
 import { useTheme, spacing, radius, fontSize } from "@/theme";
 import { Text, Button, Input, Card } from "@/components/ui/primitives";
 import { Select, useToast } from "@/components/ui/overlays";
+import { DateField } from "@/components/ui/DateField";
 import { AppLogo } from "@/components/layout/AppLogo";
 import { SIPScheduleFields, EMPTY_SCHEDULE, type SIPScheduleValue, scheduleToFormFields } from "@/components/settings/sip-schedule-fields";
 import { getFundMeta } from "@/lib/fund-meta";
@@ -125,6 +126,10 @@ export default function OnboardingScreen() {
     setLoading(false);
 
     if (result.success) {
+      // Fire the NAV feed sync now that the first fund exists — a fresh
+      // account gets the real market NAV immediately instead of waiting
+      // for the next app restart (throttled to daily inside the store).
+      void store.syncNavFeed?.();
       toast({
         title: "Welcome to SahakariSIP! 🎉",
         description: "Your fund is set up. Start adding your SIP entries.",
@@ -285,12 +290,10 @@ export default function OnboardingScreen() {
             )}
 
             {step === 3 && (
-              <Input
-                label="SIP Start Date (YYYY-MM-DD)"
+              <DateField
+                label="SIP Start Date"
                 value={startDate}
-                onChangeText={setStartDate}
-                placeholder="2024-01-15"
-                autoCapitalize="none"
+                onChange={setStartDate}
               />
             )}
 

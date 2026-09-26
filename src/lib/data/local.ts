@@ -41,8 +41,26 @@ import {
 } from "./store";
 import { todayKey } from "../format";
 import { uuid } from "../utils";
+import { decryptJson, encryptJson } from "../auth/local-vault";
+import { log } from "../logger";
+import { WEB_URL } from "../auth/mobileApi";
 
 const NS = "sahakarisip.v1";
+
+// Device-mode NAV auto-update (opt-out): the store fetches the public
+// NAV feed from the web app at most once a day and applies each quote
+// with the same "advance only if newer" rule as the server cron.
+const NAV_AUTO_KEY = `${NS}.nav_auto`;
+const NAV_LAST_SYNC_KEY = `${NS}.nav_synced_at`;
+const NAV_SYNC_INTERVAL_MS = 20 * 60 * 60 * 1000;
+
+export async function isNavAutoEnabled(): Promise<boolean> {
+  return (await AsyncStorage.getItem(NAV_AUTO_KEY)) !== "off";
+}
+
+export async function setNavAutoEnabled(on: boolean): Promise<void> {
+  await AsyncStorage.setItem(NAV_AUTO_KEY, on ? "on" : "off");
+}
 
 const key = {
   funds: (uid: string) => `${NS}.${uid}.funds`,
@@ -54,17 +72,23 @@ const key = {
 };
 
 async function readJson<T>(k: string, fallback: T): Promise<T> {
+  const raw = await AsyncStorage.getItem(k);
+  if (!raw) return fallback;
   try {
-    const raw = await AsyncStorage.getItem(k);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
+    // Vault-encrypted payload ("v1:..."); legacy plaintext passes through.
+    const json = await decryptJson(raw);
+    return JSON.parse(json) as T;
+  } catch (e) {
+    // Encrypted but undecryptable = vault locked/broken. Never mask that
+    // as empty data — a write here would silently wipe the profile.
+    if (raw.startsWith("v1:")) throw e;
+    return fallback; // legacy corrupt json
   }
 }
 
 async function writeJson(k: string, value: unknown): Promise<void> {
-  await AsyncStorage.setItem(k, JSON.stringify(value));
+  const json = JSON.stringify(value);
+  await AsyncStorage.setItem(k, await encryptJson(json));
 }
 
 export class LocalStore implements DataStore {
@@ -322,6 +346,58 @@ export class LocalStore implements DataStore {
     return { success: true };
   }
 
+  /**
+   * Device-mode NAV auto-update: fetch the public feed from the web app
+   * (at most once a day, opt-out) and advance each fund's latest_nav ONLY
+   * when the feed's quote is newer-dated — the same guard the server cron
+   * applies. Failures are silent: offline is a first-class state.
+   */
+  async syncNavFeed(): Promise<void> {
+    try {
+      if ((await AsyncStorage.getItem(NAV_AUTO_KEY)) === "off") return;
+      const last = Number((await AsyncStorage.getItem(NAV_LAST_SYNC_KEY)) ?? 0);
+      if (Date.now() - last < NAV_SYNC_INTERVAL_MS) return;
+
+      const res = await fetch(`${WEB_URL}/api/public/navs`);
+      log("nav.feed", { status: res.status, url: `${WEB_URL}/api/public/navs` });
+      if (!res.ok) return;
+      const feed = (await res.json()) as {
+        funds?: Array<{ fund_key: string; nav_date: string; nav_value: number }>;
+      };
+      if (!Array.isArray(feed.funds) || feed.funds.length === 0) return;
+
+      const latestByKey = new Map(
+        feed.funds.map((f) => [String(f.fund_key).trim().toLowerCase(), f])
+      );
+      const funds = await this.funds();
+      log("nav.syncFunds", { count: funds.length, feedKeys: [...latestByKey.keys()] });
+      for (const fund of funds) {
+        const quote = latestByKey.get(fund.fund_name.trim().toLowerCase());
+        if (!quote) { log("nav.skip", { fund: fund.fund_name, reason: "not in feed" }); continue; }
+        if (Number.isFinite(quote.nav_value) === false || quote.nav_value <= 0) continue;
+        if (fund.latest_nav_date && quote.nav_date <= fund.latest_nav_date) {
+          log("nav.skip", { fund: fund.fund_name, reason: "not newer", feedDate: quote.nav_date, current: fund.latest_nav_date });
+          continue;
+        }
+        log("nav.apply", { fund: fund.fund_name, date: quote.nav_date, nav: quote.nav_value });
+        await this.updateLatestNav({
+          fund_id: fund.id,
+          latest_nav: Number(quote.nav_value),
+          latest_nav_date: quote.nav_date,
+        });
+      }
+      // Mark the sync done ONLY when the user has funds - a brand-new
+      // account (no funds yet) must retry on the next open, right after
+      // onboarding, instead of waiting out the 20h throttle.
+      if (funds.length > 0) {
+        await AsyncStorage.setItem(NAV_LAST_SYNC_KEY, String(Date.now()));
+      }
+    } catch {
+      // Network unavailable, feed down, or a bad payload — offline is a
+      // first-class state; the next app open retries.
+    }
+  }
+
   // ------------------------------------------------------------
   // Entries
   // ------------------------------------------------------------
@@ -357,6 +433,7 @@ export class LocalStore implements DataStore {
     cacheInvalidate();
     const parsed = entrySchema.safeParse(input);
     if (!parsed.success) {
+      log("entry.validate", { issues: parsed.error.errors, input });
       return { success: false, error: parsed.error.errors[0].message };
     }
 
@@ -413,6 +490,7 @@ export class LocalStore implements DataStore {
     cacheInvalidate();
     const parsed = entrySchema.safeParse(input);
     if (!parsed.success) {
+      log("entry.validate", { issues: parsed.error.errors, input });
       return { success: false, error: parsed.error.errors[0].message };
     }
 

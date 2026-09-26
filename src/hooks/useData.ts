@@ -28,7 +28,15 @@ export function useDashboard(fundId: string = "all") {
       setLoading(false);
       return;
     }
-    const res = await store.getDashboardData(fundId);
+    let res: Awaited<ReturnType<typeof store.getDashboardData>>;
+    try {
+      res = await store.getDashboardData(fundId);
+    } catch (e) {
+      res = {
+        success: false,
+        error: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+      };
+    }
     if (res.success && res.data) {
       setData(res.data);
       setError(null);
@@ -44,7 +52,15 @@ export function useDashboard(fundId: string = "all") {
       if (!dataRef.current) setLoading(true);
       (async () => {
         if (!store) return;
-        const res = await store.getDashboardData(fundId);
+        let res: Awaited<ReturnType<typeof store.getDashboardData>>;
+        try {
+          res = await store.getDashboardData(fundId);
+        } catch (e) {
+          res = {
+            success: false,
+            error: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
+          };
+        }
         if (!active) return;
         if (res.success && res.data) {
           setData(res.data);

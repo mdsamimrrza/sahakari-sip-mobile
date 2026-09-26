@@ -7,7 +7,7 @@
 
 import React from "react";
 import { View } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowRight,
@@ -29,13 +29,18 @@ export default function LandingScreen() {
 
   // Already signed in → go straight to the dashboard (mirrors the web redirect).
   // Locked → biometric lock screen instead of the login form.
-  React.useEffect(() => {
-    if (status === "authenticated") {
-      router.replace("/(app)/dashboard");
-    } else if (status === "locked") {
-      router.replace("/(auth)/lock");
-    }
-  }, [status, router]);
+  // useFocusEffect (not a plain effect): while the signup/login screens are
+  // on top, this screen is unfocused and must NOT yank the user away —
+  // the recovery-key display right after device signup depends on it.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (status === "authenticated") {
+        router.replace("/(app)/dashboard");
+      } else if (status === "locked") {
+        router.replace("/(auth)/lock");
+      }
+    }, [status, router])
+  );
 
   if (status === "loading" || status === "authenticated" || status === "locked") {
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;

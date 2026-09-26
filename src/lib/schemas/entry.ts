@@ -42,6 +42,7 @@ export const entrySchema = z.object({
   notes: z
     .string()
     .max(MAX_NOTES_LENGTH, `Notes cannot exceed ${MAX_NOTES_LENGTH} characters`)
+    .nullable()
     .optional()
     .or(z.literal("")),
 });

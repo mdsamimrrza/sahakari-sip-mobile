@@ -10,7 +10,7 @@
 import { getRandomBytes } from "expo-crypto";
 import type { MobileUser } from "./mobileSession";
 
-const WEB_URL = (
+export const WEB_URL = (
   process.env.EXPO_PUBLIC_WEB_URL || "https://sahakari-sip.vercel.app"
 )
   .trim()

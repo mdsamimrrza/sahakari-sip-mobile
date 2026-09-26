@@ -6,7 +6,7 @@
 // notifications/push/email, appearance, help, about).
 // ============================================================
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image, Linking, Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -18,6 +18,7 @@ import {
   Receipt,
   CircleHelp,
   Star,
+  TrendingUp,
   Globe,
   LogOut,
   ChevronRight,
@@ -42,6 +43,7 @@ const APP_WEBSITE_URL = "https://sahakari-sip.vercel.app";
 
 const ROW_ICON_SIZE = 18;
 const ROW_ICON_STROKE = 2;
+
 
 export default function SettingsHubScreen() {
   const { colors, isDark } = useTheme();
@@ -295,6 +297,13 @@ export default function SettingsHubScreen() {
       {/* ---------- Preferences ---------- */}
       <SettingsGroup title="Preferences">
         <SettingsRow
+          tint={colors.primary}
+          icon={<TrendingUp size={ROW_ICON_SIZE} color={colors.primary} strokeWidth={ROW_ICON_STROKE} />}
+          label="Auto-update NAV prices"
+          subtitle="What this is and on/off"
+          onPress={() => router.push("/(app)/settings/nav-auto")}
+        />
+        <SettingsRow
           tint={colors.rose}
           icon={<Bell size={ROW_ICON_SIZE} color={colors.rose} strokeWidth={ROW_ICON_STROKE} />}
           label="Notifications"
@@ -320,6 +329,13 @@ export default function SettingsHubScreen() {
 
       {/* ---------- More ---------- */}
       <SettingsGroup title="More">
+        <SettingsRow
+          tint={colors.info}
+          icon={<Receipt size={ROW_ICON_SIZE} color={colors.info} strokeWidth={ROW_ICON_STROKE} />}
+          label="Diagnostics"
+          subtitle="Recent on-device events for troubleshooting"
+          onPress={() => router.push("/(app)/settings/diagnostics")}
+        />
         <SettingsRow
           tint={colors.secondary}
           icon={<Star size={ROW_ICON_SIZE} color={colors.secondary} strokeWidth={ROW_ICON_STROKE} />}

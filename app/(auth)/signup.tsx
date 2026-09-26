@@ -19,6 +19,7 @@ import { AuthShell } from "@/components/layout/AuthShell";
 import { AuthModeSwitch } from "@/components/auth/AuthModeSwitch";
 import { DataModeDetailsLink } from "@/components/auth/DataModeDetails";
 import { GoogleButton } from "@/components/auth/GoogleButton";
+import { RecoveryKeyOnce } from "@/components/auth/RecoveryKeyOnce";
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -47,6 +48,8 @@ export default function SignupScreen() {
   // Cloud signup step 2: the 6-digit OTP emailed by the web backend.
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  // One-time recovery key for device-mode accounts — shown once, then gone.
+  const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
 
   async function handleGoogle() {
     setError(null);
@@ -83,8 +86,17 @@ export default function SignupScreen() {
     }
 
     setLoading(true);
-    const result = await signUp(email, password, confirmPassword, mode);
-    setLoading(false);
+    let result: Awaited<ReturnType<typeof signUp>>;
+    try {
+      result = await signUp(email, password, confirmPassword, mode);
+    } catch (e) {
+      result = {
+        success: false,
+        error: e instanceof Error ? e.message : "Sign up failed unexpectedly.",
+      };
+    } finally {
+      setLoading(false);
+    }
 
     if (!result.success) {
       setError(result.error ?? "Sign up failed. Please try again.");
@@ -99,6 +111,13 @@ export default function SignupScreen() {
         title: "Check your inbox",
         description: "We sent a 6-digit confirmation code to your email.",
       });
+      return;
+    }
+
+    if (result.recoveryKey) {
+      // Device-mode account: the recovery key must be saved BEFORE going
+      // anywhere else — it is the only password-reset path.
+      setRecoveryKey(result.recoveryKey);
       return;
     }
 
@@ -136,6 +155,25 @@ export default function SignupScreen() {
       variant: "success",
     });
     router.replace("/onboarding");
+  }
+
+  if (recoveryKey) {
+    return (
+      <AuthShell compact>
+        <RecoveryKeyOnce
+          recoveryKey={recoveryKey}
+          onDone={() => {
+            setRecoveryKey(null);
+            toast({
+              title: "Account created! 🎉",
+              description: "On-device profile ready. Let's set up your first fund.",
+              variant: "success",
+            });
+            router.replace("/onboarding");
+          }}
+        />
+      </AuthShell>
+    );
   }
 
   return (
