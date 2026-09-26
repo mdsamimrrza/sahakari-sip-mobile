@@ -329,6 +329,8 @@ export default function SettingsHubScreen() {
 
       {/* ---------- More ---------- */}
       <SettingsGroup title="More">
+        {/* Diagnostics row hidden for release - logger stays active, the
+            page still exists at settings/diagnostics. Re-enable here:
         <SettingsRow
           tint={colors.info}
           icon={<Receipt size={ROW_ICON_SIZE} color={colors.info} strokeWidth={ROW_ICON_STROKE} />}
@@ -336,6 +338,7 @@ export default function SettingsHubScreen() {
           subtitle="Recent on-device events for troubleshooting"
           onPress={() => router.push("/(app)/settings/diagnostics")}
         />
+        */}
         <SettingsRow
           tint={colors.secondary}
           icon={<Star size={ROW_ICON_SIZE} color={colors.secondary} strokeWidth={ROW_ICON_STROKE} />}

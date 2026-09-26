@@ -146,13 +146,15 @@ export default function SettingsSecurityScreen() {
               Send password reset email
             </Button>
           ) : (
-            <Button
-              variant="outline"
-              fullWidth
-              onPress={() => router.push("/(auth)/forgot-password")}
+            <Text
+              variant="caption"
+              color={colors.mutedForeground}
+              style={{ fontSize: fontSize.sm }}
             >
-              Learn about recovery options
-            </Button>
+              Forgot your password? Sign out and use your recovery key via
+              "Forgot password?" on the sign-in screen. Lost the key means
+              the profile cannot be recovered.
+            </Text>
           )}
         </View>
       </Card>
