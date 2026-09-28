@@ -7,6 +7,7 @@ expo-env.d.ts
 # Local environment (see .env.example). Only EXPO_PUBLIC_* values belong
 # here — never the web app's server-side secrets.
 .env
+.env.eas
 .env.local
 .env.*.local
 
@@ -40,6 +41,7 @@ android/keystore.properties
 
 # Agent tooling
 .zcode/
+release-check.apk
 
 .vercel
 src/graphify-out/
