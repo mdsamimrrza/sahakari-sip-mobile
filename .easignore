@@ -1,0 +1,81 @@
+# Dependencies (installed on EAS builder)
+node_modules/
+
+# Local build output
+.expo/
+dist/
+web-build/
+
+# Git
+.git/
+.gitignore
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Agent tooling
+.zcode/
+
+# Debug / verification artifacts
+_verify/
+*.apk
+
+# Documentation (not needed for build)
+*.md
+!README.md
+
+# Environment files (already in EAS)
+.env
+.env.eas
+.env.local
+.env.*.local
+
+# Vercel
+.vercel/
+
+# Android local config
+android/local.properties
+android/keystore.properties
+android/app/google-services.json
+android/app/release/
+android/app/build/
+android/build/
+android/.gradle/
+
+# Native build artifacts
+*.keystore
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Metro
+.metro-health-check*
+
+# OS
+.DS_Store
+*.pem
+
+# Test / debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Large audit reports not needed for build
+SECURITY_AUDIT_REPORT*.md
+findings.json
+NEEDS-VALIDATION.md
+GOOGLE-SIGNIN-RULES.md
+AGENTS.md
+
+# Source maps / graphify output
+src/graphify-out/
+assets/adaptive-icon2.png
+
+# Supabase SQL (not needed for build)
+supabase-*.sql
