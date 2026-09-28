@@ -1,0 +1,168 @@
+﻿name: Build & attach release APK
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'             # fires on every tag like v1.0.1, v1.0.2, ...
+  release:
+    types: [published]   # also fires when a release is published via the GitHub UI
+  workflow_dispatch:     # manual re-run; set the tag input
+    inputs:
+      tag:
+        description: 'Tag to build and attach (e.g. v1.0.1). Leave empty when running on a tag ref.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0          # needed to push auto-created version tags
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Accept Android licenses & Pre-install NDK 27
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;27.1.12297006"
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          TAG="${GITHUB_REF_NAME:-}"
+          if [ "$TAG" = "main" ] || [ -z "$TAG" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          if [ "$TAG" = "main" ] || [ -z "$TAG" ]; then
+            TAG="${{ inputs.tag }}"
+          fi
+          if [ "$TAG" = "main" ] || [ -z "$TAG" ]; then
+            TAG="v$VERSION"
+          fi
+          if [ "${{ github.ref }}" = "refs/heads/main" ] && [ "${{ github.event_name }}" = "push" ]; then
+            FULL_TAG="v$VERSION"
+            if ! git rev-parse "$FULL_TAG" >/dev/null 2>&1; then
+              echo "Creating git tag $FULL_TAG from app.json"
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git tag "$FULL_TAG"
+              git push origin "$FULL_TAG"
+            fi
+            TAG="$FULL_TAG"
+          fi
+          echo "name=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Restore signing keystore
+        env:
+          KEYSTORE_BASE64:    ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD:  ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS:          ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD:       ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::Missing required signing secrets. Set KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD in repository secrets."
+            exit 1
+          fi
+          echo "Using repository keystore secret"
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          printf 'storeFile=release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" \
+            > android/keystore.properties
+
+      - name: Restore google-services.json (Firebase)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 -d > android/app/google-services.json
+            echo "google-services.json restored from secrets"
+          else
+            echo "::error::GOOGLE_SERVICES_JSON secret not set - push notifications will not work"
+            exit 1
+          fi
+
+      - name: Write app .env (Supabase + Google Sign-In + Push + API)
+        env:
+          SUPABASE_URL:           ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY:      ${{ secrets.SUPABASE_ANON_KEY }}
+          WEB_URL:                ${{ secrets.WEB_URL }}
+          # The Web OAuth client (NOT an Android client - Play Services
+          # rejects sign-ins that pass an Android client as serverClientId).
+          # Public identifier - ships inside every APK bundle anyway.
+          GOOGLE_WEB_CLIENT_ID:   416335590615-e96duqpfc9f7eg4qg0aqnj42avuiqs8l.apps.googleusercontent.com
+          EXPO_PUBLIC_VAPID_PUBLIC_KEY: ${{ secrets.EXPO_PUBLIC_VAPID_PUBLIC_KEY }}
+          API_URL:                ${{ secrets.API_URL }}
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            printf 'EXPO_PUBLIC_SUPABASE_URL=%s\nEXPO_PUBLIC_SUPABASE_ANON_KEY=%s\nEXPO_PUBLIC_DEFAULT_DATA_MODE=cloud\nEXPO_PUBLIC_WEB_URL=%s\nEXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=%s\nEXPO_PUBLIC_VAPID_PUBLIC_KEY=%s\nAPI_URL=%s\n' \
+              "$SUPABASE_URL" "$SUPABASE_ANON_KEY" "${WEB_URL:-https://sahakari-sip.vercel.app}" "${GOOGLE_WEB_CLIENT_ID:-}" "${EXPO_PUBLIC_VAPID_PUBLIC_KEY}" "${API_URL}" > .env
+            echo "Cloud mode enabled from repository secrets."
+          else
+            echo "Supabase secrets not set - building a local-mode-only APK (no .env written)."
+          fi
+
+      - name: Stamp versionName & versionCode into build.gradle
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode")
+          echo "Stamping build.gradle - versionName=\"${VERSION}\" versionCode=${VERSION_CODE}"
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/g" android/app/build.gradle
+          sed -i "s/versionCode [0-9]*/versionCode ${VERSION_CODE}/g"       android/app/build.gradle
+          grep -E 'versionName|versionCode' android/app/build.gradle
+
+      - name: Build release APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Attach APK to release (create the release if it doesn't exist yet)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          SRC="android/app/build/outputs/apk/release/app-release.apk"
+          cp "$SRC" "SahakariSIP.apk"
+
+          cat > release_notes.md <<'NOTES'
+          React Native / Expo build of **SahakariSIP** - Nepali mutual-fund & open-ended SIP tracker following SEBON accounting rules.
+
+          **Web app:** https://sahakari-sip.vercel.app
+
+          ## Download
+
+          [**SahakariSIP.apk**](https://github.com/mdsamimrrza/sahakari-sip-mobile/releases/latest/download/SahakariSIP.apk) - permanent link, always the latest build.
+
+          ## What changed
+          - Native Google Sign-In: tapping "Sign in with Google" now shows the native Android account picker instead of opening a browser.
+          NOTES
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" "SahakariSIP.apk" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "SahakariSIP.apk" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "SahakariSIP Mobile ${TAG}" \
+              --latest \
+              --notes-file release_notes.md \
+              --generate-notes
+          fi
