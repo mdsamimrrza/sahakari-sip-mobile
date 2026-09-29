@@ -7,7 +7,7 @@
 // ============================================================
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Image, Pressable, View } from "react-native";
+import { AppState, Image, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
@@ -130,10 +130,13 @@ function NotificationBell() {
     if (res.success && res.data) setItems(res.data);
   }, [store]);
 
-  // Poll every 60s while mounted, like the web NotificationBell.
+  // Poll every 5 minutes while mounted and foregrounded. The badge doesn't
+  // need to be fresher than that, and each uncached tick costs DB queries.
   useEffect(() => {
     load();
-    const id = setInterval(load, 60000);
+    const id = setInterval(() => {
+      if (AppState.currentState === "active") load();
+    }, 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [load]);
 
