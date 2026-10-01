@@ -6,7 +6,7 @@ This file records findings that require deployment, provider, or runtime facts n
 
 ## NEEDS-VAL-001: Google OAuth Handoff — Web Backend Single-Use Token Enforcement
 
-**Finding:** Deep link token replay possible if web backend doesn't enforce single-use (FIND-004)
+**Finding:** Deep link token replay possible if web backend doesn't enforce single-use (FIND-001)
 
 **Missing Fact:** Does `POST /api/mobile/exchange` on the web backend (NextAuth) mark the nonce/token as consumed and reject replays?
 
@@ -21,7 +21,7 @@ This file records findings that require deployment, provider, or runtime facts n
 
 **Related Code:**
 - `src/lib/auth/mobileApi.ts:87-100` (googleStart, googleExchange)
-- `src/lib/auth/AuthContext.tsx:871-888` (Linking listener, cold-start handler)
+- `src/lib/auth/AuthContext.tsx:1037-1054` (Linking listener, cold-start handler)
 
 ---
 
@@ -48,20 +48,45 @@ This file records findings that require deployment, provider, or runtime facts n
 
 ## NEEDS-VAL-003: Android `fullBackupContent` XML Actually Excludes Sensitive Keys
 
-**Finding:** `android:allowBackup="true"` with referenced backup rules XML (FIND-005)
+**Finding:** `android:allowBackup="true"` with referenced backup rules XML (FIND-002)
 
 **Missing Fact:** Does `android/app/src/main/res/xml/secure_store_backup_rules.xml` exclude `AsyncStorage` keys (`sahakarisip.v1.*`) and `SecureStore` data?
 
-**Why Source Cannot Confirm:** The XML file is referenced in the manifest but its content was not accessible in the workspace view during audit.
+**Why Source Cannot Confirm:** The XML file is referenced in the manifest but its content was not accessible in the workspace view during audit (only build intermediate found, which only excludes SecureStore).
 
 **Safe Validation Check:**
-1. Locate `android/app/src/main/res/xml/secure_store_backup_rules.xml`.
+1. Locate `android/app/src/main/res/xml/secure_store_backup_rules.xml` (or create it if missing).
 2. Verify it contains `<exclude domain="sharedpref" path="sahakarisip.v1.*"/>` and excludes SecureStore paths.
-3. If file is missing, permissive, or doesn't exclude the app's keys, set `android:allowBackup="false"` in `AndroidManifest.xml:14`.
+3. If file is missing, permissive, or doesn't exclude the app's keys, set `android:allowBackup="false"` in `AndroidManifest.xml:17`.
 4. **Functional test:** Build debug APK, install on device, run `adb backup -f test.ab com.samimrrza.sahakarisip`. Extract `test.ab` (using `abe.jar` or Android Backup Extractor) and verify no `sahakarisip.v1.*` keys appear in the backup.
 
 **Related Code:**
-- `android/app/src/main/AndroidManifest.xml:14` (`android:allowBackup="true" android:fullBackupContent="@xml/secure_store_backup_rules"`)
+- `android/app/src/main/AndroidManifest.xml:17` (`android:allowBackup="true" android:fullBackupContent="@xml/secure_store_backup_rules"`)
+
+---
+
+## NEEDS-VAL-004: Google ID Token Validation on Web Backend
+
+**Finding:** Native Google sign-in sends ID token to web backend for exchange (FIND-003)
+
+**Missing Fact:** Does `/api/mobile/google-native` on the web backend properly validate the Google ID token (audience = Web client ID, issuer = Google, not expired, nonce if used)?
+
+**Why Source Cannot Confirm:** Web backend is separate repository. Mobile client sends ID token; all validation is server-side.
+
+**Safe Validation Check:**
+1. Deploy test web backend instance.
+2. Obtain a valid Google ID token for a test account.
+3. Call `/api/mobile/google-native` with:
+   - Valid token → should succeed
+   - Token with wrong audience (Android client ID) → should fail
+   - Expired token → should fail
+   - Token from different Google project → should fail
+   - Malformed token → should fail
+4. Verify all invalid tokens are rejected with 400/401.
+
+**Related Code:**
+- `src/lib/auth/AuthContext.tsx:1091-1136` (native sign-in flow)
+- `src/lib/auth/mobileApi.ts:109-114` (`googleNativeSignIn`)
 
 ---
 
@@ -69,8 +94,9 @@ This file records findings that require deployment, provider, or runtime facts n
 
 | Finding | Status | Owner Action | Resolved |
 |---------|--------|--------------|----------|
-| NEEDS-VAL-001 | Open | Validate web backend token consumption | ☐ |
+| NEEDS-VAL-001 | Open | Validate web backend token consumption + expiry | ☐ |
 | NEEDS-VAL-002 | Open | Verify Supabase RLS policies + functional test | ☐ |
-| NEEDS-VAL-003 | Open | Inspect backup rules XML + adb backup test | ☐ |
+| NEEDS-VAL-003 | Open | Inspect/create backup rules XML + adb backup test | ☐ |
+| NEEDS-VAL-004 | Open | Validate web backend Google ID token verification | ☐ |
 
 **Instructions:** Update this file as validations complete. Move resolved items to the main report's Confirmed/Rejected sections with updated severity.
