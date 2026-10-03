@@ -30,7 +30,12 @@ function ThemedApp() {
   const [splashDone, setSplashDone] = useState(false);
   const [fontsLoaded] = useFonts({
     "InstrumentSerif-Regular": require("../assets/fonts/InstrumentSerif-Regular.ttf"),
-    HankenGrotesk: require("../assets/fonts/HankenGrotesk.ttf"),
+    "HankenGrotesk-Regular": require("../assets/fonts/HankenGrotesk-Regular.ttf"),
+    "HankenGrotesk-Medium": require("../assets/fonts/HankenGrotesk-Medium.ttf"),
+    "HankenGrotesk-SemiBold": require("../assets/fonts/HankenGrotesk-SemiBold.ttf"),
+    "HankenGrotesk-Bold": require("../assets/fonts/HankenGrotesk-Bold.ttf"),
+    "HankenGrotesk-ExtraBold": require("../assets/fonts/HankenGrotesk-ExtraBold.ttf"),
+    "HankenGrotesk-Black": require("../assets/fonts/HankenGrotesk-Black.ttf"),
   });
 
   useEffect(() => {
