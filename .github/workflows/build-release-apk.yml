@@ -38,6 +38,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          # Cache ~/.gradle (wrapper + dependency + build caches) across runs,
+          # so Gradle skips re-downloading deps and re-running cached tasks.
+          cache: gradle
 
       - name: Accept Android licenses & Pre-install NDK 27
         run: |
