@@ -47,7 +47,14 @@ const appJson = JSON.parse(readFileSync(appJsonPath, "utf8"));
 const current = appJson.expo.version;
 const next = bump(current);
 
+// versionCode is derived from app.json (single source of truth - the CI
+// workflow stamps build.gradle from expo.android.versionCode), and written
+// to BOTH files so they can never drift apart.
+const nextCode = Number(appJson.expo.android?.versionCode) + 1;
+if (Number.isNaN(nextCode)) throw new Error("expo.android.versionCode missing in app.json");
+
 appJson.expo.version = next;
+appJson.expo.android.versionCode = nextCode;
 writeFileSync(appJsonPath, JSON.stringify(appJson, null, 2) + "\n");
 
 // 2. android/app/build.gradle — versionName "x.y.z", versionCode n
@@ -59,7 +66,6 @@ const codeMatch = gradle.match(versionCodeRe);
 if (!versionNameRe.test(gradle) || !codeMatch) {
   throw new Error("versionName/versionCode not found in android/app/build.gradle");
 }
-const nextCode = Number(codeMatch[1]) + 1;
 writeFileSync(
   gradlePath,
   gradle
