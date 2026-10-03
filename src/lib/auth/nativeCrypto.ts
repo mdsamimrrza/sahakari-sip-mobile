@@ -8,6 +8,10 @@
 // ============================================================
 
 import * as ExpoCrypto from "expo-crypto";
+// PBKDF2 MUST use react-native-quick-crypto: Hermes has no global
+// WebCrypto (crypto.subtle is undefined on Android), so a WebCrypto
+// fallback throws at runtime on native. See AuthContext.tsx history.
+import QuickCrypto from "react-native-quick-crypto";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -55,32 +59,15 @@ export async function sha256Bytes(input: string): Promise<Uint8Array> {
   return bytes;
 }
 
-export async function pbkdf2Bytes(
+export function pbkdf2Bytes(
   password: string,
   salt: string,
   iterations: number,
   keyBytes: number
-): Promise<Uint8Array> {
-  // expo-crypto does not expose PBKDF2 directly; fall back to
-  // the Web Crypto API which is available on both iOS and Android
-  // in React Native's Hermes runtime (v0.71+).
-  const subtle = (globalThis.crypto as Crypto).subtle;
-  const keyMaterial = await subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
+): Uint8Array {
+  // Same derivation as the previous inline QuickCrypto call sites:
+  // string salt is treated as UTF-8 bytes, matching Node's pbkdf2Sync.
+  return new Uint8Array(
+    QuickCrypto.pbkdf2Sync(password, salt, iterations, keyBytes, "sha256")
   );
-  const bits = await subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: encoder.encode(salt),
-      iterations,
-    },
-    keyMaterial,
-    keyBytes * 8
-  );
-  return new Uint8Array(bits);
 }

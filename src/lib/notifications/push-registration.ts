@@ -13,6 +13,29 @@
 // on its own.
 // ============================================================
 
+import { Platform } from "react-native";
+
+// Foreground delivery: without a registered handler, expo-notifications
+// silently DROPS pushes that arrive while the app is OPEN (background
+// pushes are unaffected). SpendFlow sets the same handler in its layout.
+// The dynamic import no-ops in Expo Go, where evaluation throws.
+if (Platform.OS !== "web") {
+  import("expo-notifications")
+    .then((Notifications) => {
+      if (!Notifications?.setNotificationHandler) return;
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+        }),
+      });
+    })
+    .catch(() => { });
+}
+
 const ADMIN_PUSH_TOKEN_URL = "https://master-admin-delta.vercel.app/api/mobile/push-token";
 const EXPO_PROJECT_ID = "8ed969e7-c29d-4ad1-9f1f-e9b4368ddc34";
 // Must match the channelId the admin announce route sends. We post into our
