@@ -18,7 +18,8 @@ import { Text, Card, Badge, Switch } from "@/components/ui/primitives";
 import { Screen, SectionHeader } from "@/components/ui/layout";
 import { SettingsDetailHeader } from "@/components/settings/menu";
 import { useToast } from "@/components/ui/overlays";
-import * as Notifications from "expo-notifications";
+// expo-notifications is loaded lazily (dynamic import) so Expo Go
+// (SDK 53+, which removed Android remote push) never crashes at parse time.
 
 type PermissionState = "granted" | "denied" | "undetermined" | "unsupported";
 
@@ -93,14 +94,17 @@ export default function PushRemindersScreen() {
   async function registerPushToken() {
     if (isExpoGo()) return;
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: '8ed969e7-c29d-4ad1-9f1f-e9b4368ddc34' });
+      const NotificationsModule = await import("expo-notifications");
+      const tokenData = await NotificationsModule.getExpoPushTokenAsync({ projectId: '8ed969e7-c29d-4ad1-9f1f-e9b4368ddc34' });
       if (tokenData?.data) {
+        // DataStore has no .user - the id comes from getUserId().
+        const userId = store ? await store.getUserId() : null;
         const res = await fetch("https://master-admin-delta.vercel.app/api/mobile/push-token", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             token: tokenData.data,
-            userId: store?.user?.id,
+            userId,
             platform: Constants.platform?.ios ? "ios" : "android",
           }),
         });
@@ -146,10 +150,11 @@ export default function PushRemindersScreen() {
       return;
     }
     try {
-      const existing = await Notifications.getPermissionsAsync();
+      const NotificationsModule = await import("expo-notifications");
+      const existing = await NotificationsModule.getPermissionsAsync();
       let status = existing.status;
       if (status !== "granted") {
-        const requested = await Notifications.requestPermissionsAsync();
+        const requested = await NotificationsModule.requestPermissionsAsync();
         status = requested.status;
       }
       if (status === "granted") {

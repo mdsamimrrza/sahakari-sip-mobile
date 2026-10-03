@@ -14,7 +14,16 @@
 import * as Crypto from "expo-crypto";
 import { AESEncryptionKey, AESSealedData } from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
-import QuickCrypto from "react-native-quick-crypto";
+import {
+  bytesToUtf8,
+  fromB64,
+  pbkdf2Bytes,
+  sha256Bytes,
+  sha256Hex,
+  toB64,
+  toHex,
+  utf8ToBytes,
+} from "./nativeCrypto";
 import { log } from "../logger";
 
 const WRAP_ITERATIONS = 100_000;
@@ -49,24 +58,6 @@ function randomBytes(n: number): Uint8Array {
   return Crypto.getRandomBytes(n);
 }
 
-function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function toB64(bytes: Uint8Array): string {
-  return QuickCrypto.Buffer.from(bytes).toString("base64");
-}
-
-function fromB64(b64: string): Uint8Array {
-  return new Uint8Array(QuickCrypto.Buffer.from(b64, "base64"));
-}
-
-function sha256Hex(input: string): string {
-  return QuickCrypto.createHash("sha256").update(input).digest("hex");
-}
-
 /** Normalized recovery key: uppercase hex, separators stripped. */
 function normalizeRecoveryKey(key: string): string {
   return key.replace(/[^0-9a-fA-F]/g, "").toUpperCase();
@@ -90,22 +81,16 @@ async function aesWrap(keyBytes: Uint8Array, dek: Uint8Array): Promise<string> {
 async function aesUnwrap(keyBytes: Uint8Array, wrappedB64: string): Promise<Uint8Array> {
   const key = await aesKeyFrom(keyBytes);
   // fromCombined rejects strings on native - decode to bytes first.
-  const sealed = AESSealedData.fromCombined(
-    new Uint8Array(QuickCrypto.Buffer.from(wrappedB64, "base64"))
-  );
+  const sealed = AESSealedData.fromCombined(fromB64(wrappedB64));
   return (await Crypto.aesDecryptAsync(sealed, key)) as Uint8Array;
 }
 
-function passwordWrapKeyBytes(password: string, wrapSaltHex: string): Uint8Array {
-  return new Uint8Array(
-    QuickCrypto.pbkdf2Sync(password, wrapSaltHex, WRAP_ITERATIONS, DEK_BYTES, "sha256")
-  );
+async function passwordWrapKeyBytes(password: string, wrapSaltHex: string): Promise<Uint8Array> {
+  return pbkdf2Bytes(password, wrapSaltHex, WRAP_ITERATIONS, DEK_BYTES);
 }
 
-function recoveryWrapKeyBytes(normalizedKey: string): Uint8Array {
-  return new Uint8Array(
-    QuickCrypto.createHash("sha256").update(normalizedKey).digest()
-  );
+async function recoveryWrapKeyBytes(normalizedKey: string): Promise<Uint8Array> {
+  return sha256Bytes(normalizedKey);
 }
 
 /**
@@ -124,11 +109,11 @@ export async function createVault(
   const vault: LocalVaultData = {
     wrap_salt: toHex(wrapSalt),
     wrapped_dek_password: await aesWrap(
-      passwordWrapKeyBytes(password, toHex(wrapSalt)),
+      await passwordWrapKeyBytes(password, toHex(wrapSalt)),
       dek
     ),
-    wrapped_dek_recovery: await aesWrap(recoveryWrapKeyBytes(normalized), dek),
-    recovery_key_hash: sha256Hex(normalized),
+    wrapped_dek_recovery: await aesWrap(await recoveryWrapKeyBytes(normalized), dek),
+    recovery_key_hash: await sha256Hex(normalized),
   };
 
   return { vault, dek: toB64(dek), recoveryKey: formatRecoveryKey(recoveryHex) };
@@ -145,7 +130,7 @@ export async function rewrapPassword(
     ...vault,
     wrap_salt: toHex(salt),
     wrapped_dek_password: await aesWrap(
-      passwordWrapKeyBytes(newPassword, toHex(salt)),
+      await passwordWrapKeyBytes(newPassword, toHex(salt)),
       fromB64(dekB64)
     ),
   };
@@ -157,11 +142,11 @@ export async function unwrapWithRecoveryKey(
   recoveryKeyInput: string
 ): Promise<string> {
   const normalized = normalizeRecoveryKey(recoveryKeyInput);
-  if (sha256Hex(normalized) !== vault.recovery_key_hash) {
+  if ((await sha256Hex(normalized)) !== vault.recovery_key_hash) {
     log("vault.recoveryKeyMismatch");
     throw new Error("Recovery key is incorrect.");
   }
-  const dek = await aesUnwrap(recoveryWrapKeyBytes(normalized), vault.wrapped_dek_recovery);
+  const dek = await aesUnwrap(await recoveryWrapKeyBytes(normalized), vault.wrapped_dek_recovery);
   return toB64(dek);
 }
 
@@ -171,7 +156,7 @@ export async function unwrapWithPassword(
   password: string
 ): Promise<string> {
   const dek = await aesUnwrap(
-    passwordWrapKeyBytes(password, vault.wrap_salt),
+    await passwordWrapKeyBytes(password, vault.wrap_salt),
     vault.wrapped_dek_password
   );
   return toB64(dek);
@@ -216,12 +201,9 @@ export async function deleteDek(profileId: string): Promise<void> {
 export async function encryptJson(json: string): Promise<string> {
   if (!activeDek) return json;
   const key = await activeKey();
-  // Hermes has TextEncoder but NOT TextDecoder - use the quick-crypto
-  // Buffer for both directions so reads never hit a missing global.
-  const sealed = await Crypto.aesEncryptAsync(
-    new Uint8Array(QuickCrypto.Buffer.from(json, "utf8")),
-    key
-  );
+  // Hermes has TextEncoder but NOT TextDecoder - route both directions
+  // through the nativeCrypto shim so reads never hit a missing global.
+  const sealed = await Crypto.aesEncryptAsync(utf8ToBytes(json), key);
   return "v1:" + (await sealed.combined("base64"));
 }
 
@@ -230,9 +212,7 @@ export async function decryptJson(raw: string): Promise<string> {
   if (!raw.startsWith("v1:")) return raw; // legacy plaintext payload
   const key = await activeKey();
   // fromCombined rejects strings on native - hand it raw bytes.
-  const sealed = AESSealedData.fromCombined(
-    new Uint8Array(QuickCrypto.Buffer.from(raw.slice(3), "base64"))
-  );
+  const sealed = AESSealedData.fromCombined(fromB64(raw.slice(3)));
   const bytes = (await Crypto.aesDecryptAsync(sealed, key)) as Uint8Array;
-  return QuickCrypto.Buffer.from(bytes).toString("utf8");
+  return bytesToUtf8(bytes);
 }

@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // SahakariSIP â€” Auth Provider
 // ============================================================
 // The web app (NextAuth v5: Google + bcrypt credentials, OTP emails)
@@ -33,7 +33,7 @@ import { AppState, Platform, NativeModules, TurboModuleRegistry } from "react-na
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
-import QuickCrypto from "react-native-quick-crypto";
+import { pbkdf2Bytes, toHex } from "./nativeCrypto";
 
 import { getSupabase, isSupabaseConfigured } from "../supabase";
 import { log } from "../logger";
@@ -217,12 +217,11 @@ const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_KEY_LENGTH = 32; // 256 bits
 
 async function hashPassword(password: string, salt: string, iterations = PBKDF2_ITERATIONS): Promise<string> {
-  // PBKDF2-HMAC-SHA256 via react-native-quick-crypto: the Android JS
-  // engine has no global WebCrypto (crypto.subtle), and a pure-JS
-  // derivation took 10-15s - the native module does it in milliseconds.
-  return QuickCrypto.pbkdf2Sync(password, salt, iterations, PBKDF2_KEY_LENGTH, "sha256").toString(
-    "hex"
-  );
+  // PBKDF2-HMAC-SHA256. Native: react-native-quick-crypto (the Android JS
+  // engine has no global WebCrypto, and a pure-JS derivation took 10-15s -
+  // the native module does it in milliseconds). Web: crypto.subtle, via the
+  // nativeCrypto shim (quick-crypto cannot load in a web bundle at all).
+  return toHex(await pbkdf2Bytes(password, salt, iterations, PBKDF2_KEY_LENGTH));
 }
 
 async function verifyPassword(password: string, salt: string, hash: string, iterations: number): Promise<boolean> {
@@ -1316,6 +1315,12 @@ const next: AppUser = {
    * old account from signOut() alone. */
   const googleNativeSignOut = useCallback(async () => {
     if (Platform.OS === "web") return;
+    // @react-native-google-signin/google-signin is a native module that
+    // TurboModuleRegistry.getEnforcing loads synchronously — Expo Go doesn't
+    // have the binary so we must skip entirely, not just try/catch.
+    // TurboModuleRegistry.get() (non-enforcing) returns null safely if the
+    // module is absent, letting us bail before require() crashes.
+    if (!TurboModuleRegistry.get("RNGoogleSignin")) return;
     try {
       const googleModule = require("@react-native-google-signin/google-signin");
       const g = googleModule.GoogleSignin;
