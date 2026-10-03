@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { useTheme, fontSize, radius } from "@/theme";
 import { Text } from "@/components/ui/primitives";
 import { refreshLocalReminders } from "@/lib/notifications/local-reminders";
+import { autoRegisterPushToken } from "@/lib/notifications/push-registration";
 import { InstallmentsPopup } from "@/components/layout/InstallmentsPopup";
 
 export default function AppLayout() {
@@ -35,7 +36,14 @@ export default function AppLayout() {
   // (countdown cadence 10/5/3/1 days + due day). The scheduler checks
   // the OS permission itself, so this call is unconditionally safe.
   useEffect(() => {
-    if (store) void refreshLocalReminders(store);
+    if (store) {
+      void refreshLocalReminders(store);
+      // Keep this account's push-token row current (per-account, per-device).
+      // Cloud identities only - local-mode ids have no server user.
+      if (store.mode === "cloud") {
+        void store.getUserId().then((id) => autoRegisterPushToken(id));
+      }
+    }
   }, [store]);
 
   // Auth guard — the mobile equivalent of the web middleware.ts

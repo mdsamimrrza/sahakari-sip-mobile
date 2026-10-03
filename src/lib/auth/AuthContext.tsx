@@ -53,6 +53,7 @@ import { createStore } from "../data";
 import { CloudStore } from "../data/cloud";
 import { cacheInvalidate } from "../data/cache";
 import { removeProfilePhoto } from "../profilePhoto";
+import { autoRegisterPushToken } from "../notifications/push-registration";
 import {
   clearMobileSession,
   loadMobileSession,
@@ -825,6 +826,9 @@ const next: AppUser = {
             mode: "cloud",
           };
           await persistSession(nextUser);
+          // Register this device's push token for THIS account (per-account
+          // rows), so a device shared by several accounts notifies each one.
+          void autoRegisterPushToken(session.user.id, { prompt: true });
           void refreshDbProfile();
           void maybeOfferBiometric(nextUser);
           return { success: true };
@@ -1116,6 +1120,7 @@ const next: AppUser = {
                 mode: "cloud",
               };
               await persistSession(nextUser);
+              void autoRegisterPushToken(session.user.id, { prompt: true });
               void refreshDbProfile();
               void maybeOfferBiometric(nextUser);
               return { success: true };

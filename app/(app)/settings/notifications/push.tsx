@@ -18,6 +18,10 @@ import { Text, Card, Badge, Switch } from "@/components/ui/primitives";
 import { Screen, SectionHeader } from "@/components/ui/layout";
 import { SettingsDetailHeader } from "@/components/settings/menu";
 import { useToast } from "@/components/ui/overlays";
+import {
+  autoRegisterPushToken,
+  unregisterPushTokenForUser,
+} from "@/lib/notifications/push-registration";
 // expo-notifications is loaded lazily (dynamic import) so Expo Go
 // (SDK 53+, which removed Android remote push) never crashes at parse time.
 
@@ -92,43 +96,15 @@ export default function PushRemindersScreen() {
   );
 
   async function registerPushToken() {
-    if (isExpoGo()) return;
-    try {
-      const NotificationsModule = await import("expo-notifications");
-      const tokenData = await NotificationsModule.getExpoPushTokenAsync({ projectId: '8ed969e7-c29d-4ad1-9f1f-e9b4368ddc34' });
-      if (tokenData?.data) {
-        // DataStore has no .user - the id comes from getUserId().
-        const userId = store ? await store.getUserId() : null;
-        const res = await fetch("https://master-admin-delta.vercel.app/api/mobile/push-token", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token: tokenData.data,
-            userId,
-            platform: Constants.platform?.ios ? "ios" : "android",
-          }),
-        });
-        console.log("[push] Token registered:", res.status);
-      }
-    } catch (err) {
-      console.error("[push] Failed to register push token:", err);
-    }
+    // Shared helper skips silently if permission isn't granted - handleToggle
+    // has already secured it by the time this runs.
+    const userId = store ? await store.getUserId() : null;
+    await autoRegisterPushToken(userId);
   }
 
   async function unregisterPushToken() {
-    try {
-      const Notifications = await import("expo-notifications");
-      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: '8ed969e7-c29d-4ad1-9f1f-e9b4368ddc34' });
-      if (tokenData?.data) {
-        await fetch("https://master-admin-delta.vercel.app/api/mobile/push-token", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: tokenData.data }),
-        });
-      }
-    } catch (err) {
-      console.error("[push] Failed to unregister push token:", err);
-    }
+    const userId = store ? await store.getUserId() : null;
+    await unregisterPushTokenForUser(userId);
   }
 
   async function handleToggle() {
