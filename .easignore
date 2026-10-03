@@ -39,7 +39,10 @@ _verify/
 # Android local config
 android/local.properties
 android/keystore.properties
-android/app/google-services.json
+# google-services.json MUST be uploaded: android/ is committed, so EAS
+# never runs prebuild and scripts/prebuild-firebase.js cannot create it.
+# The file is public client config (no secrets) and stays out of git.
+# android/app/google-services.json
 android/app/release/
 android/app/build/
 android/build/
