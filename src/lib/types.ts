@@ -104,6 +104,8 @@ export interface DashboardSummary {
   sipStreak: number;
   latestNav: number | null;
   latestNavDate: string | null;
+  /** Cash dividends received, net of 5% TDS (cloud mode only; absent in local mode). */
+  dividendsNet?: number;
 }
 
 export interface ChartDataPoint {
@@ -121,6 +123,8 @@ export interface PortfolioChartPoint {
 export interface MonthlyContribution {
   month: string; // "YYYY-MM"
   amount: number;
+  /** Actual deposit dates ("YYYY-MM-DD") inside this month, ascending. */
+  dates?: string[];
   breakdown?: Array<{
     fundName: string;
     amount: number;

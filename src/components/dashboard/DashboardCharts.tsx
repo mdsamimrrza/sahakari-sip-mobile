@@ -24,6 +24,7 @@ import {
   formatCompact,
   formatCurrencyWhole,
   formatDate,
+  formatDateAxis,
   formatDateShort,
   formatMonth,
   formatMonthShort,
@@ -35,7 +36,12 @@ import { Text, Card, EmptyState, Button } from "@/components/ui/primitives";
 import { usePrivacy } from "@/lib/privacy/PrivacyContext";
 import { SectionHeader } from "@/components/ui/layout";
 import { Modal } from "@/components/ui/overlays";
-import { BarChart, DonutChart, ChartLegend, LineChart } from "@/components/charts";
+import {
+  BarChart,
+  DonutChart,
+  ChartLegend,
+  LineChart,
+} from "@/components/charts";
 
 const SHADOW = {
   shadowColor: "#000",
@@ -130,7 +136,7 @@ export function PortfolioGrowthCard({
 
   return (
     <Card style={{ borderWidth: 0, ...SHADOW }}>
-      <View style={{ padding: spacing.xl, gap: spacing.md }}>
+      <View style={{ padding: spacing.lg, gap: spacing.sm }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <Text variant="micro" color={colors.mutedForeground}>
           Portfolio Growth
@@ -138,13 +144,13 @@ export function PortfolioGrowthCard({
 
         {activePoint ? (
           <ResetPill
-            label={`${formatDateShort(activePoint.date)} (Reset)`}
+            label={`${formatDate(activePoint.date)} (Reset)`}
             onPress={() => setSelectedIndex(null)}
           />
         ) : null}
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, flexWrap: "wrap" }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, flexWrap: "wrap", marginTop: -2 }}>
         <Text
           variant="display"
           style={{
@@ -245,11 +251,12 @@ export function PortfolioGrowthCard({
             values: filtered.map((d) => d.totalInvested),
           },
         ]}
-        height={240}
+        height={190}
         minTop={4000}
         formatY={formatCompact}
         formatTooltipY={formatCurrencyWhole}
-        formatX={formatDateShort}
+        formatX={formatDateAxis}
+        formatTooltipX={formatDate}
         selectedIndex={selectedIndex}
         onSelectPoint={(idx) => setSelectedIndex(idx)}
         showLegend
@@ -341,12 +348,12 @@ export function NavHistoryCard({
           ) : null}
         </View>
 
-        {/* Range tabs — brass-tinted pill bar, active range in dark ink */}
+        {/* Range tabs — same theme-aware pill bar as Portfolio Growth */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View
             style={{
               flexDirection: "row",
-              backgroundColor: "#F0E3C8", // brass tint
+              backgroundColor: colors.muted,
               borderRadius: radius.full,
               padding: 4,
               gap: 2,
@@ -364,13 +371,18 @@ export function NavHistoryCard({
                   style={{
                     paddingHorizontal: spacing.md,
                     paddingVertical: 7,
-                    borderRadius: radius.full,
-                    backgroundColor: active ? colors.foreground : "transparent",
+                    borderRadius: radius.md,
+                    backgroundColor: active ? colors.card : "transparent",
+                    shadowColor: active ? "#000" : "transparent",
+                    shadowOpacity: active ? 0.08 : 0,
+                    shadowRadius: 4,
+                    shadowOffset: { width: 0, height: 2 },
+                    elevation: active ? 2 : 0,
                   }}
                 >
                   <Text
                     variant="caption"
-                    color={active ? colors.card : colors.warning}
+                    color={active ? colors.foreground : colors.mutedForeground}
                     style={{ fontWeight: "800" }}
                   >
                     {r}
@@ -398,7 +410,7 @@ export function NavHistoryCard({
             height={200}
             formatY={(v) => v.toFixed(1)}
             formatTooltipY={(v) => `NPR ${formatNav(v)}`}
-            formatX={formatDateShort}
+            formatX={formatDateAxis}
             // Tooltip shows the full date: month, day, and year.
             formatTooltipX={(d) => formatDate(d)}
             selectedIndex={selectedIndex}
@@ -435,6 +447,15 @@ export function MonthlyContributionsCard({
   const total = sorted.reduce((s, d) => s + d.amount, 0);
   const activeItem = selectedIndex !== null && sorted[selectedIndex] ? sorted[selectedIndex] : null;
 
+  // "2026-08-05, 2026-08-20" → "5 & 20 Aug 2026" (single: "5 Aug 2026").
+  const depositDatesLabel = (d: MonthlyContribution) => {
+    const days = (d.dates ?? []).map((s) => parseInt(s.slice(8, 10), 10));
+    if (days.length === 0) return formatMonth(d.month);
+    const [y, m] = d.month.split("-");
+    const monthName = formatMonth(d.month).replace(/\s\d{4}$/, "");
+    return `${days.join(" & ")} ${monthName} ${y}`;
+  };
+
   return (
     <Card style={{ borderWidth: 0, ...SHADOW }}>
       <View style={{ padding: spacing.xl, gap: spacing.md }}>
@@ -442,7 +463,7 @@ export function MonthlyContributionsCard({
         title="Monthly Contributions"
         subtitle={
           activeItem
-            ? `Selected: ${formatMonth(activeItem.month)} · ${formatPrivate(formatCurrencyWhole(activeItem.amount))}`
+            ? `Selected: ${depositDatesLabel(activeItem)} · ${formatPrivate(formatCurrencyWhole(activeItem.amount))}`
             : `${sorted.length} month${sorted.length === 1 ? "" : "s"} · ${formatPrivate(formatCurrencyWhole(total))} deposited`
         }
         right={
@@ -469,6 +490,11 @@ export function MonthlyContributionsCard({
           formatY={formatCompact}
           formatTooltipY={formatCurrencyWhole}
           formatX={(m) => formatMonthShort(m)}
+          // Tooltip header: the actual deposit dates, not just the month.
+          formatTooltipX={(m) => {
+            const item = sorted.find((d) => d.month === m);
+            return item ? depositDatesLabel(item) : m;
+          }}
         />
       )}
       </View>
@@ -778,7 +804,8 @@ export function FeeDragCard({
             height={200}
             formatY={formatCompact}
             formatTooltipY={formatCurrencyWhole}
-            formatX={formatDateShort}
+            formatX={formatDateAxis}
+            formatTooltipX={formatDate}
           />
         </>
       )}

@@ -44,6 +44,8 @@ export interface ComputeDashboardInput {
   navHistory: NavHistoryRow[];
   /** "all" or a specific fund id */
   fundId?: string;
+  /** Net dividends (after TDS) received for the funds in view - cloud store only. */
+  dividendsNet?: number;
 }
 
 export function computeDashboardData({
@@ -51,6 +53,7 @@ export function computeDashboardData({
   entries,
   navHistory,
   fundId = "all",
+  dividendsNet,
 }: ComputeDashboardInput): DashboardData {
   const scopedFundId = fundId && fundId !== "all" ? fundId : null;
 
@@ -202,6 +205,7 @@ export function computeDashboardData({
     sipStreak,
     latestNav,
     latestNavDate,
+    ...(dividendsNet != null ? { dividendsNet } : {}),
   };
 
   // ---- Chart data ----
@@ -235,7 +239,20 @@ export function computeDashboardData({
     }
   }
 
-  // Combined timeline of every date anything happened, across every fund in view
+  // Combined timeline of every date anything happened, across every fund in view.
+  // Anchored to the USER'S SIP start - one month before their first entry - so
+  // a 2-month-old portfolio charts 2 months of growth from zero instead of
+  // dragging the axis back to the fund's NAV-feed origin (years of empty axis).
+  const firstEntryDate = entries
+    .map((e) => e.purchase_date)
+    .sort((a, b) => a.localeCompare(b))[0];
+  let chartStartDate: string | null = null;
+  if (firstEntryDate) {
+    const d = new Date(firstEntryDate + "T00:00:00Z");
+    d.setUTCMonth(d.getUTCMonth() - 1);
+    chartStartDate = d.toISOString().slice(0, 10);
+  }
+
   const timelineDates = Array.from(
     new Set([
       ...entries.map((e) => e.purchase_date),
@@ -243,7 +260,9 @@ export function computeDashboardData({
         Array.from(m.keys())
       ),
     ])
-  ).sort((a, b) => a.localeCompare(b));
+  )
+    .filter((d) => !chartStartDate || d >= chartStartDate)
+    .sort((a, b) => a.localeCompare(b));
 
   // Running state PER FUND - units accumulated and last-known NAV.
   const runningUnitsByFund = new Map<string, number>();
@@ -304,18 +323,31 @@ export function computeDashboardData({
     }
   }
 
+  // Zero baseline: the chart opens one month before the SIP start so the
+  // viewer sees the portfolio grow FROM zero, not appear mid-air.
+  if (chartStartDate && portfolioChart[0]?.date !== chartStartDate) {
+    portfolioChart.unshift({
+      date: chartStartDate,
+      portfolioValue: 0,
+      totalInvested: 0,
+    });
+  }
+
   // NAV history chart: a single selected fund shows its own real NAV series.
   // "All Funds" shows the weighted blended per-unit value instead.
-  const navHistorySeries: ChartDataPoint[] = scopedFundId
-    ? Array.from((fundNavTimeline.get(scopedFundId) ?? new Map()).entries())
-        .map(([date, value]) => ({ date, value }))
-        .sort((a, b) => a.date.localeCompare(b.date))
-    : blendedNavPoints;
+  // Both stay anchored to the SIP window for the same reason as above.
+  const navHistorySeries: ChartDataPoint[] = (
+    scopedFundId
+      ? Array.from((fundNavTimeline.get(scopedFundId) ?? new Map()).entries())
+          .map(([date, value]) => ({ date, value }))
+          .sort((a, b) => a.date.localeCompare(b.date))
+      : blendedNavPoints
+  ).filter((p) => !chartStartDate || p.date >= chartStartDate);
 
   // ---- Monthly contributions ----
   const monthlyMap = new Map<
     string,
-    { total: number; breakdownMap: Map<string, number> }
+    { total: number; dates: string[]; breakdownMap: Map<string, number> }
   >();
   for (const entry of entries) {
     const monthKey = entry.purchase_date
@@ -323,10 +355,11 @@ export function computeDashboardData({
       : "";
     if (monthKey) {
       if (!monthlyMap.has(monthKey)) {
-        monthlyMap.set(monthKey, { total: 0, breakdownMap: new Map() });
+        monthlyMap.set(monthKey, { total: 0, dates: [], breakdownMap: new Map() });
       }
       const mData = monthlyMap.get(monthKey)!;
       mData.total += Number(entry.amount);
+      if (entry.purchase_date) mData.dates.push(entry.purchase_date);
 
       const fundName =
         funds.find((f) => f.id === entry.fund_id)?.fund_name || "Unknown Fund";
@@ -341,6 +374,7 @@ export function computeDashboardData({
   ).map(([month, mData]) => ({
     month,
     amount: mData.total,
+    dates: mData.dates.sort((a, b) => a.localeCompare(b)),
     breakdown: Array.from(mData.breakdownMap.entries()).map(
       ([fundName, amount]) => ({ fundName, amount })
     ),

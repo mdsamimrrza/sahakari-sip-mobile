@@ -14,12 +14,19 @@
 // ============================================================
 
 import { Platform } from "react-native";
+import Constants from "expo-constants";
+
+// Expo Go removed remote push in SDK 53 - importing expo-notifications
+// there throws at module init (its auto-registration side effect). Skip
+// the import entirely in Expo Go; real builds get the handler.
+const isExpoGo =
+  Constants.appOwnership === "expo" ||
+  Constants.executionEnvironment === "storeClient";
 
 // Foreground delivery: without a registered handler, expo-notifications
 // silently DROPS pushes that arrive while the app is OPEN (background
 // pushes are unaffected). SpendFlow sets the same handler in its layout.
-// The dynamic import no-ops in Expo Go, where evaluation throws.
-if (Platform.OS !== "web") {
+if (Platform.OS !== "web" && !isExpoGo) {
   import("expo-notifications")
     .then((Notifications) => {
       if (!Notifications?.setNotificationHandler) return;

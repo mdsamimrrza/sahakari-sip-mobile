@@ -283,6 +283,7 @@ export default function TaxBreakdownScreen() {
 
   const latestFeeDrag =
     feeDragChart.length > 0 ? feeDragChart[feeDragChart.length - 1].cumulativeDrag : 0;
+  const dividendsNet = summary?.dividendsNet;
   const estimatedCgtLongTerm = summary?.estimatedCgtLongTerm ?? 0;
   const estimatedCgtShortTerm = summary?.estimatedCgtShortTerm ?? 0;
   const totalEstimatedCgt = estimatedCgtLongTerm + estimatedCgtShortTerm;
@@ -742,10 +743,58 @@ export default function TaxBreakdownScreen() {
       ) : null}
     </Card>
 
-          {/* ============ SECTION 04 ============ */}
-          <Card style={{ borderWidth: 0, borderLeftWidth: 3, borderLeftColor: colors.success, backgroundColor: `${colors.success}0A`, ...SHADOW }}>
+          {/* ============ SECTION 04: Dividends received ============ */}
+          {dividendsNet !== undefined ? (
+            <Card style={{ borderWidth: 0, borderLeftWidth: 3, borderLeftColor: colors.emerald, ...SHADOW }}>
               <SectionHead
                 index="04"
+                title="Dividends You Received"
+                description="Cash the fund paid out, after 5% tax was cut"
+                badge="Cash in"
+                accent={colors.emerald}
+                open={!!open.secDiv}
+                onToggle={() => toggle("secDiv")}
+              />
+              {open.secDiv ? (
+                <View style={{ backgroundColor: `${colors.emerald}08` }}>
+                  <LedgerRow
+                    label="Dividend cash received"
+                    sub="Already in your bank, separate from unit value"
+                    value={`+${formatPrivate(formatCurrencyWhole(dividendsNet))}`}
+                    color={colors.emerald}
+                    fill={`${colors.emerald}14`}
+                    emphasis
+                    bordered={false}
+                  />
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: spacing.sm,
+                      alignItems: "flex-start",
+                      paddingHorizontal: spacing.lg,
+                      paddingVertical: spacing.md,
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      backgroundColor: colors.muted,
+                    }}
+                  >
+                    <Info size={14} color={colors.info} style={{ marginTop: 1 }} />
+                    <Text variant="caption" color={colors.mutedForeground} style={{ flex: 1, fontSize: fontSize.xs }}>
+                      Dividends are cash the fund already paid you - they are
+                      not part of the unit value below, and the unit price
+                      already dropped on the pay-out day, so nothing is counted
+                      twice.
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+            </Card>
+          ) : null}
+
+          {/* ============ SECTION 05 ============ */}
+          <Card style={{ borderWidth: 0, borderLeftWidth: 3, borderLeftColor: colors.success, backgroundColor: `${colors.success}0A`, ...SHADOW }}>
+              <SectionHead
+                index="05"
                 title="Final Payout to Your Bank"
                 description="The amount that reaches your bank"
                 badge="Payout"
@@ -785,11 +834,11 @@ export default function TaxBreakdownScreen() {
               ) : null}
             </Card>
 
-          {/* ============ SECTION 05: Verified Exit-Load Rules ============ */}
+          {/* ============ SECTION 06: Verified Exit-Load Rules ============ */}
           {taxStatus.exitLoadVerified.length > 0 || taxStatus.exitLoadUnverified.length > 0 ? (
             <Card style={{ borderWidth: 0, borderLeftWidth: 3, borderLeftColor: colors.info, ...SHADOW }}>
               <SectionHead
-                index="05"
+                index="06"
                 title="Exit-Load Rules (Fund Charges, Not Tax)"
                 description="Applied at redemption based on each lot's holding period"
                 badge={taxStatus.exitLoadVerified.length > 0 ? "Verified" : "Unverified"}

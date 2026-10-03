@@ -324,18 +324,32 @@ export const LineChart = React.memo(function LineChart({
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
-                  {(s.dots ?? valid.length <= 15) &&
-                    valid.map((p, i) => (
-                      <Circle
-                        key={`${s.key}-dot-${i}`}
-                        cx={p.x}
-                        cy={p.y}
-                        r={activeIndex === i ? 5 : 3}
-                        fill={s.color}
-                        stroke={activeIndex === i ? colors.card : undefined}
-                        strokeWidth={activeIndex === i ? 2 : 0}
-                      />
-                    ))}
+                  {s.dots &&
+                    (valid.length <= 15
+                      ? valid.map((p, i) => (
+                          <Circle
+                            key={`${s.key}-dot-${i}`}
+                            cx={p.x}
+                            cy={p.y}
+                            r={activeIndex === i ? 5 : 3}
+                            fill={s.color}
+                            stroke={activeIndex === i ? colors.card : undefined}
+                            strokeWidth={activeIndex === i ? 2 : 0}
+                          />
+                        ))
+                      : // Dense series: dots per point would overlap into a
+                        // blob - show only the selected point's marker.
+                        activeIndex !== null &&
+                        pts[activeIndex] && (
+                          <Circle
+                            cx={pts[activeIndex]!.x}
+                            cy={pts[activeIndex]!.y}
+                            r={5}
+                            fill={s.color}
+                            stroke={colors.card}
+                            strokeWidth={2}
+                          />
+                        ))}
                 </G>
               );
             })}
@@ -533,6 +547,7 @@ export const BarChart = React.memo(function BarChart({
   height = 220,
   formatY,
   formatTooltipY,
+  formatTooltipX,
   formatX,
   onSelectPoint,
 }: BaseChartProps & { onSelectPoint?: (index: number | null) => void }) {
@@ -708,7 +723,11 @@ export const BarChart = React.memo(function BarChart({
           }}
         >
           <Text variant="caption" color={colors.mutedForeground} style={{ fontWeight: "700", fontSize: 13, marginBottom: 4 }}>
-            {formatX ? formatX(labels[activeIndex]) : labels[activeIndex]}
+            {formatTooltipX
+              ? formatTooltipX(labels[activeIndex])
+              : formatX
+                ? formatX(labels[activeIndex])
+                : labels[activeIndex]}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.lg, marginTop: 2 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}>

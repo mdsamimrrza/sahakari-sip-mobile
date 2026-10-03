@@ -119,7 +119,16 @@ export class CloudStore implements DataStore {
       navQuery = navQuery.eq("fund_id", fundId);
     }
 
-    const [fundsRes, entriesRes, navRes] = await Promise.all([
+    let dividendsQuery = this.db
+      .from("dividends")
+      .select("net_amount")
+      .eq("user_id", userId);
+
+    if (fundId && fundId !== "all") {
+      dividendsQuery = dividendsQuery.eq("fund_id", fundId);
+    }
+
+    const [fundsRes, entriesRes, navRes, dividendsRes] = await Promise.all([
       this.db
         .from("fund_config")
         .select("*")
@@ -128,6 +137,7 @@ export class CloudStore implements DataStore {
         .order("created_at", { ascending: true }),
       entriesQuery,
       navQuery,
+      dividendsQuery,
     ]);
 
     const fundsError = fundsRes.error;
@@ -135,6 +145,18 @@ export class CloudStore implements DataStore {
     const entriesError = entriesRes.error;
     const entriesRaw = entriesRes.data;
     const navRows = navRes.data;
+    const dividendsNet = dividendsRes.error
+      ? undefined
+      : (dividendsRes.data ?? []).reduce(
+          (sum, d: any) => sum + Number(d.net_amount),
+          0
+        );
+    if (dividendsRes.error) {
+      console.warn(
+        "[dashboard] dividends unavailable - run supabase/migrations/20261001_dividends.sql:",
+        dividendsRes.error.message
+      );
+    }
 
     if (fundsError) return { success: false, error: fundsError.message };
     const funds = (fundsRaw ?? []) as FundConfig[];
@@ -194,6 +216,7 @@ export class CloudStore implements DataStore {
       })),
       navHistory,
       fundId,
+      dividendsNet,
     });
     cacheSet(cacheKey, data);
     return { success: true, data };

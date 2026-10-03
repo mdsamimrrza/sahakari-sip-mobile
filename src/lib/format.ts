@@ -87,6 +87,15 @@ export function formatDateShort(dateStr: string): string {
 }
 
 /**
+ * Format a date for chart axis WITH the day included.
+ * e.g. "2024-03-15" → "15 Mar '24"
+ */
+export function formatDateAxis(dateStr: string): string {
+  if (!dateStr) return "";
+  return format(parseDateSafe(dateStr), "d MMM ''yy");
+}
+
+/**
  * Format a date as relative time.
  * e.g. "2 days ago"
  */

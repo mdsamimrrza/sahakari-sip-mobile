@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Coins,
   Flame,
+  Banknote,
   ArrowUpRight,
   ArrowDownRight,
   ChevronDown,
@@ -254,6 +255,9 @@ export function SummaryCards({
                 color="#FFFFFF"
                 style={{ fontWeight: "800" }}
                 tabular
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
               >
                 {isPositive ? "+" : ""}
                 {formatPrivate(formatCurrencyWhole(summary.gainLoss, true))} (
@@ -433,6 +437,14 @@ export function SummaryCards({
           label="Rollover Cash"
           value={formatPrivate(formatCurrencyWhole(summary.unallottedCash))}
         />
+        {(summary.dividendsNet ?? 0) > 0 ? (
+          <KpiChip
+            tint={colors.emerald}
+            icon={<Banknote size={15} color={colors.emerald} />}
+            label="Dividends"
+            value={`+${formatPrivate(formatCurrencyWhole(summary.dividendsNet!))}`}
+          />
+        ) : null}
       </ScrollView>
 
       {/* ---------- Personal Summary banner ---------- */}
@@ -522,7 +534,7 @@ export function SummaryCards({
           {/* Hero */}
           <View
             style={{
-              backgroundColor: colors.primary,
+              backgroundColor: isDark ? "#4338CA" : colors.primary,
               borderRadius: radius.xl,
               padding: spacing.lg,
               gap: spacing.md,
@@ -533,7 +545,14 @@ export function SummaryCards({
                 <Text variant="micro" color="rgba(255,255,255,0.72)">
                   Total Portfolio Value
                 </Text>
-                <Text variant="title" color="#FFFFFF" style={{ fontSize: fontSize.xxl }}>
+                <Text
+                  variant="title"
+                  color="#FFFFFF"
+                  style={{ fontSize: fontSize.xxl }}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
                   {currentValueDisplay}
                 </Text>
               </View>
@@ -541,7 +560,14 @@ export function SummaryCards({
                 <Text variant="micro" color="rgba(255,255,255,0.72)">
                   Gain / Loss
                 </Text>
-                <Text variant="label" color="#FFFFFF" tabular>
+                <Text
+                  variant="label"
+                  color="#FFFFFF"
+                  tabular
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
                   {summary.gainLoss !== null
                     ? formatPrivate(formatCurrencyWhole(summary.gainLoss, true))
                     : "NPR 0"}
@@ -647,6 +673,23 @@ export function SummaryCards({
               color={gainColor}
               emphasis
             />
+            {(summary.dividendsNet ?? 0) > 0 ? (
+              <>
+                <ReconRow
+                  label="(+) Dividends Received (net of 5% TDS)"
+                  value={`+${formatPrivate(formatCurrencyWhole(summary.dividendsNet!))}`}
+                  color={colors.emerald}
+                />
+                <ReconRow
+                  label="Total Return (incl. dividends)"
+                  value={formatPrivate(
+                    formatCurrencyWhole((summary.gainLoss ?? 0) + summary.dividendsNet!, true)
+                  )}
+                  color={(summary.gainLoss ?? 0) + summary.dividendsNet! >= 0 ? colors.emerald : colors.rose}
+                  emphasis
+                />
+              </>
+            ) : null}
           </View>
 
           {/* CGT */}
@@ -742,7 +785,14 @@ function KpiChip({
         >
           {label}
         </Text>
-        <Text variant="label" tabular style={{ fontWeight: "800", fontSize: fontSize.md }} numberOfLines={1}>
+        <Text
+          variant="label"
+          tabular
+          style={{ fontWeight: "800", fontSize: fontSize.md }}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+        >
           {value}
         </Text>
       </View>

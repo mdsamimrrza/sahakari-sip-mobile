@@ -8,13 +8,33 @@
 // ============================================================
 
 import * as ExpoCrypto from "expo-crypto";
-// PBKDF2 MUST use react-native-quick-crypto: Hermes has no global
-// WebCrypto (crypto.subtle is undefined on Android), so a WebCrypto
-// fallback throws at runtime on native. See AuthContext.tsx history.
-import QuickCrypto from "react-native-quick-crypto";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+// react-native-quick-crypto's JS side calls TurboModuleRegistry.getEnforcing
+// at module evaluation, which THROWS inside Expo Go (no native binary with
+// the module). A static import here would crash the whole bundle on load,
+// so it is required lazily, inside a guard, only when PBKDF2 is actually
+// called. Real builds (APK) get the native module; Expo Go gets a clear
+// error at the call site instead of a dead app.
+type QuickCryptoType = typeof import("react-native-quick-crypto").default;
+let _quickCrypto: QuickCryptoType | null | undefined;
+function quickCrypto(): QuickCryptoType {
+  if (_quickCrypto === undefined) {
+    try {
+      _quickCrypto = require("react-native-quick-crypto").default;
+    } catch {
+      _quickCrypto = null;
+    }
+  }
+  if (!_quickCrypto) {
+    throw new Error(
+      "PBKDF2 unavailable: react-native-quick-crypto is missing from this binary (Expo Go). Use a dev/production build."
+    );
+  }
+  return _quickCrypto;
+}
 
 export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -68,6 +88,6 @@ export function pbkdf2Bytes(
   // Same derivation as the previous inline QuickCrypto call sites:
   // string salt is treated as UTF-8 bytes, matching Node's pbkdf2Sync.
   return new Uint8Array(
-    QuickCrypto.pbkdf2Sync(password, salt, iterations, keyBytes, "sha256")
+    quickCrypto().pbkdf2Sync(password, salt, iterations, keyBytes, "sha256")
   );
 }
