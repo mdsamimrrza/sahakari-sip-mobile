@@ -1,8 +1,8 @@
 {
-  "run_id": "sahakarisip-2026-10-01-001",
+  "run_id": "sahakarisip-2026-10-04-001",
   "repo": "sahakari-sip-mobile",
   "target": "C:\\Users\\samim_40uxmfb\\Desktop\\deplyed project\\sipapk",
-  "source_ref": "75adbca (v1.5.1, versionCode 11)",
+  "source_ref": "b2a67da (v1.5.5, versionCode 12)",
   "profile": "standard",
   "scope_paths": [
     "app/",
