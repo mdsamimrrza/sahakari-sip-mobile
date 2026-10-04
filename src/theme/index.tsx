@@ -165,9 +165,28 @@ export const radius = {
 } as const;
 
 // Display faces use Instrument Serif for elegant financial headlines; body uses crisp Hanken Grotesk.
+// Android resolves each weight from its own static font file, so body text
+// must reference the weight-specific family name instead of relying on
+// fontWeight against a single variable font.
 export const fontFamily = {
   display: "InstrumentSerif-Regular",
-  body: "HankenGrotesk",
+  body: "HankenGrotesk-Regular",
+  bodyWeight: (weight: string | number | undefined): string => {
+    switch (String(weight)) {
+      case "500":
+        return "HankenGrotesk-Medium";
+      case "600":
+        return "HankenGrotesk-SemiBold";
+      case "700":
+        return "HankenGrotesk-Bold";
+      case "800":
+        return "HankenGrotesk-ExtraBold";
+      case "900":
+        return "HankenGrotesk-Black";
+      default:
+        return "HankenGrotesk-Regular";
+    }
+  },
 } as const;
 
 // Type scale — rich financial proportions with strong contrast.

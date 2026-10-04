@@ -102,7 +102,7 @@ export function Text({
       adjustsFontSizeToFit={adjustsFontSizeToFit}
       minimumFontScale={minimumFontScale}
       style={[
-        { fontFamily: fontFamily.body },
+        { fontFamily: fontFamily.bodyWeight(variantStyle.fontWeight) },
         variantStyle,
         { color: color ?? colors.foreground },
         align ? { textAlign: align } : null,
