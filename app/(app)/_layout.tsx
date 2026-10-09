@@ -24,6 +24,7 @@ import { useTheme, fontSize, radius } from "@/theme";
 import { Text } from "@/components/ui/primitives";
 import { refreshLocalReminders } from "@/lib/notifications/local-reminders";
 import { autoRegisterPushToken } from "@/lib/notifications/push-registration";
+import { UpdateCard } from "@/components/updates/UpdateCard";
 import { InstallmentsPopup } from "@/components/layout/InstallmentsPopup";
 
 export default function AppLayout() {
@@ -144,6 +145,10 @@ export default function AppLayout() {
       </Tabs>
       {/* Once-per-day upcoming-installments popup (port of the web's) */}
       <InstallmentsPopup />
+      {/* In-app update check: card when a newer APK is published, blocking
+          modal when this build is below min_version. Renders nothing if
+          this build is up to date or no release is published. */}
+      <UpdateCard />
     </>
   );
 }
