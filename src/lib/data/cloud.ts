@@ -49,6 +49,41 @@ const notificationPreferencesSchema = z.object({
   notify_days_before: z.number().int().min(0).max(30),
 });
 
+// Minimal structural type - the queries below are validated at runtime.
+type NavRefClient = { from: (table: string) => any };
+
+interface NavRefRow {
+  fund_key: string;
+  nav_date: string;
+  nav_value: number;
+}
+
+// PostgREST caps a single select at 1000 rows and the full daily series
+// per fund is larger. Page through it - a plain select silently returns
+// only the OLDEST 1000 rows (ascending order), so the charts' NAV detail
+// stopped around Nov 2023 and the portfolio chart squeezed three years
+// of growth into a few pixels.
+async function fetchAllNavReference(
+  db: NavRefClient,
+  fundKeys: string[]
+): Promise<NavRefRow[]> {
+  const out: NavRefRow[] = [];
+  let offset = 0;
+  while (true) {
+    const { data } = await db
+      .from("nav_reference")
+      .select("fund_key, nav_date, nav_value")
+      .in("fund_key", fundKeys)
+      .order("nav_date", { ascending: true })
+      .range(offset, offset + 999);
+    const page = (data ?? []) as NavRefRow[];
+    out.push(...page);
+    if (page.length < 1000) break;
+    offset += 1000;
+  }
+  return out;
+}
+
 export class CloudStore implements DataStore {
   readonly mode = "cloud" as const;
 
@@ -182,13 +217,12 @@ export class CloudStore implements DataStore {
       fundKeyToIds.set(k, [...(fundKeyToIds.get(k) ?? []), f.id]);
     }
     if (fundKeyToIds.size > 0) {
-      const { data: refData } = await this.db
-        .from("nav_reference")
-        .select("fund_key, nav_date, nav_value")
-        .in("fund_key", [...fundKeyToIds.keys()])
-        .order("nav_date", { ascending: true });
+      const refData = await fetchAllNavReference(
+        this.db,
+        [...fundKeyToIds.keys()]
+      );
       const own = new Set(navHistory.map((r) => `${r.fund_id}|${r.nav_date}`));
-      for (const row of (refData ?? []) as any[]) {
+      for (const row of refData) {
         for (const fid of fundKeyToIds.get(String(row.fund_key)) ?? []) {
           const key = `${fid}|${row.nav_date}`;
           if (!own.has(key)) {
@@ -784,13 +818,12 @@ export class CloudStore implements DataStore {
       fundKeyToIds.set(k, [...(fundKeyToIds.get(k) ?? []), f.id]);
     }
     if (fundKeyToIds.size > 0) {
-      const { data: refData } = await this.db
-        .from("nav_reference")
-        .select("fund_key, nav_date, nav_value")
-        .in("fund_key", [...fundKeyToIds.keys()])
-        .order("nav_date", { ascending: true });
+      const refData = await fetchAllNavReference(
+        this.db,
+        [...fundKeyToIds.keys()]
+      );
       const own = new Set(rows.map((r) => `${r.fund_id}|${r.nav_date}`));
-      for (const row of (refData ?? []) as any[]) {
+      for (const row of refData) {
         for (const fid of fundKeyToIds.get(String(row.fund_key)) ?? []) {
           const key = `${fid}|${row.nav_date}`;
           if (!own.has(key) && (!fundId || fundId === "all" || fid === fundId)) {
