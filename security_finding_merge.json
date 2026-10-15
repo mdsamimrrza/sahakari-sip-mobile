@@ -1,0 +1,23 @@
+{
+  "fingerprint": "sha256:local-merge-cross-user-contamination-v1",
+  "boundary_crossed": "Local Device Data → Cloud Supabase (one-time merge)",
+  "lower_trust_principal": "Local device profile (unverified identity mapping)",
+  "affected_principal_resource": "Cloud user account data (fund_config, entries, nav_history, notification_preferences)",
+  "concrete_result": "A user signing into their cloud account on a shared device can inadvertently merge another local user's SIP data into their cloud account, because the merge process scans ALL local profiles on the device without validating identity match between the local profile and the authenticated cloud session.",
+  "evidence": [
+    "src/lib/data/merge.ts:99-108 listLocalDataUids() scans ALL local profiles via regex on AsyncStorage keys, no filtering by authenticated user",
+    "src/lib/data/merge.ts:214-243 inspectMergeCandidate() iterates all uids from listLocalDataUids() and aggregates counts without identity verification",
+    "src/lib/data/merge.ts:325-329 mergeLocalIntoCloud() loops through all uids from listLocalDataUids() and merges each profile's funds/entries into the cloud account",
+    "src/lib/data/merge.ts:126-133 cloudUserIds() gets effective user ID from authenticated session only",
+    "src/lib/data/cloud.ts:62-74 CloudStore.getUserId()/getEffectiveUserId() returns authenticated session identity",
+    "src/components/auth/MergePromptDialog.tsx:65 description shows aggregate counts but doesn't reveal WHICH local profiles will be merged",
+    "src/lib/auth/AuthContext.tsx:475-482 offerMerge() calls inspectMergeCandidate() without identity validation"
+  ],
+  "severity_assessment": "HIGH - Cross-user data contamination on shared devices; violates tenant isolation; data injection into another user's cloud account; recoverable via backupCloudToLocal but requires user detection",
+  "needs_validation": [
+    "Verify if local profiles store email/identity that could be matched against cloud session email",
+    "Test merge behavior on device with multiple local profiles",
+    "Confirm backupCloudToLocal only exposes authenticated user's cloud data (not other users')",
+    "Check if MERGE_DONE_PREFIX markers prevent re-merge but don't prevent initial cross-user merge"
+  ]
+}

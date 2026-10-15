@@ -1,0 +1,19 @@
+{
+  "fingerprint": "local-vault-encryptjson-plaintext-on-locked-vault",
+  "boundary_crossed": "App Runtime → Encrypted AsyncStorage",
+  "lower_trust_principal": "Locked/Unauthenticated App Runtime (vault locked, no active DEK)",
+  "affected_principal_resource": "All local encrypted data store payloads (funds, entries, nav_history, prefs, notifications, profile) written via writeJson/encryptJson",
+  "concrete_result": "When the vault is locked (activeDek === null), encryptJson() returns the plaintext JSON string instead of encrypting it. Any write operation (createFundConfig, createEntry, updateFundConfig, saveNotificationPreferences, updateProfileImage, etc.) persists unencrypted sensitive financial data to AsyncStorage. Subsequent unlock does not re-encrypt existing plaintext records.",
+  "evidence": [
+    "src/lib/auth/local-vault.ts:201-208 — encryptJson() returns raw json when !activeDek",
+    "src/lib/data/local.ts:89-92 — writeJson() calls encryptJson() for all data writes",
+    "src/lib/data/local.ts:107-129 — All CRUD operations (funds, entries, nav, prefs, notifications, profile) route through writeJson()"
+  ],
+  "severity_assessment": "CRITICAL",
+  "needs_validation": [
+    "Confirm vault can be locked during normal app operation (e.g., after logout, background timeout, or explicit lockVault())",
+    "Verify no auto-unlock logic runs before writes in LocalStore methods",
+    "Test: lock vault → call createFundConfig → inspect AsyncStorage for plaintext",
+    "Check if NAV_AUTO_KEY/NAV_LAST_SYNC_KEY plaintext storage is acceptable (low-sensitivity metadata)"
+  ]
+}

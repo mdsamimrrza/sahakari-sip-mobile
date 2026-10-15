@@ -1,0 +1,1118 @@
+[
+  {
+    "coverage_id": "deep-link::oauth-handoff::src/lib/auth/AuthContext.tsx::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "canonical_refs": {
+      "surface": "app/(auth)/auth/callback.tsx#sahakarisip://auth/callback",
+      "boundary": "src/lib/auth/AuthContext.tsx#completeGoogleHandoff",
+      "subsystem": "src/lib/auth",
+      "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    },
+    "surface": "Deep link sahakarisip://auth/callback?token= (Google OAuth handoff)",
+    "boundary": "Mobile App → Web Backend (/api/mobile/exchange) token exchange",
+    "subsystem": "src/lib/auth",
+    "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "starting_paths": [
+      "app/(auth)/auth/callback.tsx",
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "ordinary_attack_class_block": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "selected_companion_blocks": [
+      "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+      "WEB-PROTOCOL-AND-AUTH.md#Validation rules",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Deep-link, callback, and navigation attack classes",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+    ],
+    "excluded_blocks": [
+      {
+        "block": "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+        "reason": "This boundary is auth token exchange, not data access"
+      }
+    ],
+    "prior_status": "prior_confirmed_same_source",
+    "attempts": [
+      {
+        "agent_id": "agent_016793ee-f493-4794-957b-c3d9b2cd98bf",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "candidate",
+        "finding_ref": "FIND-2026-10-11-001"
+      }
+    ],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "agent_016793ee-f493-4794-957b-c3d9b2cd98bf",
+    "reviewed_paths": [
+      "app/(auth)/auth/callback.tsx",
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "local_checks": [
+      "Client-side replay journal (AsyncStorage) with 24h TTL and 50-entry cap",
+      "Non-atomic check-then-act in completeGoogleHandoff",
+      "Server-side enforcement not verifiable from mobile repo"
+    ],
+    "result_fingerprints": [
+      "oauth-handoff-replay-via-captured-nonce"
+    ],
+    "unresolved": [
+      "Server-side single-use enforcement verification required"
+    ]
+  },
+  {
+    "coverage_id": "native-google-signin::google-idtoken-validation::src/lib/auth/AuthContext.tsx::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "canonical_refs": {
+      "surface": "src/lib/auth/AuthContext.tsx#signInWithGoogle native path",
+      "boundary": "Mobile App → Web Backend (/api/mobile/google-native) ID token exchange",
+      "subsystem": "src/lib/auth",
+      "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    },
+    "surface": "Native Google Sign-In (Android/iOS) via @react-native-google-signin/google-signin",
+    "boundary": "Mobile App → Web Backend (/api/mobile/google-native) ID token exchange",
+    "subsystem": "src/lib/auth",
+    "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "starting_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "ordinary_attack_class_block": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "selected_companion_blocks": [
+      "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+      "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_confirmed_same_source",
+    "attempts": [
+      {
+        "agent_id": "agent_38021752-296a-4efe-b64b-3f172960829a",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "candidate",
+        "finding_ref": "FIND-2026-10-11-002"
+      }
+    ],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "agent_38021752-296a-4efe-b64b-3f172960829a",
+    "reviewed_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "local_checks": [
+      "Raw ID token sent to /api/mobile/google-native without client-side validation",
+      "No audience/issuer/expiry/signature checks in mobile code",
+      "Server-side validation not verifiable from mobile repo"
+    ],
+    "result_fingerprints": [
+      "native-google-signin:idtoken-server-validation-missing:src/lib/auth/AuthContext.tsx:1097-1113:src/lib/auth/mobileApi.ts:109-114"
+    ],
+    "unresolved": [
+      "Server-side ID token validation verification required"
+    ]
+  },
+  {
+    "coverage_id": "email-password::cloud-auth::src/lib/auth/AuthContext.tsx::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "canonical_refs": {
+      "surface": "src/lib/auth/AuthContext.tsx#signIn/signUp cloud mode",
+      "boundary": "Mobile App → Web Backend (/api/mobile/password-login, /signup)",
+      "subsystem": "src/lib/auth",
+      "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    },
+    "surface": "Email/password sign-in and sign-up (cloud mode)",
+    "boundary": "Mobile App → Web Backend credential verification",
+    "subsystem": "src/lib/auth",
+    "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "starting_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "ordinary_attack_class_block": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "selected_companion_blocks": [
+      "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+      "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_98d477ea-b47d-4f55-a373-8ebdf4f8c189",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-019"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_98d477ea-b47d-4f55-a373-8ebdf4f8c189",
+    "reviewed_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "local_checks": [
+      "Differentiated error messages enable email enumeration",
+      "No client-side rate limiting on auth endpoints",
+      "Weak password policy (8 chars minimum only)",
+      "HTTPS enforced but no certificate pinning"
+    ],
+    "result_fingerprints": [
+      "sha256:email-enumeration-via-auth-error-messages-2026"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "password-reset::otp-flow::src/lib/auth/AuthContext.tsx::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "canonical_refs": {
+      "surface": "src/lib/auth/AuthContext.tsx#requestPasswordReset/verifyPasswordResetOtp/completePasswordReset",
+      "boundary": "Mobile App → Web Backend (/api/mobile/password-reset) OTP flow",
+      "subsystem": "src/lib/auth",
+      "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    },
+    "surface": "Password reset OTP flow (cloud mode)",
+    "boundary": "Mobile App → Web Backend OTP verification and password reset",
+    "subsystem": "src/lib/auth",
+    "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "starting_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "ordinary_attack_class_block": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "selected_companion_blocks": [
+      "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+      "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_7a9f03ca-ba8a-4461-ab91-99caf0345f48",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "candidate",
+        "finding_ref": "FIND-2026-10-11-020"
+      }
+    ],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "agent_7a9f03ca-ba8a-4461-ab91-99caf0345f48",
+    "reviewed_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "local_checks": [
+      "Reset token stored in long-lived React ref without TTL",
+      "No client-side invalidation on background/signout/failed attempts",
+      "Server-side token lifecycle not verifiable from mobile repo"
+    ],
+    "result_fingerprints": [
+      "sha256:password-reset-otp-resettoken-client-exposure-2026"
+    ],
+    "unresolved": [
+      "Server-side resetToken TTL and single-use enforcement verification required"
+    ]
+  },
+  {
+    "coverage_id": "adb-backup::android-backup::android/app/src/main/AndroidManifest.xml::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "canonical_refs": {
+      "surface": "android/app/src/main/AndroidManifest.xml#android:allowBackup",
+      "boundary": "Device (USB/ADB) → App Private Storage",
+      "subsystem": "android/app/src/main",
+      "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch"
+    },
+    "surface": "Android ADB backup (adb backup command)",
+    "boundary": "Device (USB/ADB) → App Private Storage",
+    "subsystem": "android/app/src/main",
+    "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "starting_paths": [
+      "android/app/src/main/AndroidManifest.xml",
+      "android/app/src/main/res/xml/secure_store_backup_rules.xml",
+      "android/app/src/main/res/xml/secure_store_data_extraction_rules.xml"
+    ],
+    "ordinary_attack_class_block": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "selected_companion_blocks": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_confirmed_changed_source",
+    "attempts": [
+      {
+        "agent_id": "agent_2792f495-e28d-4a2f-91fc-a25c0f2e6c3e",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-003"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_2792f495-e28d-4a2f-91fc-a25c0f2e6c3e",
+    "reviewed_paths": [
+      "android/app/src/main/AndroidManifest.xml",
+      "android/app/src/main/res/xml/secure_store_backup_rules.xml",
+      "android/app/src/main/res/xml/secure_store_data_extraction_rules.xml",
+      "src/lib/auth/mobileSession.ts",
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/local-vault.ts"
+    ],
+    "local_checks": [
+      "allowBackup=false but expo prebuild reverts it",
+      "Backup rules include all sharedprefs, only exclude SecureStore",
+      "AsyncStorage keys (JWT, session, profiles, handoff tokens) all backed up",
+      "DEKs correctly stored in SecureStore (excluded)"
+    ],
+    "result_fingerprints": [
+      "adb-backup-asyncstorage-jwt-exfiltration"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "supabase-rls::data-isolation::src/lib/data/cloud.ts::DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+    "canonical_refs": {
+      "surface": "src/lib/data/cloud.ts#all query methods",
+      "boundary": "Supabase (Postgres) → User Data",
+      "subsystem": "src/lib/data",
+      "attack_class": "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement"
+    },
+    "surface": "Supabase data access via CloudStore (all queries)",
+    "boundary": "Supabase (Postgres) → User Data",
+    "subsystem": "src/lib/data",
+    "attack_class": "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+    "starting_paths": [
+      "src/lib/data/cloud.ts"
+    ],
+    "ordinary_attack_class_block": "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline",
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Universal moves",
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_needs_validation",
+    "attempts": [
+      {
+        "agent_id": "agent_b50bdc36-2a04-4825-a847-03ecf9e81c8c",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "candidate",
+        "finding_ref": "FIND-2026-10-11-004"
+      }
+    ],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "agent_b50bdc36-2a04-4825-a847-03ecf9e81c8c",
+    "reviewed_paths": [
+      "src/lib/data/cloud.ts",
+      "src/lib/supabase.ts",
+      "src/lib/auth/mobileSession.ts",
+      "supabase-enable-rls.sql",
+      "supabase-fix-user-mapping.sql",
+      "supabase-verify-rls.sql",
+      "NEEDS-VALIDATION.md"
+    ],
+    "local_checks": [
+      "All CloudStore queries filter by user_id from mobile session JWT",
+      "RLS policies deployed separately (SQL files in repo but not runtime config)",
+      "nav_reference table intentionally shared (market data only)",
+      "Storage RLS for avatars bucket not in repo"
+    ],
+    "result_fingerprints": [
+      "4cf29e0ed8000e75"
+    ],
+    "unresolved": [
+      "RLS policies verification against production Supabase required"
+    ]
+  },
+  {
+    "coverage_id": "profile-photo-upload::file-upload::src/lib/data/cloud.ts::WEB-PROTOCOL-AND-AUTH.md#File upload and content-type validation",
+    "canonical_refs": {
+      "surface": "src/lib/data/cloud.ts#updateProfileImage",
+      "boundary": "User Input (File) → Supabase Storage → Browser Rendering",
+      "subsystem": "src/lib/data",
+      "attack_class": "WEB-PROTOCOL-AND-AUTH.md#File upload and content-type validation"
+    },
+    "surface": "Profile photo upload via expo-document-picker",
+    "boundary": "User Input (File) → Supabase Storage → Browser Rendering",
+    "subsystem": "src/lib/data",
+    "attack_class": "WEB-PROTOCOL-AND-AUTH.md#File upload and content-type validation",
+    "starting_paths": [
+      "src/lib/data/cloud.ts",
+      "src/lib/profilePhoto.ts"
+    ],
+    "ordinary_attack_class_block": "WEB-PROTOCOL-AND-AUTH.md#File upload and content-type validation",
+    "selected_companion_blocks": [
+      "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+      "WEB-PROTOCOL-AND-AUTH.md#File upload and content-type validation",
+      "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+      "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_confirmed_same_source",
+    "attempts": [
+      {
+        "agent_id": "agent_59af6249-5d13-47f2-b7d2-72775e2f7c58",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "candidate",
+        "finding_ref": "FIND-2026-10-11-005"
+      }
+    ],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "agent_59af6249-5d13-47f2-b7d2-72775e2f7c58",
+    "reviewed_paths": [
+      "src/lib/data/cloud.ts",
+      "src/lib/profilePhoto.ts",
+      "src/components/settings/profile-image-manager.tsx"
+    ],
+    "local_checks": [
+      "Client-side MIME allowlist only (image/jpeg, png, webp)",
+      "No magic-byte validation",
+      "File uploaded with client-supplied contentType",
+      "Supabase Storage bucket policies not in repo"
+    ],
+    "result_fingerprints": [
+      "profile-photo-upload-mime-trust-cloudts-1000"
+    ],
+    "unresolved": [
+      "Supabase Storage bucket policy verification required"
+    ]
+  },
+  {
+    "coverage_id": "local-vault::envelope-encryption::src/lib/auth/local-vault.ts::ATTACK-CLASSES.md#Obvious things",
+    "canonical_refs": {
+      "surface": "src/lib/auth/local-vault.ts#createVault/unwrapWithPassword/unwrapWithRecoveryKey",
+      "boundary": "Device User → Local Encrypted Vault",
+      "subsystem": "src/lib/auth",
+      "attack_class": "ATTACK-CLASSES.md#Obvious things"
+    },
+    "surface": "Local vault envelope encryption (create, unlock, recovery)",
+    "boundary": "Device User → Local Encrypted Vault",
+    "subsystem": "src/lib/auth",
+    "attack_class": "ATTACK-CLASSES.md#Obvious things",
+    "starting_paths": [
+      "src/lib/auth/local-vault.ts",
+      "src/lib/auth/nativeCrypto.ts",
+      "src/lib/auth/nativeCrypto.web.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+    "selected_companion_blocks": [
+      "ATTACK-CLASSES.md#Core discipline",
+      "ATTACK-CLASSES.md#Obvious things",
+      "ATTACK-CLASSES.md#Universal moves",
+      "ATTACK-CLASSES.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_d8c56443-3a44-443a-a088-82534c06e58d",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-006"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_d8c56443-3a44-443a-a088-82534c06e58d",
+    "reviewed_paths": [
+      "src/lib/auth/local-vault.ts",
+      "src/lib/auth/nativeCrypto.ts",
+      "src/lib/auth/nativeCrypto.web.ts"
+    ],
+    "local_checks": [
+      "PBKDF2-HMAC-SHA256 at 100k iterations (below 2026 baseline of 600k+)",
+      "Recovery key: 128-bit random, SHA-256 wrap (no KDF needed)",
+      "AES-256-GCM via expo-crypto / react-native-quick-crypto",
+      "DEK stored in SecureStore (Keystore/Enclave backed)"
+    ],
+    "result_fingerprints": [
+      "local-vault::envelope-encryption::pbkdf2-100k-iterations-inadequate-2026"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "biometric-unlock::secure-session::src/lib/auth/biometric.ts::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary",
+    "canonical_refs": {
+      "surface": "src/lib/auth/biometric.ts#promptBiometric/saveBiometricEntry",
+      "boundary": "OS Biometric Prompt → SecureStore Session Entry",
+      "subsystem": "src/lib/auth",
+      "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary"
+    },
+    "surface": "Biometric unlock (promptBiometric, saveBiometricEntry)",
+    "boundary": "OS Biometric Prompt → SecureStore Session Entry",
+    "subsystem": "src/lib/auth",
+    "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary",
+    "starting_paths": [
+      "src/lib/auth/biometric.ts",
+      "src/lib/auth/AuthContext.tsx"
+    ],
+    "ordinary_attack_class_block": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary",
+    "selected_companion_blocks": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_e2d9aabc-55c5-4df0-b797-f92fc7edd904",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-007"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_e2d9aabc-55c5-4df0-b797-f92fc7edd904",
+    "reviewed_paths": [
+      "src/lib/auth/biometric.ts",
+      "src/lib/auth/AuthContext.tsx"
+    ],
+    "local_checks": [
+      "disableDeviceFallback: true prevents PIN/pattern fallback",
+      "SecureStore (Keystore/Enclave) stores BiometricEntry with JWT",
+      "JWT expiry checked before restore",
+      "TTL reset on biometric unlock without server revalidation"
+    ],
+    "result_fingerprints": [
+      "biometric-ttl-reset-without-server-revalidation"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "session-ttl::absolute-expiry::src/lib/auth/AuthContext.tsx::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary",
+    "canonical_refs": {
+      "surface": "src/lib/auth/AuthContext.tsx#AppState listener / expireSession",
+      "boundary": "App Runtime → Session State",
+      "subsystem": "src/lib/auth",
+      "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary"
+    },
+    "surface": "Session TTL enforcement (AppState listener, expireSession)",
+    "boundary": "App Runtime → Session State",
+    "subsystem": "src/lib/auth",
+    "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary",
+    "starting_paths": [
+      "src/lib/auth/AuthContext.tsx"
+    ],
+    "ordinary_attack_class_block": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary",
+    "selected_companion_blocks": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_confirmed_same_source",
+    "attempts": [
+      {
+        "agent_id": "agent_5893f497-5c13-4dc9-ade4-9562ddac5862",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-008"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_5893f497-5c13-4dc9-ade4-9562ddac5862",
+    "reviewed_paths": [
+      "src/lib/auth/AuthContext.tsx"
+    ],
+    "local_checks": [
+      "4-hour TTL only checked on AppState background→active transition",
+      "No periodic timer - indefinite session if app stays foregrounded",
+      "Biometric users: TTL expiry stashes session for re-auth (extends session)",
+      "Bootstrap checks TTL on cold start"
+    ],
+    "result_fingerprints": [
+      "sipapk-session-ttl-foreground-only-check"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "local-password-reset::recovery-key::src/lib/auth/AuthContext.tsx::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "canonical_refs": {
+      "surface": "src/lib/auth/AuthContext.tsx#resetLocalPassword",
+      "boundary": "Device User → Recovery Key Input → Vault DEK",
+      "subsystem": "src/lib/auth",
+      "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch"
+    },
+    "surface": "Device-local password reset with recovery key",
+    "boundary": "Device User → Recovery Key Input → Vault DEK",
+    "subsystem": "src/lib/auth",
+    "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "starting_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/local-vault.ts"
+    ],
+    "ordinary_attack_class_block": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "selected_companion_blocks": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_confirmed_same_source",
+    "attempts": [
+      {
+        "agent_id": "agent_2f0813a4-5a46-4b56-b02c-d04c67bc15b4",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-009"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_2f0813a4-5a46-4b56-b02c-d04c67bc15b4",
+    "reviewed_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/local-vault.ts",
+      "src/components/auth/RecoveryKeyOnce.tsx",
+      "app/(auth)/signup.tsx",
+      "app/(auth)/login.tsx"
+    ],
+    "local_checks": [
+      "Recovery key displayed in plaintext (large font, bold)",
+      "Recovery key copied to clipboard (Clipboard.setStringAsync)",
+      "Forgot password input lacks secureTextEntry",
+      "expo-screen-capture installed but preventScreenCaptureAsync() NOT called",
+      "Global screen capture IS active via app/_layout.tsx (covers these screens)"
+    ],
+    "result_fingerprints": [
+      "local-password-reset:recovery-key:plaintext-display-and-input-without-screen-capture-protection"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "csv-import::data-ingestion::src/lib/data/cloud.ts::ATTACK-CLASSES.md#Supply chain",
+    "canonical_refs": {
+      "surface": "src/lib/data/cloud.ts#importEntriesFromCsv",
+      "boundary": "User Input (CSV) → Validated Entries → Database",
+      "subsystem": "src/lib/data",
+      "attack_class": "ATTACK-CLASSES.md#Supply chain"
+    },
+    "surface": "CSV import via expo-document-picker",
+    "boundary": "User Input (CSV) → Validated Entries → Database",
+    "subsystem": "src/lib/data",
+    "attack_class": "ATTACK-CLASSES.md#Supply chain",
+    "starting_paths": [
+      "src/lib/data/cloud.ts",
+      "src/lib/data/local.ts",
+      "src/lib/schemas/entry.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Supply chain",
+    "selected_companion_blocks": [
+      "ATTACK-CLASSES.md#Core discipline",
+      "ATTACK-CLASSES.md#Supply chain",
+      "ATTACK-CLASSES.md#Universal moves",
+      "ATTACK-CLASSES.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_3b0fff10-8cf5-44c7-9d5b-e235b682a872",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-010"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_3b0fff10-8cf5-44c7-9d5b-e235b682a872",
+    "reviewed_paths": [
+      "src/components/entries/CsvImportModal.tsx",
+      "src/lib/schemas/entry.ts",
+      "src/lib/data/cloud.ts",
+      "src/lib/data/local.ts"
+    ],
+    "local_checks": [
+      "Custom CSV parser uses naive split(',') without RFC 4180 support",
+      "No file size limit before reading entire file into memory",
+      "MAX_IMPORT_ROWS=2000 only limits after parsing",
+      "z.coerce.number() accepts scientific notation",
+      "Date parsing accepts ambiguous formats"
+    ],
+    "result_fingerprints": [
+      "sha256:csv-import-naive-parser-no-size-limit"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "push-token::admin-backend::src/lib/notifications/push-registration.ts::ATTACK-CLASSES.md#Supply chain",
+    "canonical_refs": {
+      "surface": "src/lib/notifications/push-registration.ts#autoRegisterPushToken",
+      "boundary": "Mobile App → Admin Backend (push token registration)",
+      "subsystem": "src/lib/notifications",
+      "attack_class": "ATTACK-CLASSES.md#Supply chain"
+    },
+    "surface": "Expo push token registration to admin backend",
+    "boundary": "Mobile App → Admin Backend (push token registration)",
+    "subsystem": "src/lib/notifications",
+    "attack_class": "ATTACK-CLASSES.md#Supply chain",
+    "starting_paths": [
+      "src/lib/notifications/push-registration.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Supply chain",
+    "selected_companion_blocks": [
+      "ATTACK-CLASSES.md#Core discipline",
+      "ATTACK-CLASSES.md#Supply chain",
+      "ATTACK-CLASSES.md#Universal moves",
+      "ATTACK-CLASSES.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_17b9da0a-42c1-4ae0-b30b-0ab17a682eae",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-011"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_17b9da0a-42c1-4ae0-b30b-0ab17a682eae",
+    "reviewed_paths": [
+      "src/lib/notifications/push-registration.ts",
+      ".env"
+    ],
+    "local_checks": [
+      "Hardcoded admin backend URL (https://master-admin-delta.vercel.app)",
+      "No authentication on POST/DELETE requests",
+      "Only Content-Type header, no Authorization",
+      "Response validation only checks res.ok",
+      "API_URL in .env exists but not used"
+    ],
+    "result_fingerprints": [
+      "push-token-admin-backend-hardcoded-no-auth-2026"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "local-data-store::encrypted-storage::src/lib/data/local.ts::ATTACK-CLASSES.md#Obvious things",
+    "canonical_refs": {
+      "surface": "src/lib/data/local.ts#all methods",
+      "boundary": "App Runtime → Encrypted AsyncStorage",
+      "subsystem": "src/lib/data",
+      "attack_class": "ATTACK-CLASSES.md#Obvious things"
+    },
+    "surface": "Local encrypted data store (all CRUD operations)",
+    "boundary": "App Runtime → Encrypted AsyncStorage",
+    "subsystem": "src/lib/data",
+    "attack_class": "ATTACK-CLASSES.md#Obvious things",
+    "starting_paths": [
+      "src/lib/data/local.ts",
+      "src/lib/auth/local-vault.ts"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+    "selected_companion_blocks": [
+      "ATTACK-CLASSES.md#Core discipline",
+      "ATTACK-CLASSES.md#Obvious things",
+      "ATTACK-CLASSES.md#Universal moves",
+      "ATTACK-CLASSES.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_32407bbf-7bed-43bd-8349-50cbd5c82b09",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-012"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_32407bbf-7bed-43bd-8349-50cbd5c82b09",
+    "reviewed_paths": [
+      "src/lib/data/local.ts",
+      "src/lib/auth/local-vault.ts"
+    ],
+    "local_checks": [
+      "encryptJson() returns plaintext when !activeDek (vault locked)",
+      "All LocalStore CRUD operations route through writeJson() → encryptJson()",
+      "Vault can be locked during normal operation (logout, TTL expiry)",
+      "Plaintext writes persist unencrypted financial data to AsyncStorage"
+    ],
+    "result_fingerprints": [
+      "local-vault-encryptjson-plaintext-on-locked-vault"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "local-merge::data-migration::src/lib/data/merge.ts::DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+    "canonical_refs": {
+      "surface": "src/lib/data/merge.ts#mergeLocalIntoCloud",
+      "boundary": "Local Device Data → Cloud Supabase (one-time merge)",
+      "subsystem": "src/lib/data",
+      "attack_class": "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement"
+    },
+    "surface": "Local→cloud one-time merge (user-confirmed)",
+    "boundary": "Local Device Data → Cloud Supabase (one-time merge)",
+    "subsystem": "src/lib/data",
+    "attack_class": "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+    "starting_paths": [
+      "src/lib/data/merge.ts",
+      "src/lib/data/cloud.ts"
+    ],
+    "ordinary_attack_class_block": "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+    "selected_companion_blocks": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Core discipline",
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement",
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Universal moves",
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_3fbec222-b4b5-489e-8233-4e1212379118",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-013"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_3fbec222-b4b5-489e-8233-4e1212379118",
+    "reviewed_paths": [
+      "src/lib/data/merge.ts",
+      "src/lib/data/cloud.ts",
+      "src/components/auth/MergePromptDialog.tsx",
+      "src/lib/auth/AuthContext.tsx"
+    ],
+    "local_checks": [
+      "listLocalDataUids() scans ALL local profiles without identity filtering",
+      "inspectMergeCandidate() aggregates counts without identity verification",
+      "mergeLocalIntoCloud() merges all profiles into cloud account",
+      "MergePromptDialog shows aggregate counts but not which profiles"
+    ],
+    "result_fingerprints": [
+      "sha256:local-merge-cross-user-contamination-v1"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "env-file::credential-exposure::.env::ATTACK-CLASSES.md#Obvious things",
+    "canonical_refs": {
+      "surface": ".env (workspace file)",
+      "boundary": "Developer Workspace → Git History (Accidental Commit)",
+      "subsystem": "config",
+      "attack_class": "ATTACK-CLASSES.md#Obvious things"
+    },
+    "surface": ".env file with production credentials in workspace",
+    "boundary": "Developer Workspace → Git History (Accidental Commit)",
+    "subsystem": "config",
+    "attack_class": "ATTACK-CLASSES.md#Obvious things",
+    "starting_paths": [
+      ".env",
+      ".gitignore",
+      "scripts/pre-commit-env-guard.sh"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+    "selected_companion_blocks": [
+      "ATTACK-CLASSES.md#Core discipline",
+      "ATTACK-CLASSES.md#Obvious things",
+      "ATTACK-CLASSES.md#Universal moves",
+      "ATTACK-CLASSES.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_confirmed_same_source",
+    "attempts": [
+      {
+        "agent_id": "agent_937d8217-1e56-4f53-b2e1-085249805faf",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-014"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_937d8217-1e56-4f53-b2e1-085249805faf",
+    "reviewed_paths": [
+      ".env",
+      ".gitignore",
+      "scripts/pre-commit-env-guard.sh"
+    ],
+    "local_checks": [
+      ".env contains EXPO_PUBLIC_* credentials only (no server secrets)",
+      ".gitignore blocks .env and variants",
+      "Pre-commit hook exists but may not be installed on all machines"
+    ],
+    "result_fingerprints": [
+      "env-file-credential-exposure-sahakari-sip"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "npm-deps::transitive-vulns::package-lock.json::ATTACK-CLASSES.md#Supply chain",
+    "canonical_refs": {
+      "surface": "package-lock.json (transitive dependencies)",
+      "boundary": "Dependency Supply Chain → Application Runtime",
+      "subsystem": "dependencies",
+      "attack_class": "ATTACK-CLASSES.md#Supply chain"
+    },
+    "surface": "NPM transitive dependency vulnerabilities",
+    "boundary": "Dependency Supply Chain → Application Runtime",
+    "subsystem": "dependencies",
+    "attack_class": "ATTACK-CLASSES.md#Supply chain",
+    "starting_paths": [
+      "package-lock.json",
+      "package.json"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Supply chain",
+    "selected_companion_blocks": [
+      "ATTACK-CLASSES.md#Core discipline",
+      "ATTACK-CLASSES.md#Supply chain",
+      "ATTACK-CLASSES.md#Universal moves",
+      "ATTACK-CLASSES.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_confirmed_same_source",
+    "attempts": [
+      {
+        "agent_id": "agent_b8bc1cd3-f256-458e-8331-4e2895e47f1a",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-015"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_b8bc1cd3-f256-458e-8331-4e2895e47f1a",
+    "reviewed_paths": [
+      "package-lock.json",
+      "package.json"
+    ],
+    "local_checks": [
+      "27 transitive vulnerabilities (1 critical, 17 high, 9 moderate)",
+      "Critical: shell-quote@1.10.0 command injection via react-devtools-core",
+      "High: node-forge@1.4.0 RSA bypass via @expo/code-signing-certificates",
+      "High: braces@3.0.3 / micromatch@4.0.8 DoS via metro file-map",
+      "High: react-native-reanimated@4.5.1 / worklets@0.10.1 via expo-modules-core",
+      "All in production dependency tree (not devDependencies)"
+    ],
+    "result_fingerprints": [
+      "cef17cd3b3dd1b55f3c6bf63225a521ea2074c63fc0dc211ab33fe66d3e24025"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "web-backend-token-consumption::server-enforcement::src/lib/auth/mobileApi.ts::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "canonical_refs": {
+      "surface": "src/lib/auth/mobileApi.ts#googleExchange",
+      "boundary": "Mobile App → Web Backend (/api/mobile/exchange) single-use enforcement",
+      "subsystem": "src/lib/auth",
+      "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    },
+    "surface": "Web backend handoff token consumption (server-side)",
+    "boundary": "Mobile App → Web Backend (/api/mobile/exchange) single-use enforcement",
+    "subsystem": "src/lib/auth",
+    "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "starting_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "ordinary_attack_class_block": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "selected_companion_blocks": [
+      "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+      "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_needs_validation",
+    "attempts": [
+      {
+        "agent_id": "agent_de543238-1c28-4c70-ad43-e7d127202527",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "candidate",
+        "finding_ref": "FIND-2026-10-11-016"
+      }
+    ],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "agent_de543238-1c28-4c70-ad43-e7d127202527",
+    "reviewed_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "local_checks": [
+      "Client-side replay journal with 24h TTL and 50-entry cap",
+      "Server-side single-use enforcement not verifiable from mobile repo",
+      "Comment in code: 'Best-effort; server enforces single-use.'"
+    ],
+    "result_fingerprints": [
+      "sha256:web-backend-handoff-token-single-use-not-verifiable-mobile-repo"
+    ],
+    "unresolved": [
+      "Server-side single-use enforcement verification required"
+    ]
+  },
+  {
+    "coverage_id": "google-idtoken-server-validation::server-enforcement::src/lib/auth/mobileApi.ts::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "canonical_refs": {
+      "surface": "src/lib/auth/mobileApi.ts#googleNativeSignIn",
+      "boundary": "Mobile App → Web Backend (/api/mobile/google-native) ID token validation",
+      "subsystem": "src/lib/auth",
+      "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    },
+    "surface": "Web backend Google ID token validation (server-side)",
+    "boundary": "Mobile App → Web Backend (/api/mobile/google-native) ID token validation",
+    "subsystem": "src/lib/auth",
+    "attack_class": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "starting_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "ordinary_attack_class_block": "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+    "selected_companion_blocks": [
+      "WEB-PROTOCOL-AND-AUTH.md#Core discipline",
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "WEB-PROTOCOL-AND-AUTH.md#Universal moves",
+      "WEB-PROTOCOL-AND-AUTH.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_needs_validation",
+    "attempts": [
+      {
+        "agent_id": "agent_6cdfaa09-7a68-4d02-abc2-a16e4f803192",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "candidate",
+        "finding_ref": "FIND-2026-10-11-017"
+      }
+    ],
+    "wave": 1,
+    "status": "candidate",
+    "agent_id": "agent_6cdfaa09-7a68-4d02-abc2-a16e4f803192",
+    "reviewed_paths": [
+      "src/lib/auth/AuthContext.tsx",
+      "src/lib/auth/mobileApi.ts"
+    ],
+    "local_checks": [
+      "Raw ID token sent without client-side validation",
+      "Server-side validation (aud/iss/exp/sig) not verifiable from mobile repo",
+      "Hardcoded webClientId fallback in GoogleSignin.configure"
+    ],
+    "result_fingerprints": [
+      "google-idtoken-server-validation::mobile-trusts-server-validation::authcontext-webclientid-hardcoded"
+    ],
+    "unresolved": [
+      "Server-side ID token validation verification required"
+    ]
+  },
+  {
+    "coverage_id": "android-backup-rules::xml-content::android/app/src/main/res/xml/secure_store_backup_rules.xml::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "canonical_refs": {
+      "surface": "android/app/src/main/res/xml/secure_store_backup_rules.xml",
+      "boundary": "Device (USB/ADB) → App Private Storage (backup rules)",
+      "subsystem": "android/app/src/main",
+      "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch"
+    },
+    "surface": "Android backup rules XML content (secure_store_backup_rules.xml)",
+    "boundary": "Device (USB/ADB) → App Private Storage (backup rules)",
+    "subsystem": "android/app/src/main",
+    "attack_class": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "starting_paths": [
+      "android/app/src/main/res/xml/secure_store_backup_rules.xml",
+      "android/app/src/main/res/xml/secure_store_data_extraction_rules.xml"
+    ],
+    "ordinary_attack_class_block": "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+    "selected_companion_blocks": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Core discipline",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Universal moves",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "prior_needs_validation",
+    "attempts": [
+      {
+        "agent_id": "agent_ba586273-8d73-42a2-8715-06e005d0844c",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-003"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_ba586273-8d73-42a2-8715-06e005d0844c",
+    "reviewed_paths": [
+      "android/app/src/main/res/xml/secure_store_backup_rules.xml",
+      "android/app/src/main/res/xml/secure_store_data_extraction_rules.xml"
+    ],
+    "local_checks": [
+      "Both XML files use wildcard include for sharedprefs (path=\".\")",
+      "Only SecureStore is explicitly excluded",
+      "All other SharedPreferences data included in backups"
+    ],
+    "result_fingerprints": [
+      "android-backup-rules:sharedpref-wildcard-include:secure_store_backup_rules.xml+secure_store_data_extraction_rules.xml"
+    ],
+    "unresolved": []
+  },
+  {
+    "coverage_id": "screen-capture::prevention::app/_layout.tsx::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Obvious things",
+    "canonical_refs": {
+      "surface": "app/_layout.tsx#ScreenCapture.preventScreenCaptureAsync",
+      "boundary": "App UI → Screenshot/Screen Recording",
+      "subsystem": "app",
+      "attack_class": "ATTACK-CLASSES.md#Obvious things"
+    },
+    "surface": "Screen capture prevention (expo-screen-capture)",
+    "boundary": "App UI → Screenshot/Screen Recording",
+    "subsystem": "app",
+    "attack_class": "ATTACK-CLASSES.md#Obvious things",
+    "starting_paths": [
+      "app/_layout.tsx"
+    ],
+    "ordinary_attack_class_block": "ATTACK-CLASSES.md#Obvious things",
+    "selected_companion_blocks": [
+      "ATTACK-CLASSES.md#Core discipline",
+      "ATTACK-CLASSES.md#Obvious things",
+      "ATTACK-CLASSES.md#Universal moves",
+      "ATTACK-CLASSES.md#Validation rules"
+    ],
+    "excluded_blocks": [],
+    "prior_status": "new",
+    "attempts": [
+      {
+        "agent_id": "agent_6184fdc3-9b39-498f-aae1-a0730c2be128",
+        "timestamp": "2026-10-11T00:00:00Z",
+        "status": "confirmed",
+        "finding_ref": "FIND-2026-10-11-018"
+      }
+    ],
+    "wave": 1,
+    "status": "covered",
+    "agent_id": "agent_6184fdc3-9b39-498f-aae1-a0730c2be128",
+    "reviewed_paths": [
+      "app/_layout.tsx",
+      "package.json",
+      "src/components/auth/RecoveryKeyOnce.tsx",
+      "app/(auth)/signup.tsx",
+      "app/(auth)/login.tsx",
+      "app/(auth)/lock.tsx",
+      "app/(auth)/forgot-password.tsx"
+    ],
+    "local_checks": [
+      "Global preventScreenCaptureAsync() in app/_layout.tsx useEffect",
+      "Applies to ALL screens including auth, recovery key display, lock screen",
+      "expo-screen-capture dependency present and used correctly"
+    ],
+    "result_fingerprints": [
+      "sha256:screen-capture-global-prevention-implemented-v1"
+    ],
+    "unresolved": []
+  }
+]

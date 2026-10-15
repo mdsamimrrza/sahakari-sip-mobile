@@ -1,0 +1,19 @@
+{
+  "fingerprint": "sha256:screen-capture-global-prevention-implemented-v1",
+  "boundary_crossed": "App UI → Screenshot/Screen Recording (expo-screen-capture FLAG_SECURE boundary)",
+  "lower_trust_principal": "Malicious app / screen recorder / screenshot tool / shoulder surfer",
+  "affected_principal_resource": "All app screens including auth (login, signup, forgot-password, lock), recovery key display (RecoveryKeyOnce), and authenticated app screens",
+  "concrete_result": "Screen capture prevention IS properly implemented globally at the app root level via expo-screen-capture.preventScreenCaptureAsync() in app/_layout.tsx. The protection applies to ALL screens including sensitive ones (auth flows, recovery key display). No vulnerability found - implementation is correct and complete.",
+  "evidence": [
+    "app/_layout.tsx:23 - import * as ScreenCapture from \"expo-screen-capture\"",
+    "app/_layout.tsx:46-51 - useEffect calls ScreenCapture.preventScreenCaptureAsync() on mount with cleanup",
+    "package.json - \"expo-screen-capture\": \"~57.0.3\" dependency present",
+    "src/components/auth/RecoveryKeyOnce.tsx - Recovery key display (shown once after device-mode signup or legacy upgrade) is protected by global FLAG_SECURE",
+    "app/(auth)/signup.tsx:160-177 - RecoveryKeyOnce rendered when recoveryKey state is set",
+    "app/(auth)/login.tsx:187-199 - RecoveryKeyOnce rendered when recoveryKey state is set (legacy upgrade)",
+    "app/(auth)/lock.tsx - Biometric lock screen protected",
+    "app/(auth)/forgot-password.tsx - Password reset with recovery key input protected"
+  ],
+  "severity_assessment": "INFO - Control properly implemented, no vulnerability",
+  "needs_validation": false
+}

@@ -1,0 +1,38 @@
+{
+  "run_id": "sahakarisip-2026-10-10-001",
+  "repo": "sahakari-sip-mobile",
+  "target": "C:/Users/samim_40uxmfb/Desktop/deplyed project/sipapk",
+  "source_ref": "6ef5dad (v1.5.5, versionCode 15, clean worktree)",
+  "profile": "standard",
+  "scope_paths": [
+    "app/",
+    "src/",
+    "android/app/src/main/",
+    ".github/workflows/",
+    "package.json",
+    "app.json",
+    ".env.example"
+  ],
+  "execution_policy": "sandboxed-source-and-local-only",
+  "run_status": "completed",
+  "completed_at": "2026-10-11",
+  "findings_count": {
+    "confirmed": 13,
+    "needs_validation": 7,
+    "rejected": 0
+  },
+  "severity_breakdown": {
+    "critical": 2,
+    "high": 5,
+    "medium": 3,
+    "low": 2,
+    "informational": 1
+  },
+  "coverage_units": {
+    "planned": 21,
+    "covered": 14,
+    "candidate": 7,
+    "deferred": 0,
+    "out_of_scope": 0
+  }
+}

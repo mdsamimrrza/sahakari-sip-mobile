@@ -1,0 +1,18 @@
+{
+  "fingerprint": "sha256:csv-import-naive-parser-no-size-limit",
+  "boundary_crossed": "User Input (CSV file) → Parsed Data → Validated Entries → Database",
+  "lower_trust_principal": "Untrusted user-supplied CSV file via expo-document-picker",
+  "affected_principal_resource": "SahakariSIP entries table (Supabase/AsyncStorage), fund NAV history, dashboard computations",
+  "concrete_result": "Malicious CSV can cause: (1) Column misalignment via quoted commas/newlines bypassing naive split(',') parser, leading to amount/nav/date field confusion and invalid data insertion; (2) DoS via unbounded file read into memory (no size limit, only post-parse row cap); (3) Data corruption via scientific notation in numeric fields (z.coerce.number accepts '1e100') causing overflow in downstream financial calculations; (4) Date parsing inconsistency across JS engines via new Date(val) accepting locale-dependent formats.",
+  "evidence": [
+    "src/components/entries/CsvImportModal.tsx:70-148 — parseCsv() uses split(',') without RFC 4180 support (no quoted field handling, no escaped quotes, no embedded newlines)",
+    "src/components/entries/CsvImportModal.tsx:162 — FileSystem.readAsStringAsync(asset.uri) reads entire file with no size limit",
+    "src/components/entries/CsvImportModal.tsx:68 — MAX_IMPORT_ROWS=2000 only limits rows after parsing, not file size",
+    "src/lib/schemas/entry.ts:54-57 — date validation uses new Date(val) which accepts ambiguous formats",
+    "src/lib/schemas/entry.ts:58-60 — z.coerce.number() accepts scientific notation (e.g., '1e1000' → Infinity, caught by .finite(); but '1e10' → 10000000000 passes)",
+    "src/lib/data/cloud.ts:630-722 — importEntriesFromCsv validates via csvRowSchema.safeParse but trusts parsed output",
+    "src/lib/data/local.ts:552-641 — importEntriesFromCsv same validation path as cloud"
+  ],
+  "severity_assessment": "HIGH",
+  "needs_validation": true
+}

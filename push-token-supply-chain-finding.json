@@ -1,0 +1,22 @@
+{
+  "fingerprint": "push-token-admin-backend-hardcoded-no-auth-2026",
+  "boundary_crossed": "Mobile App → Admin Backend (push token registration)",
+  "lower_trust_principal": "Admin backend (https://master-admin-delta.vercel.app) - external Vercel deployment not under app control",
+  "affected_principal_resource": "User's Expo push token + userId (PII + notification capability)",
+  "concrete_result": "Push tokens are sent to a hardcoded admin backend URL with no authentication, no authorization, no response validation, and the backend URL is not configurable via environment variables. An attacker who compromises the Vercel deployment or hijacks the domain can harvest all users' push tokens and send arbitrary notifications. The push token is a bearer credential - anyone with it can send pushes to that device.",
+  "evidence": [
+    "src/lib/notifications/push-registration.ts:46 - Hardcoded ADMIN_PUSH_TOKEN_URL = \"https://master-admin-delta.vercel.app/api/mobile/push-token\"",
+    "src/lib/notifications/push-registration.ts:86-94 - POST request sends {token, userId, platform} with only Content-Type header, no Authorization",
+    "src/lib/notifications/push-registration.ts:115-119 - DELETE request sends {token, userId} with no authentication",
+    "src/lib/notifications/push-registration.ts:95 - Only checks res.ok, no response body validation",
+    ".env:6 - API_URL=https://master-admin-delta.vercel.app exists but is NOT used in push-registration.ts"
+  ],
+  "severity_assessment": "High",
+  "needs_validation": [
+    "Whether the admin backend at master-admin-delta.vercel.app implements any authentication/authorization for the push-token endpoint",
+    "Whether the admin backend validates the userId matches the authenticated session",
+    "Whether push tokens are stored encrypted at rest in the admin backend",
+    "Whether the Vercel deployment has proper access controls and audit logging",
+    "Whether certificate pinning or mTLS is used for this connection"
+  ]
+}

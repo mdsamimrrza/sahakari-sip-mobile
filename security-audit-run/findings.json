@@ -1,0 +1,718 @@
+[
+  {
+    "finding_id": "FIND-2026-10-11-001",
+    "fingerprint": "oauth-handoff-replay-via-captured-nonce",
+    "status": "needs_validation",
+    "title": "OAuth Handoff Token Replay - Server-Side Single-Use Enforcement Not Verifiable",
+    "severity": null,
+    "boundary": "Mobile App → Web Backend (/api/mobile/exchange)",
+    "lower_trust_principal": "Attacker with access to deep link token (clipboard, notification preview, browser history, logs)",
+    "affected_resource": "User's Google OAuth session / Supabase RLS JWT / Cloud account access",
+    "attack_scenario": "Attacker captures the 32-char hex handoff nonce from clipboard, notification preview, or browser history and replays it to /api/mobile/exchange to obtain a valid Supabase RLS JWT, granting full cloud account access.",
+    "evidence": [
+      "src/lib/auth/AuthContext.tsx:270-293 — USED_HANDOFF_TOKENS_KEY journal, markHandoffTokenUsed/isHandoffTokenUsed with 24h TTL and 50-entry cap; comment 'Best-effort; server enforces single-use'",
+      "src/lib/auth/AuthContext.tsx:997-1027 — completeGoogleHandoff checks isHandoffTokenUsed BEFORE googleExchange, marks AFTER success (non-atomic check-then-act)",
+      "src/lib/auth/AuthContext.tsx:1040-1057 — Linking listener cold-start path extracts token from sahakarisip://auth/callback?token= and calls googleHandoffRef.current directly",
+      "app/(auth)/auth/callback.tsx:31-38 — Warm handoff path: resolveGoogleHandoff resolves waiters, callback screen reflects resulting auth state",
+      "src/lib/auth/mobileApi.ts:87-94 — googleStart generates 32-char hex nonce client-side via expo-crypto getRandomBytes(16)",
+      "src/lib/auth/mobileApi.ts:97-100 — googleExchange POSTs nonce to /api/mobile/exchange; no client-side proof of server-side single-use"
+    ],
+    "root_cause": "Critical single-use enforcement relies on server-side logic in separate repository (sahakari-sip web backend) that cannot be audited from mobile codebase. Client-side journal is best-effort only.",
+    "recommended_remediation": "Add server-side audit to verify /api/mobile/exchange atomically consumes and invalidates the handoff token. Implement nonce binding to device fingerprint or session. Consider PKCE for mobile OAuth flows.",
+    "needs_validation": [
+      "Verify web backend /api/mobile/exchange implements atomic single-use consumption",
+      "Confirm token invalidation on first use (prevents replay)",
+      "Check if web backend binds nonce to IP/user-agent/device",
+      "Verify web backend rate-limits exchange endpoint"
+    ],
+    "companion_refs": [
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding",
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Deep-link, callback, and navigation attack classes"
+    ],
+    "coverage_units": [
+      "deep-link::oauth-handoff::src/lib/auth/AuthContext.tsx::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_016793ee-f493-4794-957b-c3d9b2cd98bf",
+    "validated_at": null
+  },
+  {
+    "finding_id": "FIND-2026-10-11-002",
+    "fingerprint": "native-google-signin:idtoken-server-validation-missing:src/lib/auth/AuthContext.tsx:1097-1113:src/lib/auth/mobileApi.ts:109-114",
+    "status": "needs_validation",
+    "title": "Native Google Sign-In - Server-Side ID Token Validation Not Verifiable",
+    "severity": null,
+    "boundary": "Mobile App → Web Backend (/api/mobile/google-native)",
+    "lower_trust_principal": "Mobile App (untrusted client running on user device)",
+    "affected_resource": "Web Backend authentication service / user accounts in next_auth.users",
+    "attack_scenario": "If the web backend /api/mobile/google-native fails to verify the ID token's aud/iss/exp/signature, an attacker with a valid Google ID token for a different audience (or a forged token) could authenticate as any user.",
+    "evidence": [
+      "src/lib/auth/AuthContext.tsx:1097 — hardcoded webClientId fallback used in GoogleSignin.configure()",
+      "src/lib/auth/AuthContext.tsx:1102 — idToken extracted from userInfo.data?.idToken",
+      "src/lib/auth/AuthContext.tsx:1103-1108 — only null/undefined check, no JWT validation",
+      "src/lib/auth/AuthContext.tsx:1113 — googleNativeSignIn(idToken) called with raw token",
+      "src/lib/auth/mobileApi.ts:109-114 — googleNativeSignIn() POSTs {idToken} to /google-native"
+    ],
+    "root_cause": "Mobile client sends raw Google ID token without client-side validation of audience, issuer, expiry, or signature. Server-side validation at web backend cannot be verified from mobile repository.",
+    "recommended_remediation": "Add server-side audit to verify /api/mobile/google-native validates: aud=webClientId, iss=accounts.google.com, exp > now, valid Google signature. Consider client-side pre-validation as defense-in-depth.",
+    "needs_validation": [
+      "Verify web backend /api/mobile/google-native validates ID token aud/iss/exp/signature",
+      "Confirm webClientId matches Google Cloud Console Android client config",
+      "Check if web backend uses Google's tokeninfo endpoint or local JWKS verification"
+    ],
+    "companion_refs": [
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "coverage_units": [
+      "native-google-signin::google-idtoken-validation::src/lib/auth/AuthContext.tsx::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_38021752-296a-4efe-b64b-3f172960829a",
+    "validated_at": null
+  },
+  {
+    "finding_id": "FIND-2026-10-11-003",
+    "fingerprint": "adb-backup-asyncstorage-jwt-exfiltration",
+    "status": "confirmed",
+    "title": "Android ADB Backup Exfiltrates Supabase JWT and Device-Local Credentials via SharedPreferences",
+    "severity": "high",
+    "boundary": "Device (USB/ADB) → App Private Storage",
+    "lower_trust_principal": "Physical device holder with ADB/USB access",
+    "affected_resource": "Supabase RLS JWT (accessToken), device-local password hashes/vault metadata, session identity, OAuth replay tokens",
+    "attack_scenario": "Attacker with physical device access runs 'adb backup -all com.samimrrza.sahakarisip' and extracts the backup. Using abe.jar, they unpack the backup and read all SharedPreferences including sahakarisip.v1.mobile_session (Supabase RLS JWT), sahakarisip.v1.session (user identity), sahakarisip.v1.profiles (password hashes/salts/vault), and sahakarisip.v1.used_handoff_tokens.",
+    "evidence": [
+      "android/app/src/main/AndroidManifest.xml:20 — android:allowBackup=\"false\" with comment warning expo prebuild reverts it",
+      "android/app/src/main/res/xml/secure_store_backup_rules.xml:5-6 — <include domain=\"sharedpref\" path=\".\"/> <exclude domain=\"sharedpref\" path=\"SecureStore\"/>",
+      "android/app/src/main/res/xml/secure_store_data_extraction_rules.xml:6-7,10-11 — Same include-all sharedprefs pattern for cloud-backup and device-transfer",
+      "src/lib/auth/mobileSession.ts:35,55-81 — SESSION_KEY=\"sahakarisip.v1.mobile_session\" stores MobileSession with accessToken (Supabase RLS JWT) and expiresAt in AsyncStorage",
+      "src/lib/auth/AuthContext.tsx:190-192,420-429 — SESSION_KEY=\"sahakarisip.v1.session\" stores AppUser (id, email, name, avatarUrl, mode) and SESSION_STARTED_KEY timestamp in AsyncStorage",
+      "src/lib/auth/AuthContext.tsx:233-244 — PROFILES_KEY=\"sahakarisip.v1.profiles\" stores LocalProfile[] with salt, hash, iterations, vault (wrapped DEKs) in AsyncStorage",
+      "src/lib/auth/AuthContext.tsx:272-292 — USED_HANDOFF_TOKENS_KEY=\"sahakarisip.v1.used_handoff_tokens\" stores replay-protection tokens in AsyncStorage",
+      "src/lib/auth/local-vault.ts:32,178-188 — SECURESTORE_PREFIX=\"sahakarisip.v1.dek.\" stores DEKs in SecureStore (correctly excluded)"
+    ],
+    "root_cause": "Backup rules explicitly include all SharedPreferences (domain=sharedpref path=.) while only excluding SecureStore. The only protection is android:allowBackup=false which expo prebuild reverts to true.",
+    "recommended_remediation": "Change backup rules to exclude all sahakarisip.* SharedPreferences keys. Add explicit <exclude domain=\"sharedpref\" path=\"sahakarisip\"/> rules. Add CI check to prevent allowBackup=true in Manifest. Store all sensitive data in SecureStore/Keystore, not AsyncStorage.",
+    "needs_validation": [],
+    "companion_refs": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch"
+    ],
+    "coverage_units": [
+      "adb-backup::android-backup::android/app/src/main/AndroidManifest.xml::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch",
+      "android-backup-rules::xml-content::android/app/src/main/res/xml/secure_store_backup_rules.xml::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_2792f495-e28d-4a2f-91fc-a25c0f2e6c3e",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-004",
+    "fingerprint": "4cf29e0ed8000e75",
+    "status": "needs_validation",
+    "title": "Supabase RLS Data Isolation - Server-Side Policies Not Verifiable",
+    "severity": null,
+    "boundary": "Supabase (Postgres) → User Data",
+    "lower_trust_principal": "Mobile client (untrusted code running on user device)",
+    "affected_resource": "All user portfolio data (fund_config, entries, nav_history, notification_preferences, notifications_log)",
+    "attack_scenario": "If Supabase RLS policies are missing, disabled, or misconfigured on any table, a malicious client with a valid JWT could read/write any user's data by manipulating the user_id in queries.",
+    "evidence": [
+      "src/lib/data/cloud.ts:62-65 getUserId() reads session.user.id from mobileSession",
+      "src/lib/data/cloud.ts:76-78 db getter uses getSupabase() which injects Bearer token via accessToken hook",
+      "src/lib/supabase.ts:58-63 createClient with accessToken: () => getMobileBearer()",
+      "src/lib/auth/mobileSession.ts:94-97 getMobileBearer() returns session.accessToken (RLS JWT)",
+      "src/lib/data/cloud.ts:91-92, 102-106, 112-116, 122-125, 131-137 All dashboard queries filter .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:237-242 getFundConfigs filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:262-281 createFundConfig inserts user_id: userId",
+      "src/lib/data/cloud.ts:311-316 updateFundConfig selects .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:369-373 deleteFundConfig counts .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:452-455 getEntries filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:497-509 createEntry inserts user_id: userId",
+      "src/lib/data/cloud.ts:569-582 updateEntry filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:618-622 deleteEntry filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:687 importEntriesFromCsv inserts user_id: userId in each row",
+      "src/lib/data/cloud.ts:728-734 getFundRolloverCash filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:764-770 getNavHistory filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:787-791 nav_reference query has NO user_id filter (by design - shared market data)",
+      "src/lib/data/cloud.ts:823-827 getNotificationPreferences filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:851-853 saveNotificationPreferences upserts with user_id: userId LAST",
+      "src/lib/data/cloud.ts:871-876 getNotifications filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:889-893 markNotificationRead filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:905-908 markAllNotificationsRead filters .eq('user_id', userId)",
+      "src/lib/data/cloud.ts:939-942 deleteAllUserData uses .in('user_id', ids) for both id spaces",
+      "src/lib/data/cloud.ts:972-976 getProfile filters .eq('id', userId) on users table",
+      "supabase-enable-rls.sql:30-35 ALTER TABLE ... ENABLE ROW LEVEL SECURITY for 5 tables",
+      "supabase-enable-rls.sql:42-52 Policies use user_id = public.app_effective_user_id()",
+      "supabase-fix-user-mapping.sql:81-97 Policies for fund_config, entries, nav_history use app_effective_user_id()",
+      "supabase-verify-rls.sql:29-47 Query 1 verifies rls_enabled = true on all 5 tables",
+      "supabase-verify-rls.sql:136-153 Query 7 verifies anon role sees ZERO rows without JWT",
+      "NEEDS-VALIDATION.md:28-46 NEEDS-VAL-002 documents RLS policies cannot be verified from source"
+    ],
+    "root_cause": "Application code correctly filters by user_id but actual enforcement lives in Supabase RLS policies (deployed SQL, not in this repo). The mobile repo cannot verify RLS configuration.",
+    "recommended_remediation": "Deploy Supabase RLS verification scripts (supabase-verify-rls.sql) in CI/CD. Add integration tests that verify cross-user isolation with multiple test users. Document RLS policies in repo as SQL migrations for auditability.",
+    "needs_validation": [
+      "Run supabase-verify-rls.sql against production Supabase project",
+      "Verify all user tables have RLS enabled and correct policies",
+      "Test cross-user isolation with two test accounts",
+      "Confirm Storage RLS policies for avatars bucket"
+    ],
+    "companion_refs": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement"
+    ],
+    "coverage_units": [
+      "supabase-rls::data-isolation::src/lib/data/cloud.ts::DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_b50bdc36-2a04-4825-a847-03ecf9e81c8c",
+    "validated_at": null
+  },
+  {
+    "finding_id": "FIND-2026-10-11-005",
+    "fingerprint": "profile-photo-upload-mime-trust-cloudts-1000",
+    "status": "needs_validation",
+    "title": "Profile Photo Upload - Client-Side MIME Trust Without Server Enforcement",
+    "severity": null,
+    "boundary": "User Input (File) → Supabase Storage → Browser Rendering",
+    "lower_trust_principal": "Authenticated mobile app user (client-controlled file URI and MIME type)",
+    "affected_resource": "Supabase Storage 'avatars' bucket; public avatar URLs served to web app users via <img> tags",
+    "attack_scenario": "Attacker uploads HTML/JS file with spoofed image MIME type. If Supabase Storage bucket policies don't enforce content-type on upload/serve, the file executes in web app browser context when avatar is rendered via public URL.",
+    "evidence": [
+      "src/lib/data/cloud.ts:989-1048 (updateProfileImage)",
+      "src/lib/data/cloud.ts:995-996 (fetch URI → blob, no content inspection)",
+      "src/lib/data/cloud.ts:997-998 (size check only)",
+      "src/lib/data/cloud.ts:1000-1003 (allowlist validates client-supplied mimeType parameter)",
+      "src/lib/data/cloud.ts:1005 (extension derived from trusted mimeType)",
+      "src/lib/data/cloud.ts:1021-1026 (upload with contentType: mimeType)",
+      "src/lib/data/cloud.ts:1032-1033 (public URL used directly)",
+      "src/components/settings/profile-image-manager.tsx:67 (mimeType = asset.mimeType || 'image/jpeg')",
+      "src/lib/profilePhoto.ts:61-66 (picker validation trusts asset.mimeType/asset.name)",
+      "Supabase Storage bucket policies for 'avatars' NOT in repository"
+    ],
+    "root_cause": "Client-side MIME validation trusts attacker-controlled asset.mimeType; no magic-byte validation; file uploaded with client-supplied contentType. Server-side Storage policies not verifiable from mobile repo.",
+    "recommended_remediation": "Add magic-byte validation (check file header) before upload. Configure Supabase Storage bucket policies to enforce content-type on upload and serve. Serve avatars through a proxy that sets correct Content-Type and CSP headers.",
+    "needs_validation": [
+      "Confirm Supabase Storage 'avatars' bucket policies: does upload enforce content-type? Does download serve correct Content-Type header?",
+      "Verify web app renders avatar URLs via <img> tags (same Supabase project)",
+      "Test if spoofed MIME type with HTML content executes in browser when accessed via public URL",
+      "Check if Supabase Storage normalizes/overrides content-type on serve"
+    ],
+    "companion_refs": [
+      "WEB-PROTOCOL-AND-AUTH.md#File upload and content-type validation"
+    ],
+    "coverage_units": [
+      "profile-photo-upload::file-upload::src/lib/data/cloud.ts::WEB-PROTOCOL-AND-AUTH.md#File upload and content-type validation"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_59af6249-5d13-47f2-b7d2-72775e2f7c58",
+    "validated_at": null
+  },
+  {
+    "finding_id": "FIND-2026-10-11-006",
+    "fingerprint": "local-vault::envelope-encryption::pbkdf2-100k-iterations-inadequate-2026",
+    "status": "confirmed",
+    "title": "Local Vault - PBKDF2 Iterations (100k) Below 2026 Security Baseline",
+    "severity": "medium",
+    "boundary": "Device User → Local Encrypted Vault",
+    "lower_trust_principal": "Attacker with vault metadata (salt, wrapped DEK) and offline compute",
+    "affected_resource": "User's password-wrapped DEK (and all local vault data)",
+    "attack_scenario": "Attacker extracts the vault metadata (wrap_salt, wrapped_dek_password) from AsyncStorage and performs offline brute-force attack on the password. At 100k iterations, PBKDF2-HMAC-SHA256 is ~6x below 2024-2026 baseline (NIST SP 800-63B: 600k; OWASP: 600k minimum), reducing effective password entropy by ~2.5 bits.",
+    "evidence": [
+      "src/lib/auth/local-vault.ts:29 — const WRAP_ITERATIONS = 100_000",
+      "src/lib/auth/local-vault.ts:88-90 — passwordWrapKeyBytes uses pbkdf2Bytes with WRAP_ITERATIONS",
+      "src/lib/auth/nativeCrypto.ts:82-93 — pbkdf2Bytes calls quickCrypto().pbkdf2Sync (native) / WebCrypto (web) with iterations parameter"
+    ],
+    "root_cause": "PBKDF2 iteration count of 100,000 was adequate ~2018 but is significantly below current 2026 baselines (600k+). The native crypto shim (react-native-quick-crypto) supports higher iterations.",
+    "recommended_remediation": "Increase WRAP_ITERATIONS to 600,000 (OWASP 2026 minimum) or 1,000,000 (NIST SP 800-63B). Test performance impact on target devices. Add versioning to vault format to allow iterative upgrades for existing users.",
+    "needs_validation": [],
+    "companion_refs": [
+      "ATTACK-CLASSES.md#Obvious things"
+    ],
+    "coverage_units": [
+      "local-vault::envelope-encryption::src/lib/auth/local-vault.ts::ATTACK-CLASSES.md#Obvious things"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_d8c56443-3a44-443a-a088-82534c06e58d",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-007",
+    "fingerprint": "biometric-ttl-reset-without-server-revalidation",
+    "status": "confirmed",
+    "title": "Biometric Unlock Resets Client TTL Without Server-Side Token Validation",
+    "severity": "medium",
+    "boundary": "OS Biometric Prompt → SecureStore Session Entry → Supabase RLS JWT",
+    "lower_trust_principal": "Local biometric sensor / OS authentication subsystem",
+    "affected_resource": "MobileSession (Supabase RLS JWT + user identity) stored in SecureStore",
+    "attack_scenario": "User's JWT is revoked server-side (password change, admin revoke, security event). User authenticates via biometric; app restores stale JWT from SecureStore and resets client-side 4-hour TTL without any server-side token validation. The user remains authenticated until a Supabase request fails.",
+    "evidence": [
+      "src/lib/auth/biometric.ts:106 disableDeviceFallback: true correctly prevents PIN/pattern fallback",
+      "src/lib/auth/biometric.ts:53-56 SecureStore.setItemAsync stores BiometricEntry with mobileSession (JWT) or localProfileId — Keystore/Enclave backed",
+      "src/lib/auth/AuthContext.tsx:650-654 unlockWithBiometric checks entry.mobileSession.expiresAt <= now (JWT expiry) before restore",
+      "src/lib/auth/AuthContext.tsx:658-660 TTL reset: new SESSION_STARTED_KEY written after biometric unlock, granting fresh 4-hour window",
+      "src/lib/auth/AuthContext.tsx:1359 signOut calls clearBiometricEntry() — biometric entry does NOT survive explicit signOut",
+      "src/lib/auth/AuthContext.tsx:1380-1415 expireSession stashes current mobileSession to biometric entry on TTL expiry, then sets status=locked for biometric re-auth"
+    ],
+    "root_cause": "Stateless JWT design means server-side revocation cannot be instantly enforced on biometric unlock. The app trusts the stored JWT until a Supabase request fails.",
+    "recommended_remediation": "On biometric unlock, make a lightweight Supabase API call (e.g., getUser()) to validate the JWT is still active before resetting TTL. Implement short JWT lifetime (15-30 min) with refresh token rotation for better revocation granularity.",
+    "needs_validation": [
+      "Confirm JWT lifetime (expiresAt) aligns with acceptable staleness window",
+      "Verify Supabase RLS JWT revocation propagation latency",
+      "Assess whether 4-hour client TTL + biometric TTL reset extends session beyond intended maximum"
+    ],
+    "companion_refs": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary"
+    ],
+    "coverage_units": [
+      "biometric-unlock::secure-session::src/lib/auth/biometric.ts::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_e2d9aabc-55c5-4df0-b797-f92fc7edd904",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-008",
+    "fingerprint": "sipapk-session-ttl-foreground-only-check",
+    "status": "confirmed",
+    "title": "Session TTL Only Enforced on Foreground Transition - Bypass by Keeping App Active",
+    "severity": "high",
+    "boundary": "App Runtime → Session State (absolute 4-hour TTL boundary)",
+    "lower_trust_principal": "Attacker with physical access to unlocked device (or malware with foreground execution)",
+    "affected_resource": "User session (cloud Supabase RLS JWT or local vault DEK)",
+    "attack_scenario": "Attacker with physical access to unlocked device keeps the app in foreground continuously. The absolute 4-hour TTL is only checked on AppState background→active transition. The session never expires, effectively bypassing the banking-style absolute expiry guarantee.",
+    "evidence": [
+      "src/lib/auth/AuthContext.tsx:257-261 (SESSION_TTL_MS = 4*60*60*1000 constant)",
+      "src/lib/auth/AuthContext.tsx:386-418 (AppState listener — TTL check ONLY at lines 391-400 when nextState==='active' AND prev!=='active')",
+      "src/lib/auth/AuthContext.tsx:1380-1418 (expireSession — biometric stash vs full logout)",
+      "src/lib/auth/AuthContext.tsx:698-700 (bootstrap also checks TTL on cold start)"
+    ],
+    "root_cause": "TTL enforcement is event-driven (AppState change) rather than time-driven (periodic timer). Biometric users get effective session extension via stashed re-auth.",
+    "recommended_remediation": "Add a periodic timer (e.g., setInterval every 5 min) that checks TTL regardless of AppState. On TTL expiry, call expireSession immediately even in foreground. This enforces the absolute 4-hour boundary as documented.",
+    "needs_validation": [],
+    "companion_refs": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary"
+    ],
+    "coverage_units": [
+      "session-ttl::absolute-expiry::src/lib/auth/AuthContext.tsx::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Session and token boundary"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_5893f497-5c13-4dc9-ade4-9562ddac5862",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-009",
+    "fingerprint": "local-password-reset:recovery-key:plaintext-display-and-input-without-screen-capture-protection",
+    "status": "confirmed",
+    "title": "Recovery Key Displayed/Entered in Plaintext Without Screen Capture Protection",
+    "severity": "high",
+    "boundary": "Device User → Recovery Key Input → Vault DEK",
+    "lower_trust_principal": "Device User (shoulder-surfer, screenshot/recording malware, clipboard-accessing apps)",
+    "affected_resource": "Device-local account vault DEK (full decryption of all local portfolio data)",
+    "attack_scenario": "The 128-bit recovery key is displayed in plaintext at signup (large font, bold) and entered in plaintext during password reset (no secureTextEntry). No screen capture prevention is active despite expo-screen-capture being installed. Clipboard copy exposes key to system clipboard. Attacker with visual access or clipboard access captures the recovery key and fully decrypts the local vault.",
+    "evidence": [
+      "src/lib/auth/AuthContext.tsx:936-954 — signUp creates vault and returns recoveryKey in AuthResult",
+      "src/lib/auth/AuthContext.tsx:1257-1312 — resetLocalPassword accepts recoveryKey in plaintext, calls unwrapWithRecoveryKey",
+      "src/components/auth/RecoveryKeyOnce.tsx:29 — Clipboard.setStringAsync(recoveryKey) copies key to system clipboard",
+      "src/components/auth/RecoveryKeyOnce.tsx:79 — Recovery key rendered in plaintext: {recoveryKey} with fontSize: lg, fontWeight: 800",
+      "app/(auth)/signup.tsx:117-122,160-177 — On device-mode signup, recoveryKey stored in state and RecoveryKeyOnce rendered",
+      "app/(auth)/login.tsx:227-234 — Forgot password recovery key Input lacks secureTextEntry, autoCapitalize=characters",
+      "app/(auth)/login.tsx:201-268 — Forgot password flow for local mode displays recovery key input in plaintext",
+      "package.json — expo-screen-capture:~57.0.3 installed but NOT imported/used anywhere in src/",
+      "src/lib/auth/local-vault.ts:62-64,67-69,140-151 — Recovery key normalized, SHA-256 hashed for verification, used directly as AES-256-GCM key wrapper"
+    ],
+    "root_cause": "Recovery key displayed and entered in plaintext without secureTextEntry or screen capture protection. expo-screen-capture is installed but preventScreenCaptureAsync() is never called.",
+    "recommended_remediation": "Add secureTextEntry to recovery key input fields. Call ScreenCapture.preventScreenCaptureAsync() on screens displaying/entering recovery key. Remove clipboard copy or make it optional with clear warning. Mask recovery key display (show only first/last 4 chars).",
+    "needs_validation": [],
+    "companion_refs": [
+      "DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch"
+    ],
+    "coverage_units": [
+      "local-password-reset::recovery-key::src/lib/auth/AuthContext.tsx::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Credential-store and local-secret boundary mismatch"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_2f0813a4-5a46-4b56-b02c-d04c67bc15b4",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-010",
+    "fingerprint": "sha256:csv-import-naive-parser-no-size-limit",
+    "status": "confirmed",
+    "title": "CSV Import - Naive Parser (split) Without RFC 4180 Support, No File Size Limit",
+    "severity": "high",
+    "boundary": "User Input (CSV file) → Parsed Data → Validated Entries → Database",
+    "lower_trust_principal": "Untrusted user-supplied CSV file via expo-document-picker",
+    "affected_resource": "SahakariSIP entries table (Supabase/AsyncStorage), fund NAV history, dashboard computations",
+    "attack_scenario": "Attacker crafts malicious CSV with quoted commas, embedded newlines, or scientific notation that bypasses the naive split(',') parser, causing field confusion, data corruption, or DoS via unbounded file read into memory.",
+    "evidence": [
+      "src/components/entries/CsvImportModal.tsx:70-148 — parseCsv() uses split(',') without RFC 4180 support (no quoted field handling, no escaped quotes, no embedded newlines)",
+      "src/components/entries/CsvImportModal.tsx:162 — FileSystem.readAsStringAsync(asset.uri) reads entire file with no size limit",
+      "src/components/entries/CsvImportModal.tsx:68 — MAX_IMPORT_ROWS=2000 only limits rows after parsing, not file size",
+      "src/lib/schemas/entry.ts:54-57 — date validation uses new Date(val) which accepts ambiguous formats",
+      "src/lib/schemas/entry.ts:58-60 — z.coerce.number() accepts scientific notation (e.g., '1e1000' → Infinity, caught by .finite(); but '1e10' → 10000000000 passes)",
+      "src/lib/data/cloud.ts:630-722 — importEntriesFromCsv validates via csvRowSchema.safeParse but trusts parsed output",
+      "src/lib/data/local.ts:552-641 — importEntriesFromCsv same validation path as cloud"
+    ],
+    "root_cause": "Custom CSV parser uses naive split(',') without RFC 4180 compliance. No file size limit before parsing. Zod schema allows scientific notation in numeric fields.",
+    "recommended_remediation": "Replace custom parser with RFC 4180 compliant library (e.g., PapaParse). Add file size limit (e.g., 1MB) before reading. Restrict numeric fields to fixed-point decimal regex. Add server-side row count and payload size limits.",
+    "needs_validation": [],
+    "companion_refs": [
+      "ATTACK-CLASSES.md#Supply chain"
+    ],
+    "coverage_units": [
+      "csv-import::data-ingestion::src/lib/data/cloud.ts::ATTACK-CLASSES.md#Supply chain"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_3b0fff10-8cf5-44c7-9d5b-e235b682a872",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-011",
+    "fingerprint": "push-token-admin-backend-hardcoded-no-auth-2026",
+    "status": "confirmed",
+    "title": "Push Token Registration to Hardcoded Admin Backend Without Authentication",
+    "severity": "high",
+    "boundary": "Mobile App → Admin Backend (push token registration)",
+    "lower_trust_principal": "Admin backend (https://master-admin-delta.vercel.app) - external Vercel deployment not under app control",
+    "affected_resource": "User's Expo push token + userId (PII + notification capability)",
+    "attack_scenario": "Attacker compromises the Vercel deployment or hijacks the domain, harvests all users' push tokens, and sends arbitrary notifications. Push token is a bearer credential - anyone with it can send pushes to that device.",
+    "evidence": [
+      "src/lib/notifications/push-registration.ts:46 - Hardcoded ADMIN_PUSH_TOKEN_URL = \"https://master-admin-delta.vercel.app/api/mobile/push-token\"",
+      "src/lib/notifications/push-registration.ts:86-94 - POST request sends {token, userId, platform} with only Content-Type header, no Authorization",
+      "src/lib/notifications/push-registration.ts:115-119 - DELETE request sends {token, userId} with no authentication",
+      "src/lib/notifications/push-registration.ts:95 - Only checks res.ok, no response body validation",
+      ".env:6 - API_URL=https://master-admin-delta.vercel.app exists but is NOT used in push-registration.ts"
+    ],
+    "root_cause": "Hardcoded admin backend URL with no authentication, no authorization, no response validation. Push tokens sent as bearer credentials over unauthenticated channel.",
+    "recommended_remediation": "Move admin backend URL to environment variable. Add mutual TLS or shared secret authentication for push token registration. Validate admin backend response. Consider using Expo's built-in push service directly instead of custom admin backend.",
+    "needs_validation": [
+      "Whether the admin backend at master-admin-delta.vercel.app implements any authentication/authorization",
+      "Whether the admin backend validates the userId matches the authenticated session",
+      "Whether push tokens are stored encrypted at rest in the admin backend",
+      "Whether the Vercel deployment has proper access controls and audit logging"
+    ],
+    "companion_refs": [
+      "ATTACK-CLASSES.md#Supply chain"
+    ],
+    "coverage_units": [
+      "push-token::admin-backend::src/lib/notifications/push-registration.ts::ATTACK-CLASSES.md#Supply chain"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_17b9da0a-42c1-4ae0-b30b-0ab17a682eae",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-012",
+    "fingerprint": "local-vault-encryptjson-plaintext-on-locked-vault",
+    "status": "confirmed",
+    "title": "Local Vault - encryptJson Returns Plaintext When Vault Is Locked",
+    "severity": "critical",
+    "boundary": "App Runtime → Encrypted AsyncStorage",
+    "lower_trust_principal": "Locked/Unauthenticated App Runtime (vault locked, no active DEK)",
+    "affected_resource": "All local encrypted data store payloads (funds, entries, nav_history, prefs, notifications, profile) written via writeJson/encryptJson",
+    "attack_scenario": "When the vault is locked (activeDek === null), encryptJson() returns the plaintext JSON string instead of encrypting it. Any write operation (createFundConfig, createEntry, updateFundConfig, saveNotificationPreferences, updateProfileImage, etc.) persists unencrypted sensitive financial data to AsyncStorage. Subsequent unlock does not re-encrypt existing plaintext records.",
+    "evidence": [
+      "src/lib/auth/local-vault.ts:201-208 — encryptJson() returns raw json when !activeDek",
+      "src/lib/data/local.ts:89-92 — writeJson() calls encryptJson() for all data writes",
+      "src/lib/data/local.ts:107-129 — All CRUD operations (funds, entries, nav, prefs, notifications, profile) route through writeJson()"
+    ],
+    "root_cause": "encryptJson() has a fallback to return plaintext when no active DEK, intended for legacy migration but creates a security hole when vault is locked during normal operation.",
+    "recommended_remediation": "Change encryptJson() to throw an error when vault is locked instead of returning plaintext. Add vault state check before any write operation. Ensure vault is unlocked before LocalStore methods execute (they're only called after authentication).",
+    "needs_validation": [
+      "Confirm vault can be locked during normal app operation (e.g., after logout, background timeout, or explicit lockVault())",
+      "Verify no auto-unlock logic runs before writes in LocalStore methods",
+      "Test: lock vault → call createFundConfig → inspect AsyncStorage for plaintext",
+      "Check if NAV_AUTO_KEY/NAV_LAST_SYNC_KEY plaintext storage is acceptable (low-sensitivity metadata)"
+    ],
+    "companion_refs": [
+      "ATTACK-CLASSES.md#Obvious things"
+    ],
+    "coverage_units": [
+      "local-data-store::encrypted-storage::src/lib/data/local.ts::ATTACK-CLASSES.md#Obvious things"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_32407bbf-7bed-43bd-8349-50cbd5c82b09",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-013",
+    "fingerprint": "sha256:local-merge-cross-user-contamination-v1",
+    "status": "confirmed",
+    "title": "Local-to-Cloud Merge Merges All Local Profiles Without Identity Verification",
+    "severity": "high",
+    "boundary": "Local Device Data → Cloud Supabase (one-time merge)",
+    "lower_trust_principal": "Local device profile (unverified identity mapping)",
+    "affected_resource": "Cloud user account data (fund_config, entries, nav_history, notification_preferences)",
+    "attack_scenario": "User signs into their cloud account on a shared device. The merge process scans ALL local profiles on the device without validating identity match between the local profile and the authenticated cloud session. Another user's SIP data gets merged into the current user's cloud account.",
+    "evidence": [
+      "src/lib/data/merge.ts:99-108 listLocalDataUids() scans ALL local profiles via regex on AsyncStorage keys, no filtering by authenticated user",
+      "src/lib/data/merge.ts:214-243 inspectMergeCandidate() iterates all uids from listLocalDataUids() and aggregates counts without identity verification",
+      "src/lib/data/merge.ts:325-329 mergeLocalIntoCloud() loops through all uids from listLocalDataUids() and merges each profile's funds/entries into the cloud account",
+      "src/lib/data/merge.ts:126-133 cloudUserIds() gets effective user ID from authenticated session only",
+      "src/lib/data/cloud.ts:62-74 CloudStore.getUserId()/getEffectiveUserId() returns authenticated session identity",
+      "src/components/auth/MergePromptDialog.tsx:65 description shows aggregate counts but doesn't reveal WHICH local profiles will be merged",
+      "src/lib/auth/AuthContext.tsx:475-482 offerMerge() calls inspectMergeCandidate() without identity validation"
+    ],
+    "root_cause": "Merge logic iterates all local profiles without verifying email/identity match with the authenticated cloud session. No per-profile confirmation.",
+    "recommended_remediation": "Before merge, verify local profile email matches cloud session email. Show per-profile confirmation dialog listing which local accounts will be merged. Skip profiles with mismatched identity.",
+    "needs_validation": [
+      "Verify if local profiles store email/identity that could be matched against cloud session email",
+      "Test merge behavior on device with multiple local profiles",
+      "Confirm backupCloudToLocal only exposes authenticated user's cloud data",
+      "Check if MERGE_DONE_PREFIX markers prevent re-merge but don't prevent initial cross-user merge"
+    ],
+    "companion_refs": [
+      "DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement"
+    ],
+    "coverage_units": [
+      "local-merge::data-migration::src/lib/data/merge.ts::DATA-ISOLATION-AND-LIFECYCLE.md#Missing tenant or owner enforcement"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_3fbec222-b4b5-489e-8233-4e1212379118",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-014",
+    "fingerprint": "env-file-credential-exposure-sahakari-sip",
+    "status": "confirmed",
+    "title": ".env File with Production Credentials in Workspace",
+    "severity": "low",
+    "boundary": "Developer Workspace → Git History (Accidental Commit)",
+    "lower_trust_principal": "Developer Workstation (untrusted local environment)",
+    "affected_resource": "Supabase project (entbhjpnhdjfhcctcvmt), Vercel deployments (sahakari-sip.vercel.app, master-admin-delta.vercel.app), VAPID push credentials",
+    "attack_scenario": "Developer accidentally commits .env file to git. While all values use EXPO_PUBLIC_* prefix (intended for client-side exposure) and no server-side secrets are present, the file's presence creates risk.",
+    "evidence": [
+      ".env:1-8 — Contains EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_VAPID_PUBLIC_KEY, API_URL",
+      ".gitignore:9 — Blocks .env, .env.eas, .env.local, .env.*.local",
+      "scripts/pre-commit-env-guard.sh:14-16 — Pre-commit hook blocks staging of .env and .env.* files"
+    ],
+    "root_cause": ".env file exists in workspace with production values. Pre-commit hook mitigates but may not be installed on all developer machines.",
+    "recommended_remediation": "Remove .env from workspace (use .env.example only). Ensure all developers use local .env.local files not tracked by git. Verify pre-commit hook is installed via CI check.",
+    "needs_validation": [
+      "Verify .env has never been committed to git history (check git log --all --full-history -- .env)",
+      "Confirm pre-commit hook is installed in all developer clones",
+      "Audit whether any developer has added server-side secrets to local .env",
+      "Check if EXPO_PUBLIC_SUPABASE_ANON_KEY is actually a publishable anon key"
+    ],
+    "companion_refs": [
+      "ATTACK-CLASSES.md#Obvious things"
+    ],
+    "coverage_units": [
+      "env-file::credential-exposure::.env::ATTACK-CLASSES.md#Obvious things"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_937d8217-1e56-4f53-b2e1-085249805faf",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-015",
+    "fingerprint": "cef17cd3b3dd1b55f3c6bf63225a521ea2074c63fc0dc211ab33fe66d3e24025",
+    "status": "confirmed",
+    "title": "NPM Transitive Dependencies - 27 Vulnerabilities (1 Critical, 17 High, 9 Moderate)",
+    "severity": "critical",
+    "boundary": "Dependency Supply Chain → Application Runtime",
+    "lower_trust_principal": "Transitive NPM dependencies (shell-quote@1.10.0, node-forge@1.4.0, braces@3.0.3, micromatch@4.0.8, react-native-reanimated@4.5.1, react-native-worklets@0.10.1, metro@0.84.6, @expo/* packages)",
+    "affected_resource": "SahakariSIP mobile application runtime (Expo SDK 57 / React Native 0.86.3)",
+    "attack_scenario": "Supply chain compromise via transitive dependencies in runtime path. Critical command injection in shell-quote enables RCE during build/dev. RSA signature verification bypass in node-forge affects code-signing integrity. DoS vectors in metro tooling.",
+    "evidence": [
+      "package.json:19 \"expo\": \"~57.0.26\"",
+      "package.json:41 \"react-native\": \"0.86.3\"",
+      "package.json:43 \"react-native-quick-crypto\": \"^1.1.7\"",
+      "npm audit: shell-quote@1.10.0 (critical, CVE GHSA-pqg4-j6r4-53mv, CWE-78) via react-native@0.86.3 → react-devtools-core@6.1.5",
+      "npm audit: node-forge@1.4.0 (high, CVE GHSA-86w9-cpqp-85rv, CWE-347) via expo@57.0.26 → @expo/cli@57.0.27 → @expo/code-signing-certificates@0.0.6",
+      "npm audit: braces@3.0.3 (high, CVE GHSA-vfj7-8cjw-p6xm, CWE-674) via @expo/metro-file-map@57.0.3 → micromatch@4.0.8",
+      "npm audit: micromatch@4.0.8 (high) via metro-file-map@0.84.5 (expo) and metro-file-map@0.84.6 (react-native)",
+      "npm audit: react-native-reanimated@4.5.1 (high) via expo-router@57.0.24 and expo-modules-core@57.0.20",
+      "npm audit: react-native-worklets@0.10.1 (high) via @expo/ui@57.0.21 and expo-modules-core@57.0.20",
+      "npm ls: shell-quote@1.10.0 in prod tree at react-native → react-devtools-core",
+      "npm ls: node-forge@1.4.0 in prod tree at expo → @expo/cli → @expo/code-signing-certificates",
+      "npm ls: braces@3.0.3 / micromatch@4.0.8 in prod tree at @expo/metro-file-map and react-native metro"
+    ],
+    "root_cause": "Expo SDK 57 pins vulnerable transitive dependencies in production dependency chain. These are not devDependencies - they ship in the APK.",
+    "recommended_remediation": "Upgrade to Expo SDK 58+ or React Native 0.87+ which may resolve transitive vulnerabilities. Add npm audit CI gate. Monitor for patched versions of affected packages. Consider pinning overrides in package.json for critical vulns.",
+    "needs_validation": [
+      "Confirm shell-quote@1.10.0 command injection exploitable in CI/build context",
+      "Verify node-forge@1.4.0 RSA bypass impacts expo code-signing in production builds",
+      "Assess react-native-reanimated@4.5.1 / worklets@0.10.1 runtime exploitability",
+      "Check if Expo SDK 58+ or React Native 0.87+ resolves these transitive vulnerabilities",
+      "Validate braces/micromatch DoS requires attacker-controlled glob patterns in metro config"
+    ],
+    "companion_refs": [
+      "ATTACK-CLASSES.md#Supply chain"
+    ],
+    "coverage_units": [
+      "npm-deps::transitive-vulns::package-lock.json::ATTACK-CLASSES.md#Supply chain"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_b8bc1cd3-f256-458e-8331-4e2895e47f1a",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-016",
+    "fingerprint": "sha256:web-backend-handoff-token-single-use-not-verifiable-mobile-repo",
+    "status": "needs_validation",
+    "title": "Web Backend Handoff Token Single-Use Enforcement Not Verifiable",
+    "severity": null,
+    "boundary": "Mobile App → Web Backend (/api/mobile/exchange)",
+    "lower_trust_principal": "Mobile Client (untrusted, user-controlled device)",
+    "affected_resource": "Web Backend OAuth handoff token consumption endpoint",
+    "attack_scenario": "If the web backend does not atomically consume and invalidate the handoff token, an attacker who intercepts the sahakarisip://auth/callback?token=... redirect could replay it to obtain a valid Supabase RLS JWT.",
+    "evidence": [
+      "src/lib/auth/mobileApi.ts:97-100 - googleExchange() POSTs nonce to /api/mobile/exchange",
+      "src/lib/auth/AuthContext.tsx:270-293 - Client-side handoff token journal (USED_HANDOFF_TOKENS_KEY) with TTL and cap",
+      "src/lib/auth/AuthContext.tsx:291 - Comment: 'Best-effort; server enforces single-use.'",
+      "src/lib/auth/AuthContext.tsx:266-267 - Comment: 'completeGoogleHandoff dedupes the exchange (the token is single-use server-side too)'",
+      "src/lib/auth/AuthContext.tsx:998-1002 - completeGoogleHandoff() checks isHandoffTokenUsed() before exchange",
+      "src/lib/auth/AuthContext.tsx:1004-1005 - Calls googleExchange(token) then markHandoffTokenUsed(token)"
+    ],
+    "root_cause": "Server-side single-use enforcement is a critical OAuth/OIDC security control that cannot be verified from the mobile repository.",
+    "recommended_remediation": "Add server-side audit of /api/mobile/exchange in sahakari-sip web backend repo. Verify atomic token consumption and invalidation.",
+    "needs_validation": [
+      "Verify web backend /api/mobile/exchange implements atomic single-use consumption",
+      "Confirm token invalidation on first use",
+      "Check if web backend logs replay attempts"
+    ],
+    "companion_refs": [
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "coverage_units": [
+      "web-backend-token-consumption::server-enforcement::src/lib/auth/mobileApi.ts::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_de543238-1c28-4c70-ad43-e7d127202527",
+    "validated_at": null
+  },
+  {
+    "finding_id": "FIND-2026-10-11-017",
+    "fingerprint": "google-idtoken-server-validation::mobile-trusts-server-validation::authcontext-webclientid-hardcoded",
+    "status": "needs_validation",
+    "title": "Google ID Token Server-Side Validation Not Verifiable",
+    "severity": null,
+    "boundary": "Mobile App → Web Backend (/api/mobile/google-native)",
+    "lower_trust_principal": "Mobile App (unverified client)",
+    "affected_resource": "Web Backend Google ID token validation endpoint",
+    "attack_scenario": "Mobile client sends raw Google ID token to /api/mobile/google-native without client-side validation. Server-side validation (audience, issuer, expiry, signature) cannot be verified from mobile repository.",
+    "evidence": [
+      "src/lib/auth/AuthContext.tsx:1097 - hardcoded webClientId in GoogleSignin.configure",
+      "src/lib/auth/AuthContext.tsx:1102 - idToken extracted from GoogleSignin.signIn() result",
+      "src/lib/auth/AuthContext.tsx:1113 - googleNativeSignIn(idToken) called with raw token",
+      "src/lib/auth/mobileApi.ts:109-114 - POST /google-native with { idToken } body"
+    ],
+    "root_cause": "Trust boundary violation: client assumes server validates ID token but server code is in separate repo.",
+    "recommended_remediation": "Add server-side audit of /api/mobile/google-native in sahakari-sip web backend repo. Verify audience=webClientId, issuer=accounts.google.com, expiry, signature validation.",
+    "needs_validation": [
+      "Verify web backend /api/mobile/google-native validates ID token aud/iss/exp/signature",
+      "Confirm webClientId matches Google Cloud Console Android client config"
+    ],
+    "companion_refs": [
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "coverage_units": [
+      "google-idtoken-server-validation::server-enforcement::src/lib/auth/mobileApi.ts::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_6cdfaa09-7a68-4d02-abc2-a16e4f803192",
+    "validated_at": null
+  },
+  {
+    "finding_id": "FIND-2026-10-11-018",
+    "fingerprint": "sha256:screen-capture-global-prevention-implemented-v1",
+    "status": "confirmed",
+    "title": "Screen Capture Prevention - Properly Implemented Globally",
+    "severity": "informational",
+    "boundary": "App UI → Screenshot/Screen Recording (expo-screen-capture FLAG_SECURE boundary)",
+    "lower_trust_principal": "Malicious app / screen recorder / screenshot tool / shoulder surfer",
+    "affected_resource": "All app screens including auth (login, signup, forgot-password, lock), recovery key display (RecoveryKeyOnce), and authenticated app screens",
+    "attack_scenario": "No vulnerability found. Screen capture prevention IS properly implemented globally at the app root level via expo-screen-capture.preventScreenCaptureAsync() in app/_layout.tsx. The protection applies to ALL screens including sensitive ones.",
+    "evidence": [
+      "app/_layout.tsx:23 - import * as ScreenCapture from \"expo-screen-capture\"",
+      "app/_layout.tsx:46-51 - useEffect calls ScreenCapture.preventScreenCaptureAsync() on mount with cleanup",
+      "package.json - \"expo-screen-capture\": \"~57.0.3\" dependency present",
+      "src/components/auth/RecoveryKeyOnce.tsx - Recovery key display protected by global FLAG_SECURE",
+      "app/(auth)/signup.tsx:160-177 - RecoveryKeyOnce rendered when recoveryKey state is set",
+      "app/(auth)/login.tsx:187-199 - RecoveryKeyOnce rendered when recoveryKey state is set (legacy upgrade)",
+      "app/(auth)/lock.tsx - Biometric lock screen protected",
+      "app/(auth)/forgot-password.tsx - Password reset with recovery key input protected"
+    ],
+    "root_cause": "N/A - control properly implemented",
+    "recommended_remediation": "No action needed. Screen capture prevention is correctly implemented.",
+    "needs_validation": [],
+    "companion_refs": [
+      "ATTACK-CLASSES.md#Obvious things"
+    ],
+    "coverage_units": [
+      "screen-capture::prevention::app/_layout.tsx::DESKTOP-MOBILE-AND-LOCAL-IPC.md#Obvious things"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_6184fdc3-9b39-498f-aae1-a0730c2be128",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-019",
+    "fingerprint": "sha256:email-enumeration-via-auth-error-messages-2026",
+    "status": "confirmed",
+    "title": "Email Enumeration via Differentiated Auth Error Messages",
+    "severity": "medium",
+    "boundary": "Mobile App → Web Backend credential verification",
+    "lower_trust_principal": "Unauthenticated mobile app user (attacker-controlled input, untrusted network)",
+    "affected_resource": "User account existence and authentication state",
+    "attack_scenario": "Attacker uses signin/signup error messages to enumerate valid email addresses. Signin differentiates 'email not confirmed' vs 'invalid credentials'. Signup passes through server error 'email already exists'. No client-side rate limiting on auth endpoints.",
+    "evidence": [
+      "src/lib/auth/AuthContext.tsx:835-848 — signIn differentiates 'email not confirmed' vs 'invalid credentials' error messages",
+      "src/lib/auth/AuthContext.tsx:918-922 — signup passes through server error messages directly (e.g., 'email already exists')",
+      "src/lib/auth/mobileApi.ts:118-123 — passwordLogin sends email+password in plaintext JSON body over HTTPS",
+      "src/lib/auth/mobileApi.ts:125-129 — signup sends email+password+confirmPassword to /api/mobile/signup over HTTPS",
+      "src/lib/auth/AuthContext.tsx:903-908 — Only client-side validation is password length >= 8 and password match; no complexity requirements",
+      "src/lib/auth/mobileApi.ts:33-63 — request() function has no retry/backoff, no rate-limit handling, no certificate pinning",
+      "src/lib/auth/mobileApi.ts:13-19 — WEB_URL defaults to https://sahakari-sip.vercel.app; isWebConfigured only checks https:// prefix"
+    ],
+    "root_cause": "Differentiated error messages leak account existence. No client-side rate limiting. Weak password policy (8 chars only).",
+    "recommended_remediation": "Use generic error messages ('invalid credentials' for both wrong password and unconfirmed email). Implement client-side rate limiting with exponential backoff. Add password complexity requirements. Consider certificate pinning for auth endpoints.",
+    "needs_validation": [
+      "Confirm server-side rate limiting exists on /api/mobile/password-login and /api/mobile/signup",
+      "Verify server returns generic error messages for email enumeration",
+      "Confirm bcrypt verification is server-side only",
+      "Verify OTP email confirmation is enforced before first signin"
+    ],
+    "companion_refs": [
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "coverage_units": [
+      "email-password::cloud-auth::src/lib/auth/AuthContext.tsx::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_98d477ea-b47d-4f55-a373-8ebdf4f8c189",
+    "validated_at": "2026-10-11"
+  },
+  {
+    "finding_id": "FIND-2026-10-11-020",
+    "fingerprint": "sha256:password-reset-otp-resettoken-client-exposure-2026",
+    "status": "needs_validation",
+    "title": "Password Reset Token Stored in Long-Lived React Ref Without Client-Side Lifecycle Management",
+    "severity": null,
+    "boundary": "Mobile App → Web Backend (OTP verification & password reset)",
+    "lower_trust_principal": "Mobile App (untrusted client environment)",
+    "affected_resource": "User account takeover via password reset flow",
+    "attack_scenario": "The resetToken returned by verifyResetOtp is stored in a long-lived React ref (resetTokenRef.current) with no client-side invalidation on background, failed attempts, time expiry, or sign-out. An attacker with access to the running app memory can extract the valid resetToken and complete password reset without the OTP.",
+    "evidence": [
+      "src/lib/auth/AuthContext.tsx:350 - resetTokenRef = useRef({ token: null, email: null }) holds resetToken in memory for component lifetime",
+      "src/lib/auth/AuthContext.tsx:1519-1522 - verifyPasswordResetOtp stores result.resetToken and result.email in resetTokenRef.current",
+      "src/lib/auth/AuthContext.tsx:1551-1559 - completePasswordReset reads token from resetTokenRef.current, uses storedEmail for binding, clears ref only on success",
+      "src/lib/auth/mobileApi.ts:149-156 - verifyResetOtp returns { resetToken, email } from server; throws if no resetToken",
+      "src/lib/auth/mobileApi.ts:158-168 - completeReset requires email, resetToken, newPassword, confirmPassword"
+    ],
+    "root_cause": "Reset token stored in long-lived React ref with no client-side TTL, invalidation on background/signout, or failed attempt tracking.",
+    "recommended_remediation": "Add client-side TTL for resetToken (e.g., 10 min). Invalidate on AppState background, signOut, or failed completeReset attempt. Store resetToken in SecureStore with expiry instead of React ref. Server-side must enforce single-use and short TTL.",
+    "needs_validation": [
+      "Server-side resetToken TTL and single-use enforcement",
+      "Server-side OTP rate limiting (6-digit)",
+      "Server-side brute-force protection on verifyResetOtp endpoint",
+      "Whether resetToken is cryptographically bound to email/server-session"
+    ],
+    "companion_refs": [
+      "WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "coverage_units": [
+      "password-reset::otp-flow::src/lib/auth/AuthContext.tsx::WEB-PROTOCOL-AND-AUTH.md#OAuth/OIDC request and callback binding"
+    ],
+    "phase": "hunting",
+    "agent_id": "agent_7a9f03ca-ba8a-4461-ab91-99caf0345f48",
+    "validated_at": null
+  }
+]
