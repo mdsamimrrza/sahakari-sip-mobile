@@ -26,12 +26,44 @@ import type {
   NotificationPreferences,
 } from "../types";
 import { getSupabase } from "../supabase";
+import { loadMobileSession } from "../auth/mobileSession";
 import { CloudStore } from "./cloud";
 import type { CsvImportRow } from "./store";
 
 const NS = "sahakarisip.v1";
 const BACKUP_PREFIX = `${NS}.merge_backup.`;
 const MERGE_DONE_PREFIX = `${NS}.merge_done.`;
+// AuthContext owns this key (PROFILES_KEY); duplicated here because
+// importing AuthContext from merge.ts would be an import cycle.
+const LOCAL_PROFILES_KEY = `${NS}.profiles`;
+
+/**
+ * Drop device datasets that provably belong to a DIFFERENT local account
+ * than the signed-in cloud user (shared-device guard). A dataset is kept
+ * when its profile is unknown (legacy id spaces - the historical behavior)
+ * or its email matches the session, so same-user migration is unaffected.
+ */
+async function filterOwnUids(uids: string[]): Promise<string[]> {
+  try {
+    const session = await loadMobileSession();
+    const cloudEmail = session?.user.email?.toLowerCase().trim();
+    if (!cloudEmail) return uids;
+    const raw = await AsyncStorage.getItem(LOCAL_PROFILES_KEY);
+    if (!raw) return uids;
+    const profiles = JSON.parse(raw) as Array<{ id: string; email?: string }>;
+    const emailById = new Map(
+      profiles.map((p) => [p.id, p.email?.toLowerCase().trim() ?? ""])
+    );
+    return uids.filter((uid) => {
+      const email = emailById.get(uid);
+      // No profile row (or no email recorded): keep - can't prove a mismatch.
+      return email === undefined || email === "" || email === cloudEmail;
+    });
+  } catch {
+    // Never let the guard block a merge on a storage/session read failure.
+    return uids;
+  }
+}
 
 /**
  * Remove the merge recovery snapshot and done markers for every profile.
@@ -216,7 +248,7 @@ export async function inspectMergeCandidate(
 ): Promise<MergeCounts | null> {
   const ids = await cloudUserIds(cloud);
 
-  const uids = await listLocalDataUids();
+  const uids = await filterOwnUids(await listLocalDataUids());
   let localFunds = 0;
   let localEntries = 0;
   let pending = false;
@@ -251,7 +283,7 @@ export async function inspectMergeCandidate(
 export async function hasUnmergedLocalData(cloud: CloudStore): Promise<boolean> {
   const effectiveId = await cloud.getEffectiveUserId();
   if (!effectiveId) return false;
-  const uids = await listLocalDataUids();
+  const uids = await filterOwnUids(await listLocalDataUids());
   for (const uid of uids) {
     const done = await AsyncStorage.getItem(`${MERGE_DONE_PREFIX}${effectiveId}.${uid}`);
     if (done) continue;
@@ -322,7 +354,7 @@ export async function mergeLocalIntoCloud(
   const fundsByName = new Map<string, FundConfig>();
   for (const f of cloudFunds) fundsByName.set(fundKey(effectiveUserId, f.fund_name), f);
 
-  const uids = await listLocalDataUids();
+  const uids = await filterOwnUids(await listLocalDataUids());
 
   for (const uid of uids) {
     const ds = await readLocalDataset(uid);

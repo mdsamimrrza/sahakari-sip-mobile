@@ -43,7 +43,15 @@ if (Platform.OS !== "web" && !isExpoGo) {
     .catch(() => { });
 }
 
-const ADMIN_PUSH_TOKEN_URL = "https://master-admin-delta.vercel.app/api/mobile/push-token";
+// Configurable via EXPO_PUBLIC_ADMIN_PUSH_URL so the token registry can be
+// moved without a code change. Falls back to the current deployment. The
+// registry endpoint must validate (userId, token) pairs server-side - a
+// client secret in the APK would be extractable, so real authorization
+// lives on the backend, not here.
+const ADMIN_PUSH_TOKEN_URL = (
+  process.env.EXPO_PUBLIC_ADMIN_PUSH_URL ||
+  "https://master-admin-delta.vercel.app/api/mobile/push-token"
+).trim();
 const EXPO_PROJECT_ID = "8ed969e7-c29d-4ad1-9f1f-e9b4368ddc34";
 // Must match the channelId the admin announce route sends. We post into our
 // own channel because the default FCM fallback channel ("Miscellaneous") can

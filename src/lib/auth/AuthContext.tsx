@@ -53,7 +53,7 @@ import { createStore } from "../data";
 import { CloudStore } from "../data/cloud";
 import { cacheInvalidate } from "../data/cache";
 import { removeProfilePhoto } from "../profilePhoto";
-import { autoRegisterPushToken } from "../notifications/push-registration";
+import { autoRegisterPushToken, unregisterPushTokenForUser } from "../notifications/push-registration";
 import {
   clearMobileSession,
   loadMobileSession,
@@ -214,7 +214,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // ---------- Local profile helpers ----------
 
-const PBKDF2_ITERATIONS = 100_000;
+// OWASP 2026 minimum for PBKDF2-HMAC-SHA256, applied to NEW login hashes.
+// Profiles always record their iteration count, so raising this never
+// changes how an existing hash is verified.
+const PBKDF2_ITERATIONS = 600_000;
+/** Profiles created before the iterations field was recorded - their hash
+ *  was made at this work factor, so verification must use exactly it. */
+const LEGACY_PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_KEY_LENGTH = 32; // 256 bits
 
 async function hashPassword(password: string, salt: string, iterations = PBKDF2_ITERATIONS): Promise<string> {
@@ -415,6 +421,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
     return () => sub.remove();
+  }, []);
+
+  // Absolute-TTL watchdog: the AppState listener above only fires on a
+  // background→foreground transition, so a continuously foregrounded app
+  // would never re-check the 4-hour banking-style expiry. Poll cheaply so
+  // the absolute boundary holds even mid-session.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (
+        userRef.current &&
+        sessionStartedAtRef.current &&
+        Date.now() - Date.parse(sessionStartedAtRef.current) > SESSION_TTL_MS
+      ) {
+        void expireSessionRef.current();
+      }
+    }, 60_000);
+    return () => clearInterval(id);
   }, []);
 
   const persistSession = useCallback(async (next: AppUser | null) => {
@@ -851,14 +874,37 @@ const next: AppUser = {
 
       // ---- Device-local mode ----
       const profiles = await readProfiles();
-      const profile = profiles.find((p) => p.email === normalized);
-      if (!profile) {
+      const profileIdx = profiles.findIndex((p) => p.email === normalized);
+      if (profileIdx === -1) {
         return { success: false, error: "No on-device profile found for this email. Create one first." };
       }
-      const iterations = profile.iterations ?? PBKDF2_ITERATIONS;
+      let profile = profiles[profileIdx];
+      // Profiles created before the iterations field existed hashed at the
+      // old work factor - verify at exactly what they recorded.
+      const iterations = profile.iterations ?? LEGACY_PBKDF2_ITERATIONS;
       const valid = await verifyPassword(password, profile.salt, profile.hash, iterations);
       if (!valid) {
         return { success: false, error: "Invalid email or password. Please try again." };
+      }
+      // One-time upgrade: re-record the login hash at the current work
+      // factor now that the password is verified. Never done speculatively -
+      // a failed rehash must not block the sign-in below.
+      if (!profile.iterations) {
+        try {
+          const upSalt = uuid();
+          const upgraded: LocalProfile = {
+            ...profile,
+            salt: upSalt,
+            hash: await hashPassword(password, upSalt),
+            iterations: PBKDF2_ITERATIONS,
+          };
+          await writeProfiles(
+            (await readProfiles()).map((p) => (p.id === profile.id ? upgraded : p))
+          );
+          profile = upgraded;
+        } catch {
+          // Keep signing in with the legacy hash - upgrade retries next login.
+        }
       }
       // Unlock the vault — or migrate a legacy profile into one. Legacy
       // migration hands back a recovery key, shown once on the login screen.
@@ -1356,6 +1402,11 @@ const next: AppUser = {
    * is alive, never after an explicit logout.
    */
   const signOut = useCallback(async () => {
+    // Remove this device's push registration for the account BEFORE the
+    // identity is cleared, or the server keeps notifying a logged-out
+    // account on this device (and a shared device gets two accounts' pushes).
+    const u = userRef.current;
+    if (u) void unregisterPushTokenForUser(u.id);
     await clearBiometricEntry();
     biometricEnabledRef.current = false;
     setBiometricEnabled(false);

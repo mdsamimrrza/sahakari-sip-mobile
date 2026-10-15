@@ -26,7 +26,12 @@ import {
 } from "./nativeCrypto";
 import { log } from "../logger";
 
-const WRAP_ITERATIONS = 100_000;
+// OWASP 2026 minimum for PBKDF2-HMAC-SHA256. Vaults record the iteration
+// count they were wrapped with (wrap_iterations), so raising this only
+// affects NEW wraps - existing vaults keep unwrapping at their stored value.
+const WRAP_ITERATIONS = 600_000;
+/** Vault wrap count before wrap_iterations was recorded (unwrap fallback). */
+const LEGACY_WRAP_ITERATIONS = 100_000;
 const DEK_BYTES = 32; // 256 bits
 const RECOVERY_BYTES = 16; // 128 bits
 const SECURESTORE_PREFIX = "sahakarisip.v1.dek.";
@@ -40,10 +45,15 @@ export interface LocalVaultData {
   wrapped_dek_recovery: string;
   /** sha256 hex of the normalized recovery key (verify without GCM round-trips) */
   recovery_key_hash: string;
+  /** PBKDF2 rounds the DEK was password-wrapped with. Absent = legacy 100k. */
+  wrap_iterations?: number;
 }
 
 /** The in-memory DEK for the signed-in local profile. Null = locked. */
 let activeDek: Uint8Array | null = null;
+/** True once any vault has been unlocked this session. Legacy profiles
+ *  (no vault yet) never set it, so they keep their plaintext behavior. */
+let hasEverUnlocked = false;
 /** Cached AESEncryptionKey for the active DEK — one native import per
  *  session instead of per encrypt/decrypt call. */
 let activeAesKey: AESEncryptionKey | null = null;
@@ -85,8 +95,12 @@ async function aesUnwrap(keyBytes: Uint8Array, wrappedB64: string): Promise<Uint
   return (await Crypto.aesDecryptAsync(sealed, key)) as Uint8Array;
 }
 
-async function passwordWrapKeyBytes(password: string, wrapSaltHex: string): Promise<Uint8Array> {
-  return pbkdf2Bytes(password, wrapSaltHex, WRAP_ITERATIONS, DEK_BYTES);
+async function passwordWrapKeyBytes(
+  password: string,
+  wrapSaltHex: string,
+  iterations: number = WRAP_ITERATIONS
+): Promise<Uint8Array> {
+  return pbkdf2Bytes(password, wrapSaltHex, iterations, DEK_BYTES);
 }
 
 async function recoveryWrapKeyBytes(normalizedKey: string): Promise<Uint8Array> {
@@ -114,6 +128,7 @@ export async function createVault(
     ),
     wrapped_dek_recovery: await aesWrap(await recoveryWrapKeyBytes(normalized), dek),
     recovery_key_hash: await sha256Hex(normalized),
+    wrap_iterations: WRAP_ITERATIONS,
   };
 
   return { vault, dek: toB64(dek), recoveryKey: formatRecoveryKey(recoveryHex) };
@@ -133,6 +148,7 @@ export async function rewrapPassword(
       await passwordWrapKeyBytes(newPassword, toHex(salt)),
       fromB64(dekB64)
     ),
+    wrap_iterations: WRAP_ITERATIONS,
   };
 }
 
@@ -156,7 +172,9 @@ export async function unwrapWithPassword(
   password: string
 ): Promise<string> {
   const dek = await aesUnwrap(
-    await passwordWrapKeyBytes(password, vault.wrap_salt),
+    // Vault created before wrap_iterations was recorded? It was wrapped at
+    // the old 100k work factor - unwrap at exactly what it was wrapped with.
+    await passwordWrapKeyBytes(password, vault.wrap_salt, vault.wrap_iterations ?? LEGACY_WRAP_ITERATIONS),
     vault.wrapped_dek_password
   );
   return toB64(dek);
@@ -166,6 +184,7 @@ export async function unwrapWithPassword(
 export function unlockVault(dekB64: string): void {
   activeDek = fromB64(dekB64);
   activeAesKey = null;
+  hasEverUnlocked = true;
 }
 
 export function lockVault(): void {
@@ -197,9 +216,20 @@ export async function deleteDek(profileId: string): Promise<void> {
 
 // ---------- Payload encryption used by the local data store ----------
 
-/** Encrypt a JSON payload with the active DEK. No DEK → legacy plaintext. */
+/** Encrypt a JSON payload with the active DEK.
+ *
+ * Fail CLOSED once a vault has been unlocked this session: a write while
+ * locked must never silently downgrade vault-protected data to plaintext.
+ * Legacy profiles (pre-vault, plaintext data, no unlock yet) keep the
+ * plaintext passthrough so a restored session still works until their
+ * next sign-in migrates them to a vault. */
 export async function encryptJson(json: string): Promise<string> {
-  if (!activeDek) return json;
+  if (!activeDek) {
+    if (hasEverUnlocked) {
+      throw new Error("Vault is locked - refusing to write unencrypted data.");
+    }
+    return json;
+  }
   const key = await activeKey();
   // Hermes has TextEncoder but NOT TextDecoder - route both directions
   // through the nativeCrypto shim so reads never hit a missing global.

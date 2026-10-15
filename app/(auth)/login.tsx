@@ -231,6 +231,7 @@ export default function LoginScreen() {
               placeholder="XXXX-XXXX-XXXX-XXXX-…"
               autoCapitalize="characters"
               autoCorrect={false}
+              secureTextEntry
             />
             <Input
               label="New password"

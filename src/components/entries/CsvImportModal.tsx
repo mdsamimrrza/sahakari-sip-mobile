@@ -66,14 +66,49 @@ export function CsvImportModal({
   // Upper bound on a single import batch — keeps the parsed preview and the
   // store's bulk insert bounded no matter how large the picked file is.
   const MAX_IMPORT_ROWS = 2000;
+  // Read guard: reject oversized files BEFORE loading them into memory.
+  const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
   function parseCsv(text: string) {
-    const lines = text
-      .split(/\r\n|\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
+    // RFC 4180 state machine: quoted fields may contain commas, escaped
+    // quotes (""), and newlines. Plain unquoted CSV parses identically to
+    // the previous split(",") behavior, so existing imports are unaffected.
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let field = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          field += c;
+        }
+      } else if (c === '"') {
+        inQuotes = true;
+      } else if (c === ",") {
+        row.push(field);
+        field = "";
+      } else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        row.push(field);
+        field = "";
+        if (row.some((cell) => cell.trim() !== "")) rows.push(row);
+        row = [];
+      } else {
+        field += c;
+      }
+    }
+    row.push(field);
+    if (row.some((cell) => cell.trim() !== "")) rows.push(row);
 
-    if (lines.length <= 1) {
+    if (rows.length <= 1) {
       toast({
         title: "Invalid CSV",
         description: "File contains no data rows.",
@@ -82,7 +117,7 @@ export function CsvImportModal({
       return;
     }
 
-    const header = lines[0].toLowerCase().split(",").map((h) => h.trim());
+    const header = (rows[0] ?? []).map((h) => h.trim().toLowerCase());
     const dateIdx = header.findIndex((h) => h.includes("date"));
     const amountIdx = header.findIndex((h) => h.includes("amount"));
     const navIdx = header.findIndex((h) => h.includes("nav"));
@@ -99,10 +134,10 @@ export function CsvImportModal({
     }
 
     const parsed: ParsedRow[] = [];
-    const dataLines = lines.slice(1, MAX_IMPORT_ROWS + 1);
-    const truncated = lines.length - 1 > MAX_IMPORT_ROWS;
-    for (let i = 0; i < dataLines.length; i++) {
-      const cols = dataLines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    const dataRows = rows.slice(1, MAX_IMPORT_ROWS + 1);
+    const truncated = rows.length - 1 > MAX_IMPORT_ROWS;
+    for (let i = 0; i < dataRows.length; i++) {
+      const cols = dataRows[i].map((c) => c.trim());
       const dateStr = cols[dateIdx] || "";
       const amountNum = parseFloat(cols[amountIdx] || "0");
       const navNum = parseFloat(cols[navIdx] || "0");
@@ -158,6 +193,15 @@ export function CsvImportModal({
 
       const asset = result.assets[0];
       setFileName(asset.name ?? "import.csv");
+
+      if ((asset.size ?? 0) > MAX_IMPORT_BYTES) {
+        toast({
+          title: "File too large",
+          description: "CSV must be under 2MB.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       const text = await FileSystem.readAsStringAsync(asset.uri);
       parseCsv(text);

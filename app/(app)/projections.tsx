@@ -24,15 +24,25 @@ import {
 import { formatCompact, formatCurrencyWhole, parseDateSafe } from "@/lib/format";
 import { formatFundShortName } from "@/lib/utils";
 import { format } from "date-fns";
-import type { ReturnScenario, StepUpRate } from "@/lib/types";
+import type { ProjectionRow, ReturnScenario, StepUpRate } from "@/lib/types";
 import { useTheme, spacing, radius, fontSize } from "@/theme";
 import { Screen, SectionHeader } from "@/components/ui/layout";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Text, Card, Badge, Skeleton, Input, Button, EmptyState } from "@/components/ui/primitives";
-import { useToast } from "@/components/ui/overlays";
+import { Modal, useToast } from "@/components/ui/overlays";
 import { DropdownMenu, type DropdownAnchor } from "@/components/ui/overlays";
-import { Check, ChevronDown } from "lucide-react-native";
+import {
+  Check,
+  ChevronDown,
+  Wallet,
+  TrendingUp,
+  Percent,
+  ShieldCheck,
+  CalendarClock,
+  X,
+} from "lucide-react-native";
 import { LineChart } from "@/components/charts";
+import { CGT_NP_REDEMPTION } from "@/lib/tax";
 
 const SHADOW = {
   shadowColor: "#000",
@@ -213,6 +223,8 @@ export default function ProjectionsScreen() {
   }
 
   const tableRows = useMemo(() => calculateProjectionTable(params), [params]);
+  // Tapped milestone (5Y/10Y/15Y/20Y) shown in the breakdown sheet.
+  const [milestoneDetail, setMilestoneDetail] = useState<ProjectionRow | null>(null);
   const milestones = useMemo(
     () => tableRows.filter((r) => MILESTONE_YEARS.includes(r.year)),
     [tableRows]
@@ -254,6 +266,33 @@ export default function ProjectionsScreen() {
   const projectedValues = chartPoints.map((p) =>
     p.type === "projected" ? p.value : null
   );
+
+  // Model curve across history: what a flat SIP (your current monthly
+  // amount) compounded at the chosen return would have built from the
+  // earliest fund start. Always positive, so tapping a past date compares
+  // your actual corpus against the steady-rate model. The bridge below
+  // still pins the crossover point to the real corpus.
+  if (data && data.funds.length > 0) {
+    const earliest = data.funds
+      .map((f) => f.start_date)
+      .reduce((a, b) => (a < b ? a : b));
+    const r = returnPct / 100 / 12;
+    const monthsFrom = (d: string) => {
+      const a = parseDateSafe(earliest);
+      const b = parseDateSafe(d);
+      if (isNaN(a.getTime()) || isNaN(b.getTime())) return 0;
+      return Math.max(
+        0,
+        (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
+      );
+    };
+    const fvFactor = (m: number) => (r === 0 ? m : ((1 + r) ** m - 1) / r);
+    for (let i = 0; i < chartPoints.length; i++) {
+      const p = chartPoints[i];
+      if (p.type !== "actual") break;
+      projectedValues[i] = Math.round(monthlySip * fvFactor(monthsFrom(p.date)));
+    }
+  }
   // Bridge the gap so the projected line connects to the last actual point
   const lastActualIdx: number = actualValues.reduce<number>(
     (acc, v, i) => (v !== null ? i : acc),
@@ -694,6 +733,12 @@ export default function ProjectionsScreen() {
                 const dt = parseDateSafe(d);
                 return isNaN(dt.getTime()) ? d : format(dt, "MMM d, yyyy");
               }}
+              // Show both series rows on tap: the actual value when the
+              // tapped date has history, the projection otherwise.
+              tooltipShowAllSeries
+              // Difference row: actual minus model - negative means your
+              // real corpus is behind the steady-rate curve.
+              returnLabel="Actual vs model:"
               showLegend
             />
           )}
@@ -705,7 +750,7 @@ export default function ProjectionsScreen() {
         <View style={{ padding: spacing.xl, gap: spacing.sm }}>
           <SectionHeader
             title="Milestones"
-            subtitle="Bar shows corpus · white tick shows put in"
+            subtitle="Tap a row for the full breakdown · bar shows corpus"
           />
           {cold ? (
             <>
@@ -717,12 +762,17 @@ export default function ProjectionsScreen() {
               const isLast = idx === milestones.length - 1;
               return (
               <View key={r.year} style={{ gap: spacing.sm }}>
-                <View
-                  style={{
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show ${r.year}-year projection breakdown`}
+                  onPress={() => setMilestoneDetail(r)}
+                  style={({ pressed }) => ({
                     flexDirection: "row",
                     alignItems: "center",
                     gap: spacing.sm,
-                  }}
+                    opacity: pressed ? 0.6 : 1,
+                    borderRadius: radius.sm,
+                  })}
                 >
                   <View
                     style={{
@@ -754,7 +804,7 @@ export default function ProjectionsScreen() {
                   >
                     {formatCurrencyWhole(r.totalGain, true)}
                   </Text>
-                </View>
+                </Pressable>
                   <View
                     style={{
                       height: 8,
@@ -785,7 +835,7 @@ export default function ProjectionsScreen() {
                     />
                   </View>
                   <Text variant="caption" color={colors.mutedForeground}>
-                    Put in{" "}
+                    Investment{" "}
                     <Text
                       variant="caption"
                       color={colors.info}
@@ -803,6 +853,464 @@ export default function ProjectionsScreen() {
           </Text>
         </View>
       </Card>
+
+      {/* ---------- Milestone breakdown (tap a milestone row) ---------- */}
+      <Modal
+        visible={milestoneDetail !== null}
+        onClose={() => setMilestoneDetail(null)}
+        position="bottom"
+      >
+        {milestoneDetail && (() => {
+          // Tax split: growth from the last 12 months counts as short-term
+          // (5%); everything older is long-term (3.75%). The table only
+          // holds 5/10/15/20Y rows, so replay the same compounding loop
+          // for 12 fewer months to get the year-ago gain.
+          const monthsTotal = milestoneDetail.year * 12;
+          const monthlyRate = params.annualReturnPct / 100 / 12;
+          let agoCorpus = params.currentCorpus;
+          let agoInvested = 0;
+          let agoSip = params.monthlySip;
+          for (let m = 1; m <= monthsTotal - 12; m++) {
+            if (params.stepUpPct > 0 && m > 1 && (m - 1) % 12 === 0) {
+              agoSip *= 1 + params.stepUpPct / 100;
+            }
+            agoCorpus = agoCorpus * (1 + monthlyRate) + agoSip;
+            agoInvested += agoSip;
+          }
+          const agoGain = Math.round(
+            agoCorpus - agoInvested - params.realPrincipalSoFar
+          );
+          const shortGain = Math.max(0, milestoneDetail.totalGain - agoGain);
+          const longGain = Math.max(0, milestoneDetail.totalGain - shortGain);
+          const cgtLong = Math.round(
+            longGain * (CGT_NP_REDEMPTION.longTermRatePct / 100)
+          );
+          const cgtShort = Math.round(
+            shortGain * (CGT_NP_REDEMPTION.shortTermRatePct / 100)
+          );
+          const cgt = cgtLong + cgtShort;
+          const investedShare =
+            milestoneDetail.corpusValue > 0
+              ? Math.min(1, milestoneDetail.totalInvested / milestoneDetail.corpusValue)
+              : 0;
+          const gainPct =
+            milestoneDetail.totalInvested > 0
+              ? Math.round((milestoneDetail.totalGain / milestoneDetail.totalInvested) * 100)
+              : 0;
+          const gainPositive = milestoneDetail.totalGain >= 0;
+          return (
+          <View style={{ gap: spacing.lg, paddingTop: spacing.sm }}>
+            {/* Sheet handle + header */}
+            <View style={{ gap: spacing.md }}>
+              <View
+                style={{
+                  alignSelf: "center",
+                  width: 44,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: colors.border,
+                }}
+              />
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: spacing.md,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text variant="heading">Milestone breakdown</Text>
+                  <Text variant="caption" color={colors.mutedForeground}>
+                    Synced with your live portfolio
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Close breakdown"
+                  onPress={() => setMilestoneDetail(null)}
+                  style={({ pressed }) => ({
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: colors.muted,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <X size={16} color={colors.mutedForeground} />
+                </Pressable>
+              </View>
+
+              {/* Year switcher */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 3,
+                  padding: 3,
+                  borderRadius: radius.full,
+                  backgroundColor: colors.muted,
+                }}
+              >
+                {milestones.map((m) => {
+                  const active = m.year === milestoneDetail.year;
+                  return (
+                    <Pressable
+                      key={m.year}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Show ${m.year}-year breakdown`}
+                      onPress={() => setMilestoneDetail(m)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        borderRadius: radius.full,
+                        alignItems: "center",
+                        backgroundColor: active ? colors.card : "transparent",
+                        borderWidth: 1,
+                        borderColor: active ? colors.border : "transparent",
+                      }}
+                    >
+                      <Text
+                        style={{ fontSize: fontSize.sm, fontWeight: "800", fontVariant: ["tabular-nums"] }}
+                        color={active ? (m.year === 20 ? colors.secondary : colors.emerald) : colors.mutedForeground}
+                      >
+                        {m.year}Y
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Hero panel — solid gold banknote, dark ink text */}
+            <View
+              style={{
+                borderRadius: radius.xl,
+                backgroundColor: "#EAB308",
+                paddingVertical: spacing.xl,
+                paddingHorizontal: spacing.xl,
+                overflow: "hidden",
+              }}
+            >
+              {/* Coin décor */}
+              <View pointerEvents="none" style={{ position: "absolute", left: -30, bottom: -44, width: 110, height: 110, borderRadius: 55, backgroundColor: "rgba(15,23,42,0.08)" }} />
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm }}>
+                <Text style={{ fontSize: fontSize.xs, fontWeight: "900", letterSpacing: 1.4, color: "rgba(15,23,42,0.72)" }}>
+                  PROJECTED CORPUS
+                </Text>
+                <View style={{ paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full, backgroundColor: "#0F172A" }}>
+                  <Text style={{ fontSize: fontSize.xs, fontWeight: "900", fontVariant: ["tabular-nums"], color: "#EAB308" }}>
+                    {milestoneDetail.year} YEARS
+                  </Text>
+                </View>
+              </View>
+              <Text
+                style={{
+                  fontSize: 42,
+                  fontWeight: "900",
+                  fontVariant: ["tabular-nums"],
+                  letterSpacing: -1,
+                  marginTop: spacing.xs,
+                  color: "#0F172A",
+                }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {formatCurrencyWhole(milestoneDetail.corpusValue)}
+              </Text>
+              <View
+                style={{
+                  alignSelf: "flex-start",
+                  marginTop: spacing.sm,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: 6,
+                  borderRadius: radius.full,
+                  backgroundColor: "#0F172A",
+                }}
+              >
+                <Text
+                  style={{ fontSize: fontSize.sm, fontWeight: "900", fontVariant: ["tabular-nums"], color: "#FFFFFF" }}
+                >
+                  {formatCurrencyWhole(milestoneDetail.totalGain, true)} profit
+                  {milestoneDetail.totalInvested > 0 ? ` (${Math.abs(gainPct)}%)` : ""}
+                </Text>
+              </View>
+            </View>
+
+            {/* Composition bar: investment vs growth */}
+            <View style={{ gap: spacing.sm }}>
+              <View
+                style={{
+                  height: 10,
+                  borderRadius: 5,
+                  overflow: "hidden",
+                  flexDirection: "row",
+                  backgroundColor: colors.muted,
+                }}
+              >
+                <View
+                  style={{
+                    width: `${Math.round(investedShare * 100)}%`,
+                    backgroundColor: colors.info,
+                  }}
+                />
+                <View style={{ flex: 1, backgroundColor: colors.emerald }} />
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.info }} />
+                  <Text variant="caption" color={colors.mutedForeground}>
+                    Investment{" "}
+                    <Text style={{ fontWeight: "800", fontVariant: ["tabular-nums"] }} color={colors.info}>
+                      {formatCurrencyWhole(milestoneDetail.totalInvested)}
+                    </Text>
+                    {milestoneDetail.corpusValue > 0
+                      ? ` (${Math.round(investedShare * 100)}%)`
+                      : ""}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.emerald }} />
+                  <Text variant="caption" color={colors.mutedForeground}>
+                    Profit{" "}
+                    <Text style={{ fontWeight: "800", fontVariant: ["tabular-nums"] }} color={colors.emerald}>
+                      {formatCurrencyWhole(milestoneDetail.totalGain)}
+                    </Text>
+                    {milestoneDetail.corpusValue > 0
+                      ? ` (${100 - Math.round(investedShare * 100)}%)`
+                      : ""}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Waterfall: how the corpus is built */}
+            <View
+              style={{
+                borderRadius: radius.xl,
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+                overflow: "hidden",
+                ...SHADOW,
+              }}
+            >
+              {[
+                {
+                  icon: Wallet,
+                  tint: colors.info,
+                  sign: "",
+                  label: "Investment",
+                  sub: "Money you added",
+                  value: formatCurrencyWhole(milestoneDetail.totalInvested),
+                  pct: milestoneDetail.corpusValue > 0
+                    ? `${Math.round(investedShare * 100)} of every 100 is your money`
+                    : undefined,
+                },
+                {
+                  icon: TrendingUp,
+                  tint: colors.success,
+                  sign: "+",
+                  label: "Profit",
+                  sub: milestoneDetail.totalInvested > 0
+                    ? `+${Math.abs(gainPct)}% growth`
+                    : undefined,
+                  value: formatCurrencyWhole(milestoneDetail.totalGain),
+                  pct: undefined as string | undefined,
+                },
+                {
+                  icon: Percent,
+                  tint: colors.amber,
+                  sign: "\u2212",
+                  label: `Long-term tax · ${CGT_NP_REDEMPTION.longTermRatePct}%`,
+                  sub: "On older growth",
+                  value: formatCurrencyWhole(cgtLong),
+                  pct: undefined as string | undefined,
+                },
+                {
+                  icon: Percent,
+                  tint: colors.rose,
+                  sign: "\u2212",
+                  label: `Short-term tax · ${CGT_NP_REDEMPTION.shortTermRatePct}%`,
+                  sub: "On last year's growth",
+                  value: formatCurrencyWhole(cgtShort),
+                  pct: undefined as string | undefined,
+                },
+              ].map((w, i) => (
+                <View
+                  key={w.label}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing.md,
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.md,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: colors.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 11,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: `${w.tint}22`,
+                    }}
+                  >
+                    <w.icon size={16} color={w.tint} strokeWidth={2.4} />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      {w.sign ? (
+                        <View
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 9,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: w.tint,
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: "900", color: "#FFFFFF", lineHeight: 14 }}>
+                            {w.sign}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <Text variant="label" color={colors.foreground} style={{ fontWeight: "800" }}>
+                        {w.label}
+                      </Text>
+                    </View>
+                    {w.sub ? (
+                      <Text
+                        variant="caption"
+                        color={colors.mutedForeground}
+                        style={{ fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase", fontWeight: "700" }}
+                      >
+                        {w.sub}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={{ alignItems: "flex-end", gap: 2 }}>
+                    <Text
+                      style={{ fontSize: fontSize.md, fontWeight: "900", fontVariant: ["tabular-nums"] }}
+                      color={colors.foreground}
+                    >
+                      {w.value}
+                    </Text>
+                    {w.pct ? (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.full, backgroundColor: colors.muted }}>
+                        <Text
+                          style={{ fontSize: 10, fontWeight: "800", fontVariant: ["tabular-nums"] }}
+                          color={colors.mutedForeground}
+                        >
+                          {w.pct}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+              {/* Net after tax — the answer */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.md,
+                  paddingVertical: spacing.md,
+                  paddingHorizontal: spacing.md,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.border,
+                  backgroundColor: `${colors.secondary}14`,
+                }}
+              >
+                <View
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 11,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: colors.secondary,
+                  }}
+                >
+                  <ShieldCheck size={16} color="#FFFFFF" strokeWidth={2.4} />
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <View
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: colors.secondary,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "900", color: "#FFFFFF", lineHeight: 14 }}>
+                        =
+                      </Text>
+                    </View>
+                    <Text variant="label" color={colors.foreground} style={{ fontWeight: "900" }}>
+                      Net after tax
+                    </Text>
+                  </View>
+                  {milestoneDetail.corpusValue > 0 ? (
+                    <Text variant="caption" color={colors.mutedForeground} style={{ fontSize: fontSize.xs }}>
+                      After all tax · you keep {Math.round(((milestoneDetail.corpusValue - cgt) / milestoneDetail.corpusValue) * 1000) / 10} of every 100
+                    </Text>
+                  ) : null}
+                </View>
+                <Text
+                  style={{ fontSize: fontSize.xl, fontWeight: "900", fontVariant: ["tabular-nums"] }}
+                  color={colors.secondary}
+                >
+                  {formatCurrencyWhole(milestoneDetail.corpusValue - cgt)}
+                </Text>
+              </View>
+            </View>
+
+            {/* SIP by then */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: spacing.md,
+                paddingVertical: spacing.md,
+                paddingHorizontal: spacing.md,
+                borderRadius: radius.md,
+                backgroundColor: colors.muted,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                <CalendarClock size={16} color={colors.mutedForeground} />
+                <Text variant="caption" color={colors.mutedForeground}>
+                  Monthly SIP by then
+                </Text>
+              </View>
+              <Text
+                style={{ fontSize: fontSize.md, fontWeight: "800", fontVariant: ["tabular-nums"] }}
+                color={colors.foreground}
+              >
+                {formatCurrencyWhole(milestoneDetail.monthlySip)}
+              </Text>
+            </View>
+
+            <Text variant="caption" color={colors.mutedForeground} style={{ fontSize: fontSize.xs }}>
+              Grown at {returnPct}% with a {stepUpPct}% step-up.
+              Tax split: {CGT_NP_REDEMPTION.longTermRatePct}% long-term,{" "}
+              {CGT_NP_REDEMPTION.shortTermRatePct}% short-term.
+              An illustration, not a promise.
+            </Text>
+          </View>
+          );
+        })()}
+      </Modal>
         </>
       )}
     </Screen>

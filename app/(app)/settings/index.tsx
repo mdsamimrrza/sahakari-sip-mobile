@@ -329,14 +329,6 @@ export default function SettingsHubScreen() {
 
       {/* ---------- More ---------- */}
       <SettingsGroup title="More">
-        {/* TEMPORARILY re-enabled for Google sign-in debugging */}
-        <SettingsRow
-          tint={colors.info}
-          icon={<Receipt size={ROW_ICON_SIZE} color={colors.info} strokeWidth={ROW_ICON_STROKE} />}
-          label="Diagnostics"
-          subtitle="Recent on-device events for troubleshooting"
-          onPress={() => router.push("/(app)/settings/diagnostics")}
-        />
         <SettingsRow
           tint={colors.secondary}
           icon={<Star size={ROW_ICON_SIZE} color={colors.secondary} strokeWidth={ROW_ICON_STROKE} />}

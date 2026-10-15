@@ -112,6 +112,8 @@ export const LineChart = React.memo(function LineChart({
   showTooltip = true,
   showLegend = false,
   tooltipVariant = "light",
+  tooltipShowAllSeries = false,
+  returnLabel = "Return:",
   selectedIndex,
   onSelectPoint,
 }: BaseChartProps & {
@@ -119,6 +121,12 @@ export const LineChart = React.memo(function LineChart({
   showLegend?: boolean;
   /** "dark" = ink pill with light text (web NAV History style). */
   tooltipVariant?: "light" | "dark";
+  /** Render a row for EVERY series, "–" when a series has no value at the
+   *  tapped index (growth curve: Actual and Projected never coexist
+   *  except at the crossover). Default false = skip empty series. */
+  tooltipShowAllSeries?: boolean;
+  /** Label for the series[0] - series[1] difference row. */
+  returnLabel?: string;
   selectedIndex?: number | null;
   onSelectPoint?: (index: number | null) => void;
 }) {
@@ -422,7 +430,8 @@ export const LineChart = React.memo(function LineChart({
 
           {series.map((s) => {
             const v = s.values[activeIndex];
-            if (v === null || v === undefined) return null;
+            const missing = v === null || v === undefined;
+            if (missing && !tooltipShowAllSeries) return null;
             return (
               <View
                 key={s.key}
@@ -454,11 +463,20 @@ export const LineChart = React.memo(function LineChart({
                 <Text
                   variant="caption"
                   color={s.color}
-                  style={{ fontWeight: "800", fontSize: 13, flexShrink: 0 }}
+                  style={{
+                    fontWeight: "800",
+                    fontSize: 13,
+                    flexShrink: 0,
+                    ...(missing ? { opacity: 0.5 } : {}),
+                  }}
                   numberOfLines={1}
                   tabular
                 >
-                  {formatTooltipY ? formatTooltipY(v) : v.toFixed(0)}
+                  {missing
+                    ? "–"
+                    : formatTooltipY
+                      ? formatTooltipY(v)
+                      : v.toFixed(0)}
                 </Text>
               </View>
             );
@@ -482,7 +500,7 @@ export const LineChart = React.memo(function LineChart({
                 }}
               >
                 <Text variant="caption" color={colors.foreground} style={{ fontWeight: "700", fontSize: 13 }}>
-                  Return:
+                  {returnLabel}
                 </Text>
                 <Text
                   variant="caption"

@@ -26,6 +26,8 @@ function safeStringify(value: unknown): string {
 }
 
 export function log(tag: string, detail?: unknown): void {
+  // Disabled in release builds - diagnostics are dev-only now.
+  if (!__DEV__) return;
   const line = `${new Date().toISOString().slice(11, 23)} [${tag}]${
     detail === undefined ? "" : " " + safeStringify(detail)
   }`;
