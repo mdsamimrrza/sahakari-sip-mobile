@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <!--  Auto Backup configuration for Android 11 and lower -->
+<!--  Backup is include-only: ONLY sharedpref is listed, so the AsyncStorage
+      database RKStorage (session JWT, local profiles, replay journal) and
+      everything outside sharedpref is never backed up by construction.
+      No credential leaves the device even if android:allowBackup is ever
+      flipped back to true by a future `expo prebuild`. (Do not add
+      <exclude domain="database"> entries for this - lint's FullBackupContent
+      check fails on excludes that are not under an include, and they would
+      be no-ops anyway.) -->
 <full-backup-content>
   <include domain="sharedpref" path="."/>
   <exclude domain="sharedpref" path="SecureStore"/>

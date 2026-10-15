@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <!--  Auto Backup configuration for Android 12 and higher -->
+<!--  Backup is include-only: ONLY sharedpref is listed, so the AsyncStorage
+      database RKStorage (session JWT, local profiles, replay journal) and
+      everything outside sharedpref is never included in cloud backup or
+      device-to-device transfer. (Do not add <exclude domain="database">
+      entries for this - lint's FullBackupContent check fails on excludes
+      that are not under an include, and they would be no-ops anyway.) -->
 <data-extraction-rules>
   <cloud-backup>
     <include domain="sharedpref" path="."/>
